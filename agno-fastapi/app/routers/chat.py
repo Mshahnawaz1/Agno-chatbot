@@ -23,7 +23,8 @@ async def chat(body: ChatRequest, user: CurrentUser):
         session = db.get_chat_session(body.session_id, user["id"])
         if session is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
-
+        
+    # Here giving the user_id and session_id 
     run = await agent.arun(
         body.message,
         user_id=user["id"],

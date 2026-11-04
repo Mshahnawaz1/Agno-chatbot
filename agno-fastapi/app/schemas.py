@@ -22,6 +22,7 @@ class SessionOut(BaseModel):
     user_id: str
     title: str | None
     created_at: str
+    updated_at: str
 
 
 class ChatRequest(BaseModel):

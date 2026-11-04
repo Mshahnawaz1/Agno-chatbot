@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
     id          TEXT PRIMARY KEY,
     user_id     TEXT NOT NULL REFERENCES users(id),
     title       TEXT,
-    created_at  TEXT DEFAULT CURRENT_TIMESTAMP
+    created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id);
 """
@@ -75,11 +76,11 @@ def create_chat_session(user_id: str, title: str | None) -> dict:
         ).fetchone()
     return dict(row)
 
-
+# Newest first
 def list_chat_sessions(user_id: str) -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT * FROM chat_sessions WHERE user_id = ? ORDER BY created_at DESC",
+            "SELECT * FROM chat_sessions WHERE user_id = ? ORDER BY updated_at DESC",
             (user_id,),
         ).fetchall()
     return [dict(r) for r in rows]
@@ -93,3 +94,10 @@ def get_chat_session(session_id: str, user_id: str) -> dict | None:
             (session_id, user_id),
         ).fetchone()
     return dict(row) if row else None
+
+def touch_chat_session(session_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (session_id,),
+        )

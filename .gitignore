@@ -10,7 +10,7 @@ wheels/
 
 # Virtual environments
 .venv
-learn_agno/
+learn_agno/data
 references/
 .env
 data/

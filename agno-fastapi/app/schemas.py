@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class UserCreate(BaseModel):
@@ -25,12 +25,25 @@ class SessionOut(BaseModel):
     updated_at: str
 
 
-class ChatRequest(BaseModel):
-    message: str
-    session_id: str | None = None   # None => start a new chat
-
-
 class ChatResponse(BaseModel):
     session_id: str
     run_id: str
     content: str
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)   # rejects empty / huge input
+    session_id: str | None = None
+
+
+class MessageOut(BaseModel):
+    role: str
+    content: str
+
+class UserCreate(BaseModel):
+    email: str
+    name: str | None = None
+    password: str = Field(min_length=8, max_length=128)
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"

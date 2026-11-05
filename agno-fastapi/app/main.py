@@ -10,6 +10,8 @@ from fastapi import FastAPI
 from app import db
 from app.routers import sessions, users, chat
 
+from fastapi.middleware.cors import CORSMiddleware
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,6 +20,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Agno + FastAPI", lifespan=lifespan)
+
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080"],
+    allow_methods=["*"],
+    allow_headers=["*"],   # covers X-User-Id
+)
+
 app.include_router(users.router)
 app.include_router(sessions.router)
 app.include_router(chat.router)

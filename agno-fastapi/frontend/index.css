@@ -1,0 +1,284 @@
+/* ---------- Theme ---------- */
+:root {
+  --bg: #212121;
+  --sidebar: #171717;
+  --hover: #2a2a2a;
+  --active: #333333;
+  --bubble: #2f2f2f;
+  --border: #3a3a3a;
+  --text: #ececec;
+  --muted: #9b9b9b;
+  --danger: #ff7b7b;
+  --accent: #10a37f;
+  --sidebar-width: 260px;
+  --content-width: 760px;
+}
+
+/* ---------- Base ---------- */
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  display: flex;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+
+.error { color: var(--danger); }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: var(--sidebar-width);
+  padding: 10px;
+  background: var(--sidebar);
+  transition: margin-left 0.2s;
+}
+
+.sidebar.is-hidden { margin-left: calc(var(--sidebar-width) * -1); }
+
+.sidebar-btn {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+}
+
+.sidebar-btn:hover { background: var(--hover); }
+
+.session-list {
+  flex: 1;
+  margin: 10px 0;
+  overflow-y: auto;
+}
+
+.session-item {
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.session-item:hover { background: var(--hover); }
+.session-item.is-active { background: var(--active); }
+
+.session-note {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---------- Main column ---------- */
+.main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.icon-btn {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: 20px;
+}
+
+.icon-btn:hover { background: var(--hover); }
+
+.chat-title {
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Messages ---------- */
+.messages { flex: 1; overflow-y: auto; }
+
+.welcome {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 26px;
+  font-weight: 500;
+}
+
+.message-wrap {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.message-row { display: flex; padding: 14px 0; }
+.message-row.user { justify-content: flex-end; }
+
+.user-bubble {
+  max-width: 85%;
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: var(--bubble);
+  white-space: pre-wrap;
+}
+
+.assistant-body { width: 100%; }
+.assistant-body > :first-child { margin-top: 0; }
+.assistant-body > :last-child { margin-bottom: 0; }
+
+.assistant-body pre {
+  padding: 12px;
+  border-radius: 8px;
+  background: #0d0d0d;
+  overflow-x: auto;
+}
+
+.assistant-body code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.assistant-body :not(pre) > code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #0d0d0d;
+}
+
+.assistant-body table { border-collapse: collapse; }
+
+.assistant-body th,
+.assistant-body td {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+}
+
+/* Blinking cursor shown while a reply is streaming */
+.assistant-body.is-streaming::after {
+  content: "▍";
+  margin-left: 2px;
+  animation: blink 1s steps(2) infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- Composer ---------- */
+.composer { padding: 0 20px 18px; }
+
+.composer-box {
+  display: flex;
+  align-items: flex-end;
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 8px 8px 8px 18px;
+  border-radius: 26px;
+  background: var(--bubble);
+}
+
+.composer-input {
+  flex: 1;
+  max-height: 200px;
+  padding: 8px 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  resize: none;
+}
+
+.send-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #000;
+  font-size: 16px;
+}
+
+.composer-hint {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- Settings dialog ---------- */
+.dialog {
+  width: min(440px, 92vw);
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--sidebar);
+  color: var(--text);
+}
+
+.dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+
+.dialog h3 { margin: 0 0 4px; }
+
+.dialog label {
+  display: block;
+  margin: 12px 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dialog input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bubble);
+  color: var(--text);
+  font: inherit;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.dialog-actions button {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+}
+
+.dialog-actions .primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---------- Small screens ---------- */
+@media (max-width: 700px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 5;
+  }
+}

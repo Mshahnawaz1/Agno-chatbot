@@ -20,7 +20,6 @@ agent = Agent(
     model=Groq(id="openai/gpt-oss-120b"),
     db=agent_db,
     add_datetime_to_context=True,
-    add_history_to_context=True,
     num_history_runs= 5,
     instructions="You are a helpful assistant.",
 )

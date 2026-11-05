@@ -5,3 +5,10 @@ pydantic-settings
 pyjwt
 pwdlib[argon2]
 python-multipart
+
+chromadb 
+openai
+
+pypdf
+
+sentence-transformers

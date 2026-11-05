@@ -13,3 +13,4 @@ wheels/
 learn_agno/
 references/
 .env
+data/

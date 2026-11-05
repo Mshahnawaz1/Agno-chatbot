@@ -1,7 +1,17 @@
+"""
+Run:
+PYTHONPATH=. python3 app/agent.py
+agno-fastapi/app/agent.py
+"""
 from agno.agent import Agent
 from agno.models.groq import Groq
 from agno.db.sqlite import SqliteDb
 from agno.tools.yfinance import YFinanceTools
+from agno.knowledge.knowledge import Knowledge
+from agno.knowledge.embedder.openai import OpenAIEmbedder
+from agno.vectordb.chroma import ChromaDb
+from agno.vectordb.search import SearchType
+from agno.knowledge.embedder.fastembed import FastEmbedEmbedder
 
 import httpx
 import os
@@ -19,19 +29,42 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL")
 
-
-
-
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+CHROMA_DB = "data/chromadb"
 
 def get_weather(city: str) -> str:
     """Get the current weather for a city."""
     r = httpx.get(f"https://wttr.in/{city}?format=3")
     return r.text
 
-# One shared instance. Never put user_id/session_id here; pass them per call.
+# embedder = OpenAIEmbedder(
+#     id=EMBEDDING_MODEL,
+#     api_key=OPENROUTER_API_KEY,
+#     base_url=OPENROUTER_BASE_URL,
+# )
+embedder = FastEmbedEmbedder()
+
+
+# 2. Vector DB: Persistent ChromaDB instance
+vector_db = ChromaDb(
+    collection="groq_knowledge_vectors",
+    path=CHROMA_DB,
+    persistent_client=True,
+    embedder=embedder,
+    search_type=SearchType.hybrid,
+    hybrid_rrf_k=60,  # default
+
+)
+knowledge = Knowledge(
+    name="System Docs Knowledge Base",
+    vector_db=vector_db,            
+)
+
 agent = Agent(
     model=Groq(id="openai/gpt-oss-120b"),
     db=agent_db,
+    knowledge=knowledge,
+    search_knowledge=True,
     search_past_sessions=True,
     enable_agentic_memory=True,
     add_memories_to_context=True,
@@ -41,3 +74,4 @@ agent = Agent(
     add_history_to_context= True,
     instructions="You are a helpful assistant.",
 )
+agent.print_response("What is the name of my client?")

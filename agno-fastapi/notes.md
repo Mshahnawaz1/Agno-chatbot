@@ -38,7 +38,7 @@ chat response
 ``` bash
 curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent" \
   -H 'Content-Type: application/json' \
-  -H 'X-goog-api-key: AQ.Ab8RN6Izijr2z5EHK-EFZ0UDGCnDhaIyOtI6Z-7Mli9zrhq7PQ' \
+  -H 'X-goog-api-key: API KEY' \
   -X POST \
   -d '{
     "contents": [

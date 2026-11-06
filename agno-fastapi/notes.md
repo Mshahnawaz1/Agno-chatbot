@@ -4,8 +4,7 @@ Start the html server,
 python3 -m http.server 8080 
 
 
-
-### Testing 
+### DATA formats 
 ``` json
 new user
 {
@@ -33,3 +32,29 @@ chat response
 }
 ```
 
+
+### CMD for tests 
+
+``` bash
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent" \
+  -H 'Content-Type: application/json' \
+  -H 'X-goog-api-key: AQ.Ab8RN6Izijr2z5EHK-EFZ0UDGCnDhaIyOtI6Z-7Mli9zrhq7PQ' \
+  -X POST \
+  -d '{
+    "contents": [
+      {
+        "parts": [
+          {
+            "text": "Explain how AI works in a few words"
+          }
+        ]
+      }
+    ]
+  }'
+
+
+  curl -N -X POST http://localhost:8000/chat/stream \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer d4e52952-7d61-469c-b585-bddabb8f16aa" \
+  -d '{"message": "What is the weather in bilaspur today?"}'
+  ```

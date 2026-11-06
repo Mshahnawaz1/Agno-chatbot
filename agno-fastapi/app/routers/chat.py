@@ -50,7 +50,6 @@ async def chat(body: ChatRequest, user: CurrentUser):
     # Adding metrics
     metrics = run.metrics.to_dict()
     tools = run.tools or []
-
     metrics["num_tools"] = len(tools)
     metrics["tools_metrics"] = [(t.tool_name, t.result, t.tool_args) for t in tools]
     return ChatResponse(

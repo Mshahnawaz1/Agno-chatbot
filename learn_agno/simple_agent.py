@@ -67,22 +67,22 @@ agent = Agent(
     num_history_runs= 5,
     add_history_to_context= True,
     instructions="You are a helpful assistant.",
+    session_id="Veldora1"
 )
 
-agent.print_response("What is name of user birth place?")
+# agent.print_response("What is name of user birth place?")
 
+import asyncio
 
-# run_response = agent.run("What is the skill requirement for the company?")
-# # Session metrics
-# for message in run_response.messages:
-#     if message.role == "assistant":
-#         pprint(message.metrics.to_dict())
-# # Run metrics (RunMetrics)
-# pprint(run_response.metrics.to_dict())
-# # Per-model breakdown
-# if run_response.metrics.details:
-#     for model_type, model_metrics_list in run_response.metrics.details.items():
-#         for m in model_metrics_list:
-#             print(f"{model_type}: {m.provider}/{m.id} - {m.total_tokens} tokens")
-# # Session metrics (SessionMetrics)
-# pprint(agent.get_session_metrics().to_dict())
+async def run_agent(agent):
+    run_response = await agent.arun("What is the weather in Kolkata today?")
+    pprint(run_response.content)                # the answer text
+    pprint(run_response.metrics.to_dict()) 
+    tools = run_response.tools or []
+    print("Tool calls:", len(tools))
+    # print("tools meta", tools)
+    for t in tools:
+        print(t.tool_name, t.tool_args, t.result)     # run metrics
+
+if __name__ == "__main__":
+    asyncio.run(run_agent(agent))

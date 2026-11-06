@@ -46,8 +46,15 @@ async def chat(body: ChatRequest, user: CurrentUser):
         logger.exception("agent run failed")
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The model call failed")
     db.touch_chat_session(session["id"])
+
+    # Adding metrics
+    metrics = run.metrics.to_dict()
+    tools = run.tools or []
+
+    metrics["num_tools"] = len(tools)
+    metrics["tools_metrics"] = [(t.tool_name, t.result, t.tool_args) for t in tools]
     return ChatResponse(
-        session_id=session["id"], run_id=run.run_id, content=run.content or ""
+        session_id=session["id"], run_id=run.run_id, content=run.content or "", metrics=metrics
     )
 
 
@@ -57,6 +64,8 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
 
     async def event_stream() -> AsyncIterator[str]:
         run_id = None
+        tools = []
+        final_metrics = None
         yield sse("session", {"session_id": session["id"]})
         try:
             async for event in agent.arun(
@@ -64,11 +73,23 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
                 user_id=user["id"],
                 session_id=session["id"],
                 stream=True,
+                stream_events=True
             ):
-                if event.event == RunEvent.run_content:
+                if event.event == RunEvent.run_content: #Why?
                     run_id = run_id or event.run_id
                     if event.content:
                         yield sse("token", {"content": str(event.content)})
+                elif event.event == RunEvent.tool_call_completed:
+                    tools.append(event.tool)
+
+                elif event.event == RunEvent.run_completed:
+                    run_id = run_id or event.run_id
+                    final_metrics = event.metrics.to_dict()
+
+            final_metrics["num_tools"] = len(tools)
+            final_metrics["tools_metrics"] = [(t.tool_name, t.result, t.tool_args) for t in tools]
+            
+            yield sse("metrics", final_metrics)
             yield sse("done", {"run_id": run_id})
         except Exception:
             logger.exception("stream failed")

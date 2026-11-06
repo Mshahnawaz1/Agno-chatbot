@@ -74,4 +74,4 @@ agent = Agent(
     add_history_to_context= True,
     instructions="You are a helpful assistant.",
 )
-agent.print_response("What is the name of my client?")
+# agent.print_response("What is the name of my client?")

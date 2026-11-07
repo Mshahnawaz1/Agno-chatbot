@@ -64,7 +64,7 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
     async def event_stream() -> AsyncIterator[str]:
         run_id = None
         tools = []
-        final_metrics = None
+        final_metrics = {}
         yield sse("session", {"session_id": session["id"]})
         try:
             async for event in agent.arun(
@@ -74,7 +74,16 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
                 stream=True,
                 stream_events=True
             ):
-                if event.event == RunEvent.run_content: #Why?
+                if event.event == RunEvent.run_error:
+                    # Guardrail failures (InputCheckError/OutputCheckError) arrive here as
+                    # an event, not as a raised exception.
+                    logger.warning("run error: %s (%s)", event.content, getattr(event, "error_type", None))
+                    yield sse("guardrail_error", {
+                        "message": str(event.content),
+                        "type": getattr(event, "error_type", None),
+                    })
+                    return  # stop streaming; finally still touches the session
+                if event.event == RunEvent.run_content:
                     run_id = run_id or event.run_id
                     if event.content:
                         yield sse("token", {"content": str(event.content)})
@@ -90,9 +99,9 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
             
             yield sse("metrics", final_metrics)
             yield sse("done", {"run_id": run_id})
-        except Exception:
+        except Exception as e:
             logger.exception("stream failed")
-            yield sse("error", {"message": "Generation failed"})
+            yield sse("error", {"message": f"Generation failed. Error {e}"})
         finally:
             db.touch_chat_session(session["id"])
 

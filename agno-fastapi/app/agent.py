@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.config import settings
-from app.guardrails import piiGuardrails, get_weather, input_length_guardrail, logger_hook
+from app.guardrails import piiGuardrails, get_weather, input_length_guardrail, tool_logger_hook, output_hook_validate
 
 Path(settings.agno_db_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -52,7 +52,8 @@ agent = Agent(
     db=agent_db,
     knowledge=knowledge,
     pre_hooks=[input_length_guardrail, piiGuardrails],
-    tool_hooks=[logger_hook], #applied to each tool call
+    tool_hooks=[tool_logger_hook], #applied to each tool call
+    post_hooks=[output_hook_validate],
     search_knowledge=True,
     search_past_sessions=True,
     enable_agentic_memory=True,

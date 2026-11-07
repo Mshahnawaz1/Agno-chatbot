@@ -1,7 +1,5 @@
 # Agno chatbot
 
-
-
 A chatbot project built using [Agno](https://www.agno.com/), exploring AI agent development and integration with FastAPI.
 
 [![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/mshahnawaz1/agno-chatbot?utm_source=readme&utm_medium=badge)
@@ -14,13 +12,11 @@ Agno-chatbot/
 │
 ├── learn_agno/
 │   └── ... 
-│
 ├── agno-fastapi/
 │   ├── frontend/
 │   │   └── ...
 │   ├── requirements.txt
 │   └── ...
-│
 ├── .gitignore
 ├── pyproject.toml
 ├── uv.lock
@@ -54,8 +50,6 @@ Run frontend
 cd frontend
 python3 -m http.server 8080 
 ```
-
-Configure the required environment variables and API keys before running the application.
 
 ## 🛠️ Tech Stack
 

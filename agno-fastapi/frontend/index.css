@@ -460,3 +460,9 @@ button {
     margin-bottom: 8px;
   }
 }
+
+/* Guardrail rejection: a warning for the user, not a server failure. */
+.error.guardrail {
+  border-left: 3px solid var(--danger);
+  padding-left: 10px;
+}

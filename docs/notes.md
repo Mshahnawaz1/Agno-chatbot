@@ -57,4 +57,15 @@ curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lates
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer d4e52952-7d61-469c-b585-bddabb8f16aa" \
   -d '{"message": "What is the weather in bilaspur today?"}'
+
+
+  curl -N -X POST http://localhost:8000/chat/stream \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: d4e52952-7d61-469c-b585-bddabb8f16aa" \
+  -d '{"message": "What is the capital of France?", "session_id": ""}'
+
+  curl -N -X POST http://localhost:8000/chat/stream \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: d4e52952-7d61-469c-b585-bddabb8f16aa" \
+  -d "{\"message\": \"$(python3 -c 'print("a"*400)')\", \"session_id\": \"\"}"
   ```

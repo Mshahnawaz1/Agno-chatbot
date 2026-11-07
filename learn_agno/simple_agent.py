@@ -13,8 +13,8 @@ from agno.knowledge.embedder.openai import OpenAIEmbedder
 from agno.vectordb.chroma import ChromaDb
 from agno.vectordb.search import SearchType
 from rich.pretty import pprint
-from ingestion import get_weather
 from agno.knowledge.embedder.fastembed import FastEmbedEmbedder
+from agno.run import RunStatus
 
 embedder = FastEmbedEmbedder()
 
@@ -23,6 +23,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
+
+from ingestion import get_weather
+from utils import validate_input, validate_output
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -67,22 +70,80 @@ agent = Agent(
     num_history_runs= 5,
     add_history_to_context= True,
     instructions="You are a helpful assistant.",
-    session_id="Veldora1"
+    session_id="Veldora1",
+    pre_hooks=[validate_input],
+    post_hooks=[validate_output]
 )
 
 # agent.print_response("What is name of user birth place?")
 
 import asyncio
+input_text = """
+Welcome to Agno
+Copy page
 
-async def run_agent(agent):
-    run_response = await agent.arun("What is the weather in Kolkata today?")
-    pprint(run_response.content)                # the answer text
-    pprint(run_response.metrics.to_dict()) 
-    tools = run_response.tools or []
-    print("Tool calls:", len(tools))
-    # print("tools meta", tools)
-    for t in tools:
-        print(t.tool_name, t.tool_args, t.result)     # run metrics
+The self-managing agent platform.
+
+Agno is a self-managing agent platform. Build agents for your company, product, or customers. Run them as durable services on AgentOS. Put them to work automating company operations.
+
+Build agents with the Agno, Claude Agent, or Codex SDKs. Combine agents into teams and workflows.
+Run agents as durable services with built-in API and MCP. AgentOS handles authentication, role-based access, resume/replay, human approvals, scheduling, and durable execution.
+Automate company operations with Company OS. Organize work into projects, tasks, and recurring routines. People set direction and review results; agents execute.
+Agno provides the orchestration and service layer around your agents, making them available in:
+
+Your product: using the REST API.
+Claude and ChatGPT: using the MCP server.
+Chat apps like Slack: using Agno Interfaces.
+Run your platform in your own cloud and keep your data in your control. Review conversations, inspect traces, manage knowledge, and track your agent activity using the AgentOS UI.
+
+Get started
+
+Select your cloud provider and give this prompt to your coding agent:
+
+Render
+Railway
+Docker
+AWS
+Fly
+GCP
+Kubernetes
+Azure
+Modal
+
+
+Help me set up my agent platform and build my first agent.
+Clone https://github.com/agno-agi/agentos-render into a folder called agent-platform, cd in, and run the setup-platform skill (in .agents/skills/).
+The setup skill runs your platform locally and helps you build your first agent. You get:
+
+A durable runtime (AgentOS) with an API and MCP server.
+PostgreSQL for storing conversations, memory, and platform activity.
+OS Manager to help build and manage your
+"""
+
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+async def run_agent(agent, user_input: str):
+    try:
+        response = await agent.arun(user_input)
+        if response.status == RunStatus.completed:
+            print(response.content)
+        else:
+            logger.error("Agent execution status: %s", response.status)
+
+        # Metrics
+        if response.metrics:
+            print(response.metrics.to_dict())
+        return response
+
+    except Exception as e:
+        logger.exception(
+            "Agent execution or hook validation failed: %s",
+            e
+        )
+        return None
+
 
 if __name__ == "__main__":
-    asyncio.run(run_agent(agent))
+    asyncio.run(run_agent(agent, "Hello"))

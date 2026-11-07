@@ -8,18 +8,17 @@ from agno.models.groq import Groq
 from agno.db.sqlite import SqliteDb
 from agno.tools.yfinance import YFinanceTools
 from agno.knowledge.knowledge import Knowledge
-from agno.knowledge.embedder.openai import OpenAIEmbedder
 from agno.vectordb.chroma import ChromaDb
 from agno.vectordb.search import SearchType
 from agno.knowledge.embedder.fastembed import FastEmbedEmbedder
 
-import httpx
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
 from app.config import settings
+from app.guardrails import piiGuardrails, get_weather, input_length_guardrail, logger_hook
 
 Path(settings.agno_db_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -29,19 +28,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL")
 
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 CHROMA_DB = "data/chromadb"
-
-def get_weather(city: str) -> str:
-    """Get the current weather for a city."""
-    r = httpx.get(f"https://wttr.in/{city}?format=3")
-    return r.text
-
-# embedder = OpenAIEmbedder(
-#     id=EMBEDDING_MODEL,
-#     api_key=OPENROUTER_API_KEY,
-#     base_url=OPENROUTER_BASE_URL,
-# )
 embedder = FastEmbedEmbedder()
 
 
@@ -64,6 +51,8 @@ agent = Agent(
     model=Groq(id="openai/gpt-oss-120b"),
     db=agent_db,
     knowledge=knowledge,
+    pre_hooks=[input_length_guardrail, piiGuardrails],
+    tool_hooks=[logger_hook], #applied to each tool call
     search_knowledge=True,
     search_past_sessions=True,
     enable_agentic_memory=True,

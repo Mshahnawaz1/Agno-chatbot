@@ -5,12 +5,15 @@ uvicorn app.main:app --reload          # run from the agno-fastapi/ root
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from app import db
 from app.routers import sessions, users, chat
 
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
 
 
 @asynccontextmanager
@@ -39,4 +42,7 @@ app.include_router(chat.router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+# must be registered last: a mount at "/" matches every path
+app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
 

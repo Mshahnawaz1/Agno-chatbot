@@ -2,6 +2,7 @@ from agno.guardrails.pii import PIIDetectionGuardrail
 from agno.run.agent import RunInput, RunOutput
 from agno.exceptions import CheckTrigger, InputCheckError, OutputCheckError
 from agno.utils.log import logger
+from agno.tools import tool
 
 import time
 from typing import Any, Callable, Dict
@@ -36,11 +37,6 @@ def input_length_guardrail(run_input: RunInput) -> None:
             check_trigger=CheckTrigger.INPUT_NOT_ALLOWED,
         )
 
-
-def get_weather(city: str) -> str:
-    """Get the current weather for a city."""
-    r = httpx.get(f"https://wttr.in/{city}?format=3")
-    return r.text
 
 def tool_logger_hook(
     function_name: str,

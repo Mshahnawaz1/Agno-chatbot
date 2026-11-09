@@ -18,7 +18,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.config import settings
-from app.guardrails import piiGuardrails, get_weather, input_length_guardrail, tool_logger_hook, output_hook_validate
+from app.guardrails import piiGuardrails, input_length_guardrail, tool_logger_hook, output_hook_validate
+from app.tools import primes_below, get_weather
 
 Path(settings.agno_db_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -60,7 +61,7 @@ agent = Agent(
     add_memories_to_context=True,
     add_datetime_to_context=True,
     num_history_runs= 5,
-    tools = [get_weather, YFinanceTools()],
+    tools = [primes_below ,get_weather, YFinanceTools()],
     add_history_to_context= True,
     instructions="You are a helpful assistant.",
 )

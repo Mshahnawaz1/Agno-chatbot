@@ -63,7 +63,7 @@ knowledge.insert(
 
 pdf_reader = PDFReader(
     chunk=True,             # Enable automatic chunking, can be changed to recursive or other.
-    chunk_size=1000,        # Number of characters per chunk
+    chunk_size=3000,        # Number of characters per chunk
     split_on_pages=True,    # Preserve page-level document boundaries
     # password="secret",    # Optional: for encrypted PDFs
 )

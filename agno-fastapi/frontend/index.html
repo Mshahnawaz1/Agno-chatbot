@@ -13,7 +13,7 @@
   <aside class="sidebar" id="sidebar">
     <button class="sidebar-btn" id="new-chat-btn">✎ New chat</button>
     <div class="session-list" id="session-list"></div>
-    <button class="sidebar-btn" id="settings-btn">⚙ Settings</button>
+    <button class="sidebar-btn" id="logout-btn">⎋ Log out</button>
   </aside>
 
   <div class="main">
@@ -33,16 +33,21 @@
     </footer>
   </div>
 
-  <dialog class="dialog" id="settings-dialog">
-    <h3>Settings</h3>
-    <label for="base-url-input">API base URL</label>
-    <input id="base-url-input" placeholder="http://localhost:8000">
-    <label for="user-id-input">User ID (sent as X-User-Id)</label>
-    <input id="user-id-input" placeholder="e.g. 1">
-    <div class="dialog-actions">
-      <button id="settings-cancel-btn">Cancel</button>
-      <button class="primary" id="settings-save-btn">Save</button>
-    </div>
+  <dialog class="dialog" id="auth-dialog">
+    <form id="auth-form">
+      <h3>Log in or sign up</h3>
+      <div class="auth-error" id="auth-error" role="alert" hidden></div>
+      <label for="auth-email-input">Email</label>
+      <input id="auth-email-input" type="email" autocomplete="username" required>
+      <label for="auth-password-input">Password</label>
+      <input id="auth-password-input" type="password" autocomplete="current-password" minlength="8" required>
+      <label for="auth-name-input">Name (sign up only, optional)</label>
+      <input id="auth-name-input" autocomplete="name">
+      <div class="dialog-actions">
+        <button type="button" id="signup-btn">Sign up</button>
+        <button type="submit" class="primary" id="login-btn">Log in</button>
+      </div>
+    </form>
   </dialog>
 
   <script src="settings.js"></script>
@@ -54,7 +59,7 @@
   <script src="sessions.js"></script>
   <script src="chat.js"></script>
   <script src="composer.js"></script>
-  <script src="settings-dialog.js"></script>
+  <script src="auth.js"></script>
   <script src="main.js"></script>
 </body>
 </html>

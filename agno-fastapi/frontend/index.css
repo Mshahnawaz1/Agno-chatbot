@@ -380,7 +380,7 @@ button {
   color: var(--muted);
 }
 
-/* ---------- Settings dialog ---------- */
+/* ---------- Dialog ---------- */
 .dialog {
   width: min(440px, 92vw);
   padding: 20px;
@@ -433,6 +433,20 @@ button {
   border-color: var(--accent);
   background: var(--accent);
   color: #fff;
+}
+
+.dialog-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.auth-error {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid #e5484d;
+  border-radius: 8px;
+  color: #e5484d;
+  font-size: 13px;
 }
 
 /* ---------- Small screens ---------- */

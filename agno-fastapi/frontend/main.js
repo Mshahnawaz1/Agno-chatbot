@@ -8,19 +8,22 @@ function bindEvents() {
     els.sendBtn.addEventListener("click", sendMessage);
     els.composerInput.addEventListener("input", autosizeComposer);
     els.composerInput.addEventListener("keydown", onComposerKeydown);
-    $("settings-btn").addEventListener("click", openSettings);
-    $("settings-save-btn").addEventListener("click", saveSettings);
-    $("settings-cancel-btn").addEventListener("click", () => els.settingsDialog.close());
+    $("logout-btn").addEventListener("click", logout);
+    els.authForm.addEventListener("submit", login);
+    els.signupBtn.addEventListener("click", signup);
+    // The app is useless logged out, so Escape must not dismiss the login dialog.
+    els.authDialog.addEventListener("cancel", (e) => e.preventDefault());
 }
 
 function init() {
     bindEvents();
     showWelcome();
 
-    if (!settings.userId) {
-        openSettings();
+    if (!settings.token) {
+        openAuth();
         return;
     }
+    // If the stored token has expired, this gets a 401 and api.check opens login.
     loadSessions();
 }
 

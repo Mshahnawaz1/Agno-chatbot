@@ -43,7 +43,7 @@ async function loadSessions() {
     } catch (err) {
         state.sessions = [];
         els.sessionList.innerHTML =
-            '<div class="session-note error">Could not load chats. Check Settings.</div>';
+            '<div class="session-note error">Could not load chats.</div>';
         console.error("Failed to load sessions:", err);
     }
 }

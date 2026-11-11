@@ -1,20 +1,18 @@
 "use strict";
 
-/* Settings stored in localStorage (API base URL + dev user id). */
-
-const DEFAULT_BASE_URL = "http://localhost:8000";
+/* Access token stored in localStorage. API calls use relative paths
+   because FastAPI serves this frontend from the same origin. */
 
 const settings = {
-    get baseUrl() {
-        return (localStorage.getItem("baseUrl") || DEFAULT_BASE_URL).replace(/\/$/, "");
+    get token() {
+        return localStorage.getItem("accessToken") || "";
     },
 
-    get userId() {
-        return localStorage.getItem("userId") || "";
+    saveToken(token) {
+        localStorage.setItem("accessToken", token);
     },
 
-    save(baseUrl, userId) {
-        localStorage.setItem("baseUrl", baseUrl);
-        localStorage.setItem("userId", userId);
+    clearToken() {
+        localStorage.removeItem("accessToken");
     },
 };

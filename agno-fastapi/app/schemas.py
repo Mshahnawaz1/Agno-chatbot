@@ -1,9 +1,23 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def normalize_email(email: str) -> str:
+    """One canonical form, so A@x.com and a@x.com can't become two accounts."""
+    return email.strip().lower()
 
 
 class UserCreate(BaseModel):
-    email: str
-    name: str | None = None
+    # Light shape check; swap for pydantic's EmailStr if you install email-validator.
+    email: str = Field(max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    name: str | None = Field(default=None, max_length=100)
+    # max_length also caps how much hashing work one request can cause
+    password: str = Field(min_length=8, max_length=128)
+
+    # mode="before": normalize first, then the pattern/length checks run on the result
+    @field_validator("email", mode="before")
+    @classmethod
+    def _normalize_email(cls, v):
+        return normalize_email(v) if isinstance(v, str) else v
 
 
 class UserOut(BaseModel):
@@ -39,10 +53,6 @@ class ChatRequest(BaseModel):
 class MessageOut(BaseModel):
     role: str
     content: str
-
-class UserCreate(BaseModel):
-    email: str
-    name: str | None = None
 
 class Token(BaseModel):
     access_token: str

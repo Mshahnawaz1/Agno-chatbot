@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import db
-from app.routers import sessions, users, chat
+from app.routers import auth, sessions, users, chat
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
@@ -31,9 +31,10 @@ app.add_middleware(
     # allow_origins=["http://localhost:8080"],
     allow_origins= ["*"],
     allow_methods=["*"],
-    allow_headers=["*"],   # covers X-User-Id
+    allow_headers=["*"],   # covers Authorization
 )
 
+app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(sessions.router)
 app.include_router(chat.router)

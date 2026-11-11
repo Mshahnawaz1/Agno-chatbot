@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     id          TEXT PRIMARY KEY,
     email       TEXT UNIQUE NOT NULL,
     name        TEXT,
+    password_hash TEXT NOT NULL,
     created_at  TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS chat_sessions (
@@ -46,20 +47,36 @@ def init_db() -> None:
 
 
 # ---- users ----
-def create_user(email: str, name: str | None) -> dict:
+# Every query except get_user_by_email selects only these columns, so the
+# password hash never ends up in the `user` dict that routes receive.
+PUBLIC_USER_COLUMNS = "id, email, name, created_at"
+
+
+def create_user(email: str, name: str | None, password_hash: str) -> dict:
     user_id = str(uuid.uuid4())  # this becomes Agno's user_id later
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO users (id, email, name) VALUES (?, ?, ?)",
-            (user_id, email, name),
+            "INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)",
+            (user_id, email, name, password_hash),
         )
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        row = conn.execute(
+            f"SELECT {PUBLIC_USER_COLUMNS} FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
     return dict(row)
 
 
 def get_user(user_id: str) -> dict | None:
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        row = conn.execute(
+            f"SELECT {PUBLIC_USER_COLUMNS} FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def get_user_by_email(email: str) -> dict | None:
+    """Login only: includes password_hash. Never return this row to a client."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     return dict(row) if row else None
 
 

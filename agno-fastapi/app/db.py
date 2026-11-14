@@ -21,6 +21,28 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
     updated_at  TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id);
+
+-- connectors: our app's OAuth registration per provider (encrypted JSON)
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    connector_id TEXT PRIMARY KEY,
+    client       TEXT NOT NULL
+);
+-- in-flight OAuth logins, matched on the callback's ?state=
+CREATE TABLE IF NOT EXISTS oauth_states (
+    state         TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL REFERENCES users(id),
+    connector_id  TEXT NOT NULL,
+    code_verifier TEXT NOT NULL,
+    created_at    TEXT DEFAULT CURRENT_TIMESTAMP
+);
+-- a user's tokens or API key per connector (encrypted JSON)
+CREATE TABLE IF NOT EXISTS user_connectors (
+    user_id      TEXT NOT NULL REFERENCES users(id),
+    connector_id TEXT NOT NULL,
+    credentials  TEXT NOT NULL,
+    created_at   TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, connector_id)
+);
 """
 
 
@@ -117,4 +139,76 @@ def touch_chat_session(session_id: str) -> None:
         conn.execute(
             "UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (session_id,),
+        )
+
+# ---- connectors ----
+# Values passed in here are already encrypted by app.connectors.auth.
+
+
+def save_oauth_client(connector_id: str, client: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO oauth_clients (connector_id, client) VALUES (?, ?)",
+            (connector_id, client),
+        )
+
+
+def get_oauth_client(connector_id: str) -> str | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT client FROM oauth_clients WHERE connector_id = ?", (connector_id,)
+        ).fetchone()
+    return row["client"] if row else None
+
+
+def save_oauth_state(state: str, user_id: str, connector_id: str, code_verifier: str) -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM oauth_states WHERE created_at < datetime('now', '-10 minutes')")
+        conn.execute(
+            "INSERT INTO oauth_states (state, user_id, connector_id, code_verifier) VALUES (?, ?, ?, ?)",
+            (state, user_id, connector_id, code_verifier),
+        )
+
+
+def pop_oauth_state(state: str, connector_id: str) -> dict | None:
+    """Single use and 10-minute expiry. Expired rows are purged by save_oauth_state."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "DELETE FROM oauth_states WHERE state = ? AND connector_id = ?"
+            " AND created_at >= datetime('now', '-10 minutes') RETURNING *",
+            (state, connector_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def save_credentials(user_id: str, connector_id: str, credentials: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO user_connectors (user_id, connector_id, credentials) VALUES (?, ?, ?)",
+            (user_id, connector_id, credentials),
+        )
+
+
+def get_credentials(user_id: str, connector_id: str) -> str | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT credentials FROM user_connectors WHERE user_id = ? AND connector_id = ?",
+            (user_id, connector_id),
+        ).fetchone()
+    return row["credentials"] if row else None
+
+
+def list_connected(user_id: str) -> list[str]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT connector_id FROM user_connectors WHERE user_id = ?", (user_id,)
+        ).fetchall()
+    return [r["connector_id"] for r in rows]
+
+
+def delete_credentials(user_id: str, connector_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM user_connectors WHERE user_id = ? AND connector_id = ?",
+            (user_id, connector_id),
         )

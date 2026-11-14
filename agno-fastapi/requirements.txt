@@ -12,3 +12,7 @@ openai
 pypdf
 
 sentence-transformers
+mcp
+fastmcp
+httpx
+cryptography

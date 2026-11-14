@@ -34,6 +34,7 @@ async function finishLogin(email, password) {
     els.authDialog.close();
     startNewChat();
     loadSessions();
+    loadConnectors();
 }
 
 async function login(event) {

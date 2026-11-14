@@ -7,6 +7,7 @@ into HTTP errors. Keeping crypto here means there's one place to audit.
 from datetime import datetime, timedelta, timezone
 
 import jwt
+from cryptography.fernet import Fernet
 from pwdlib import PasswordHash
 
 from app.config import settings
@@ -63,3 +64,16 @@ def decode_access_token(token: str) -> str:
     if not isinstance(sub, str) or not sub:
         raise jwt.InvalidTokenError("Invalid subject")
     return sub
+
+
+# ---- connector secrets (OAuth tokens, API keys) at rest ----
+
+_fernet = Fernet(settings.connector_secret)
+
+
+def encrypt(text: str) -> str:
+    return _fernet.encrypt(text.encode()).decode()
+
+
+def decrypt(token: str) -> str:
+    return _fernet.decrypt(token.encode()).decode()

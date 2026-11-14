@@ -10,7 +10,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import db
-from app.routers import auth, sessions, users, chat
+from app.routers import auth, sessions, users, chat, connectors
+from app.connectors import tools as connector_tools
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
@@ -20,6 +21,7 @@ from fastapi.templating import Jinja2Templates
 async def lifespan(app: FastAPI):
     db.init_db()  # create tables on startup
     yield
+    await connector_tools.close_all()  # close open MCP connections
 
 
 app = FastAPI(title="Agno + FastAPI", lifespan=lifespan)
@@ -38,6 +40,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(sessions.router)
 app.include_router(chat.router)
+app.include_router(connectors.router)
 
 
 @app.get("/health")

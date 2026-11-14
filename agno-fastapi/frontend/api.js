@@ -70,6 +70,39 @@ const api = {
         return api.getJson(`/sessions/${encodeURIComponent(sessionId)}/messages`);
     },
 
+    // ---- connectors ----
+
+    listConnectors() {
+        return api.getJson("/connectors");
+    },
+
+    /** Returns {url} for OAuth connectors, or {needsApiKey: true} when the server has no OAuth. */
+    async authorizeConnector(id) {
+        const res = await fetch(`/connectors/${encodeURIComponent(id)}/authorize`, {
+            method: "POST",
+            headers: api.headers(),
+        });
+        if (res.status === 409) return { needsApiKey: true };
+        return (await api.check(res)).json();
+    },
+
+    async setConnectorKey(id, apiKey) {
+        const res = await fetch(`/connectors/${encodeURIComponent(id)}/api-key`, {
+            method: "PUT",
+            headers: api.headers({ json: true }),
+            body: JSON.stringify({ api_key: apiKey }),
+        });
+        await api.check(res);
+    },
+
+    async disconnectConnector(id) {
+        const res = await fetch(`/connectors/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            headers: api.headers(),
+        });
+        await api.check(res);
+    },
+
     async openChatStream(message, sessionId, signal) {
         const res = await fetch("/chat/stream", {
             method: "POST",

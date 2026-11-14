@@ -20,6 +20,7 @@ load_dotenv()
 from app.config import settings
 from app.guardrails import piiGuardrails, input_length_guardrail, tool_logger_hook, output_hook_validate
 from app.tools import primes_below, get_weather
+from app.connectors.tools import user_mcp_tools
 
 Path(settings.agno_db_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -45,8 +46,16 @@ vector_db = ChromaDb(
 )
 knowledge = Knowledge(
     name="System Docs Knowledge Base",
-    vector_db=vector_db,            
+    vector_db=vector_db,
 )
+
+BASE_TOOLS = [primes_below, get_weather, YFinanceTools()]
+
+
+async def agent_tools(run_context) -> list:
+    """Resolved by agno on every run: shared tools + this user's connected MCP servers."""
+    return BASE_TOOLS + await user_mcp_tools(run_context.user_id)
+
 
 agent = Agent(
     model=Groq(id="openai/gpt-oss-120b"),
@@ -61,7 +70,8 @@ agent = Agent(
     add_memories_to_context=True,
     add_datetime_to_context=True,
     num_history_runs= 5,
-    tools = [primes_below ,get_weather, YFinanceTools()],
+    tools=agent_tools,
+    cache_callables=False,  # tools differ per user and change when they (dis)connect
     add_history_to_context= True,
     instructions="You are a helpful assistant.",
 )

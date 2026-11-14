@@ -18,6 +18,7 @@ function bindEvents() {
 function init() {
     bindEvents();
     showWelcome();
+    handleConnectorRedirect();
 
     if (!settings.token) {
         openAuth();
@@ -25,6 +26,7 @@ function init() {
     }
     // If the stored token has expired, this gets a 401 and api.check opens login.
     loadSessions();
+    loadConnectors();
 }
 
 init();

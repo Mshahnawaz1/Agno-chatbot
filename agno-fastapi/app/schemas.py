@@ -57,3 +57,17 @@ class MessageOut(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+class ConnectorOut(BaseModel):
+    id: str
+    name: str
+    notes: str
+    connected: bool
+
+
+class AuthorizeOut(BaseModel):
+    url: str
+
+
+class ApiKeyIn(BaseModel):
+    api_key: str = Field(min_length=1, max_length=2000)

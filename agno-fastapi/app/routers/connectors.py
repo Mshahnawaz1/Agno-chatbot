@@ -8,7 +8,8 @@ from app import db
 from app.connectors import auth, tools
 from app.connectors.registry import CONNECTORS, Connector
 from app.deps import CurrentUser
-from app.schemas import ApiKeyIn, AuthorizeOut, ConnectorOut, ConnectorUpdate
+from app.schemas import ApiKeyIn, AuthorizeOut, ConnectorOut, ConnectorUpdate, SkillOut
+from app.skills import skills
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/connectors", tags=["connectors"])
@@ -34,6 +35,7 @@ def list_connectors(user: CurrentUser):
             tools=c.include_tools,
             connected=c.id in connected,
             enabled=connected.get(c.id, False),
+            skill=s.description if (s := skills.get_skill(c.id)) else None,
         )
         for c in CONNECTORS.values()
     ]
@@ -90,3 +92,18 @@ async def disconnect(connector_id: str, user: CurrentUser):
     c = get_connector(connector_id)
     db.delete_credentials(user["id"], c.id)
     await tools.disconnect(user["id"], c.id)
+
+
+@router.get("/{connector_id}/skill", response_model=SkillOut)
+def get_skill(connector_id: str, user: CurrentUser):
+    """The connector's SKILL.md (connector_skills/<id>/), for reading on the connectors page."""
+    c = get_connector(connector_id)
+    skill = skills.get_skill(c.id)
+    if skill is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{c.name} has no skill")
+    return SkillOut(
+        name=skill.name,
+        description=skill.description,
+        allowed_tools=skill.allowed_tools or [],
+        instructions=skill.instructions,
+    )

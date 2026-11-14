@@ -95,13 +95,19 @@ const api = {
         await api.check(res);
     },
 
-    async setConnectorEnabled(id, enabled) {
+    /** switches: {enabled}. */
+    async updateConnector(id, switches) {
         const res = await fetch(`/connectors/${encodeURIComponent(id)}`, {
             method: "PATCH",
             headers: api.headers({ json: true }),
-            body: JSON.stringify({ enabled }),
+            body: JSON.stringify(switches),
         });
         await api.check(res);
+    },
+
+    /** {name, description, allowed_tools, instructions} from the connector's SKILL.md */
+    getConnectorSkill(id) {
+        return api.getJson(`/connectors/${encodeURIComponent(id)}/skill`);
     },
 
     async disconnectConnector(id) {

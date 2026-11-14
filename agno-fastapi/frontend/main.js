@@ -10,6 +10,11 @@ function bindEvents() {
     els.composerInput.addEventListener("keydown", onComposerKeydown);
     $("logout-btn").addEventListener("click", logout);
     $("connectors-btn").addEventListener("click", openConnectorsPage);
+    $("skill-dialog-close").addEventListener("click", () => $("skill-dialog").close());
+    // Click on the backdrop (outside the dialog box) closes it too.
+    $("skill-dialog").addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) e.currentTarget.close();
+    });
     window.addEventListener("hashchange", route);
     els.authForm.addEventListener("submit", login);
     els.signupBtn.addEventListener("click", signup);

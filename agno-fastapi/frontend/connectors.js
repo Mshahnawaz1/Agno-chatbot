@@ -6,7 +6,10 @@
    Switch on  -> not connected yet: start OAuth (or ask for an API key);
                  connected but off: turn it back on.
    Switch off -> keep the login, but the agent stops getting its tools.
-   Disconnect -> forget the login entirely. */
+   Disconnect -> forget the login entirely.
+
+   Some connectors also ship a SKILL.md (connector_skills/<id>/): a playbook the
+   assistant loads on demand. Click it to read it. */
 
 const CONNECTORS_HASH = "#connectors";
 
@@ -76,14 +79,7 @@ function connectorCard(c) {
     title.appendChild(el("span", `connector-status ${status.cls}`, status.label));
     head.appendChild(title);
 
-    const toggle = el("label", "switch");
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.checked = c.enabled;
-    input.setAttribute("aria-label", `${c.name} on or off`);
-    input.addEventListener("change", () => onSwitch(c, input));
-    toggle.append(input, el("span", "switch-track"));
-    head.appendChild(toggle);
+    head.appendChild(switchEl(c.enabled, `${c.name} on or off`, (input) => onSwitch(c, input)));
     card.appendChild(head);
 
     if (c.notes) card.appendChild(el("p", "connector-notes", c.notes));
@@ -101,8 +97,9 @@ function connectorCard(c) {
     add("Permissions", c.scopes.length ? chips(c.scopes) : "Server default");
     add(
         c.tools ? `Tools (${c.tools.length})` : "Tools",
-        c.tools ? chips(c.tools) : "Every tool the server offers",
+        c.tools ? chips(c.tools) : "Every tool the server offers (attached on demand)",
     );
+    add("Skill", c.skill ? skillRow(c) : "None");
     card.appendChild(details);
 
     if (c.connected) {
@@ -113,6 +110,47 @@ function connectorCard(c) {
         card.appendChild(actions);
     }
     return card;
+}
+
+function switchEl(checked, label, onChange) {
+    const toggle = el("label", "switch");
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = checked;
+    input.setAttribute("aria-label", label);
+    input.addEventListener("change", () => onChange(input));
+    toggle.append(input, el("span", "switch-track"));
+    return toggle;
+}
+
+/** SKILL.md link + its description. */
+function skillRow(c) {
+    const row = el("div", "skill-row");
+    const open = el("button", "link-btn skill-link", "📄 SKILL.md");
+    open.addEventListener("click", () => openSkill(c));
+    row.append(open, el("div", "skill-description", c.skill));
+    return row;
+}
+
+async function openSkill(c) {
+    const dialog = $("skill-dialog");
+    $("skill-dialog-title").textContent = `${c.name} · SKILL.md`;
+    $("skill-dialog-description").textContent = c.skill;
+    const body = $("skill-dialog-body");
+    body.textContent = "Loading…";
+    if (!dialog.open) dialog.showModal();
+    try {
+        const skill = await api.getConnectorSkill(c.id);
+        body.innerHTML = renderMarkdown(skill.instructions);
+        if (skill.allowed_tools.length) {
+            const tools = el("div", "skill-tools");
+            tools.append(el("div", "connectors-intro", "Tools it attaches when loaded (allowed-tools):"), chips(skill.allowed_tools));
+            body.prepend(tools);
+        }
+    } catch (err) {
+        body.innerHTML = "";
+        body.appendChild(el("div", "error", `Could not load the skill: ${err.message}`));
+    }
 }
 
 function chips(items) {
@@ -130,7 +168,7 @@ async function onSwitch(c, input) {
             if (!done) input.checked = false; // cancelled, or we're off to the provider
             return;
         }
-        await api.setConnectorEnabled(c.id, on);
+        await api.updateConnector(c.id, { enabled: on });
         await loadConnectors();
     } catch (err) {
         input.checked = !on;

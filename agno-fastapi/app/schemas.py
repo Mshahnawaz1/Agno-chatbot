@@ -68,6 +68,14 @@ class ConnectorOut(BaseModel):
     tools: list[str] | None  # None = every tool the server offers
     connected: bool  # the user has logged in / saved a key
     enabled: bool  # connected and switched on, so the agent gets its tools
+    skill: str | None  # its SKILL.md description; None = no skill for this connector
+
+
+class SkillOut(BaseModel):
+    name: str
+    description: str
+    allowed_tools: list[str]
+    instructions: str  # SKILL.md body, markdown
 
 
 class ConnectorUpdate(BaseModel):

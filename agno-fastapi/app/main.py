@@ -3,6 +3,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload          # run from the agno-fastapi/ root
 """
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -15,6 +16,13 @@ from app.connectors import tools as connector_tools
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
+
+
+# uvicorn configures only its own loggers; show ours (run costs, routing, tool calls) too.
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S"))
+logging.getLogger("app").addHandler(_handler)
+logging.getLogger("app").setLevel(logging.INFO)
 
 
 @asynccontextmanager

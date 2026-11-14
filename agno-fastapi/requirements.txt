@@ -16,3 +16,4 @@ mcp
 fastmcp
 httpx
 cryptography
+google-genai

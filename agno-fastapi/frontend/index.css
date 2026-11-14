@@ -647,6 +647,62 @@ button {
   cursor: progress;
 }
 
+/* Skill row + SKILL.md dialog */
+.skill-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.skill-link {
+  margin-left: -8px;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.skill-tools {
+  margin-bottom: 12px;
+}
+
+.skill-tools .connectors-intro {
+  margin: 0 0 4px;
+}
+
+.skill-description {
+  flex-basis: 100%;
+  color: var(--muted);
+}
+
+.skill-dialog {
+  width: min(680px, 94vw);
+  max-height: 85vh;
+}
+
+.skill-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.skill-dialog .connectors-intro {
+  margin: 4px 0 12px;
+}
+
+.skill-body {
+  font-size: 14px;
+}
+
+.skill-body h1 {
+  font-size: 18px;
+}
+
+.skill-body h2 {
+  font-size: 15px;
+  margin: 16px 0 6px;
+}
+
 /* ---------- Small screens ---------- */
 @media (max-width: 700px) {
   .sidebar {

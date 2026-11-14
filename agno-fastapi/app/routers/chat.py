@@ -41,6 +41,18 @@ def run_metrics(metrics, tools) -> dict:
     return out
 
 
+def log_run(run_id, metrics, tools) -> None:
+    """One line per run: what it cost and which tools it called. Tune routing from these."""
+    if metrics is None:
+        return
+    logger.info(
+        "run %s done: in=%s out=%s %.1fs ttft=%.1fs tools=[%s]",
+        (run_id or "?")[:8], metrics.input_tokens, metrics.output_tokens,
+        metrics.duration or 0, metrics.time_to_first_token or 0,
+        ",".join(t.tool_name for t in tools or []),
+    )
+
+
 def sse(event: str, data: dict) -> str:
     # json.dumps keeps newlines inside tokens from breaking the SSE framing
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
@@ -50,11 +62,15 @@ def sse(event: str, data: dict) -> str:
 async def chat(body: ChatRequest, user: CurrentUser):
     session = resolve_session(body, user)
     try:
-        run = await agent.arun(body.message, user_id=user["id"], session_id=session["id"])
+        run = await agent.arun(
+            body.message, user_id=user["id"], session_id=session["id"],
+            metadata={"query": body.message},  # lets the tool router see the message
+        )
     except Exception:
         logger.exception("agent run failed")
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The model call failed")
     db.touch_chat_session(session["id"])
+    log_run(run.run_id, run.metrics, run.tools)
 
     return ChatResponse(
         session_id=session["id"], run_id=run.run_id, content=run.content or "",
@@ -77,7 +93,8 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
                 user_id=user["id"],
                 session_id=session["id"],
                 stream=True,
-                stream_events=True
+                stream_events=True,
+                metadata={"query": body.message},  # lets the tool router see the message
             ):
                 if event.event == RunEvent.run_error:
                     # Guardrail failures (InputCheckError/OutputCheckError) arrive here as
@@ -98,6 +115,7 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
                 elif event.event == RunEvent.run_completed:
                     run_id = run_id or event.run_id
                     final_metrics = run_metrics(event.metrics, tools)
+                    log_run(run_id, event.metrics, tools)
 
             if final_metrics:
                 yield sse("metrics", final_metrics)

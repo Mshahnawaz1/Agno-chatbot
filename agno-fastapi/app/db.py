@@ -44,6 +44,12 @@ CREATE TABLE IF NOT EXISTS user_connectors (
     created_at   TEXT DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, connector_id)
 );
+-- each connector's MCP tool list (JSON), so a run needn't contact the server to know it
+CREATE TABLE IF NOT EXISTS connector_catalog (
+    connector_id TEXT PRIMARY KEY,
+    tools        TEXT NOT NULL,
+    fetched_at   REAL NOT NULL
+);
 """
 
 
@@ -230,3 +236,19 @@ def delete_credentials(user_id: str, connector_id: str) -> None:
             "DELETE FROM user_connectors WHERE user_id = ? AND connector_id = ?",
             (user_id, connector_id),
         )
+
+
+def save_catalog(connector_id: str, tools: str, fetched_at: float) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO connector_catalog (connector_id, tools, fetched_at) VALUES (?, ?, ?)",
+            (connector_id, tools, fetched_at),
+        )
+
+
+def get_catalog(connector_id: str) -> tuple[str, float] | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT tools, fetched_at FROM connector_catalog WHERE connector_id = ?", (connector_id,)
+        ).fetchone()
+    return (row["tools"], row["fetched_at"]) if row else None

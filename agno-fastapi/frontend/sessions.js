@@ -50,6 +50,7 @@ async function loadSessions() {
 
 async function openSession(sessionId) {
     stopStreaming();
+    closeConnectorsPage();
 
     state.activeSessionId = sessionId;
     setActiveTitle(findSession(sessionId)?.title);
@@ -73,6 +74,7 @@ async function openSession(sessionId) {
 
 function startNewChat() {
     stopStreaming();
+    closeConnectorsPage();
 
     state.activeSessionId = null;
     setActiveTitle("New chat");

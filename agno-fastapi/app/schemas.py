@@ -63,7 +63,15 @@ class ConnectorOut(BaseModel):
     id: str
     name: str
     notes: str
-    connected: bool
+    url: str
+    scopes: list[str]
+    tools: list[str] | None  # None = every tool the server offers
+    connected: bool  # the user has logged in / saved a key
+    enabled: bool  # connected and switched on, so the agent gets its tools
+
+
+class ConnectorUpdate(BaseModel):
+    enabled: bool
 
 
 class AuthorizeOut(BaseModel):

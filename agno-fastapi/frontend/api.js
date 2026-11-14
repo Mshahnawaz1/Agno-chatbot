@@ -95,6 +95,15 @@ const api = {
         await api.check(res);
     },
 
+    async setConnectorEnabled(id, enabled) {
+        const res = await fetch(`/connectors/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            headers: api.headers({ json: true }),
+            body: JSON.stringify({ enabled }),
+        });
+        await api.check(res);
+    },
+
     async disconnectConnector(id) {
         const res = await fetch(`/connectors/${encodeURIComponent(id)}`, {
             method: "DELETE",

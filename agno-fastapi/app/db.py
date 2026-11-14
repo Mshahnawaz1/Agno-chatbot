@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS user_connectors (
     user_id      TEXT NOT NULL REFERENCES users(id),
     connector_id TEXT NOT NULL,
     credentials  TEXT NOT NULL,
+    enabled      INTEGER NOT NULL DEFAULT 1,  -- off = keep the login, don't load its tools
     created_at   TEXT DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, connector_id)
 );
@@ -66,6 +67,10 @@ def init_db() -> None:
     Path(settings.app_db_path).parent.mkdir(parents=True, exist_ok=True)
     with get_conn() as conn:
         conn.executescript(SCHEMA)
+        # Databases created before the on/off switch lack the column.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(user_connectors)")}
+        if "enabled" not in cols:
+            conn.execute("ALTER TABLE user_connectors ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
 
 
 # ---- users ----
@@ -184,7 +189,9 @@ def pop_oauth_state(state: str, connector_id: str) -> dict | None:
 def save_credentials(user_id: str, connector_id: str, credentials: str) -> None:
     with get_conn() as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO user_connectors (user_id, connector_id, credentials) VALUES (?, ?, ?)",
+            # Upsert, not REPLACE: a token refresh must not reset the on/off switch.
+            "INSERT INTO user_connectors (user_id, connector_id, credentials) VALUES (?, ?, ?)"
+            " ON CONFLICT (user_id, connector_id) DO UPDATE SET credentials = excluded.credentials",
             (user_id, connector_id, credentials),
         )
 
@@ -198,12 +205,23 @@ def get_credentials(user_id: str, connector_id: str) -> str | None:
     return row["credentials"] if row else None
 
 
-def list_connected(user_id: str) -> list[str]:
+def list_connected(user_id: str) -> dict[str, bool]:
+    """The user's connected connectors: connector_id -> switched on."""
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT connector_id FROM user_connectors WHERE user_id = ?", (user_id,)
+            "SELECT connector_id, enabled FROM user_connectors WHERE user_id = ?", (user_id,)
         ).fetchall()
-    return [r["connector_id"] for r in rows]
+    return {r["connector_id"]: bool(r["enabled"]) for r in rows}
+
+
+def set_connector_enabled(user_id: str, connector_id: str, enabled: bool) -> bool:
+    """False if the user hasn't connected this connector."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE user_connectors SET enabled = ? WHERE user_id = ? AND connector_id = ?",
+            (int(enabled), user_id, connector_id),
+        )
+    return cur.rowcount > 0
 
 
 def delete_credentials(user_id: str, connector_id: str) -> None:

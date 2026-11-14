@@ -449,6 +449,204 @@ button {
   font-size: 13px;
 }
 
+/* ---------- Connectors page ---------- */
+.sidebar-btn.is-active {
+  background: var(--active);
+}
+
+.connectors-page {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.connectors-page[hidden] {
+  display: none;
+}
+
+.connectors-wrap {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 8px 20px 40px;
+}
+
+.connectors-wrap h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.connectors-intro {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.connector-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.connector-card {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--sidebar);
+}
+
+.connector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.connector-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.connector-title h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.connector-status {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.connector-status.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.connector-notes {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.connector-details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 14px 0 0;
+  font-size: 13px;
+}
+
+.connector-details dt {
+  color: var(--muted);
+}
+
+.connector-details dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.connector-details code,
+.chip {
+  font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--bubble);
+}
+
+.connector-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.link-btn {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: 13px;
+}
+
+.link-btn:hover {
+  background: var(--hover);
+}
+
+.link-btn.danger {
+  color: var(--danger);
+}
+
+/* On/off switch */
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--active);
+  transition: background 0.15s ease;
+}
+
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s ease;
+}
+
+.switch input:checked + .switch-track {
+  background: var(--accent);
+}
+
+.switch input:checked + .switch-track::after {
+  transform: translateX(18px);
+  background: #fff;
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.switch input:disabled {
+  cursor: progress;
+}
+
 /* ---------- Small screens ---------- */
 @media (max-width: 700px) {
   .sidebar {
@@ -463,6 +661,19 @@ button {
 
   .composer {
     padding: 0 12px 14px;
+  }
+
+  .connectors-wrap {
+    padding: 8px 14px 32px;
+  }
+
+  .connector-details {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .connector-details dd {
+    margin-bottom: 8px;
   }
 
   .metrics-grid {

@@ -19,11 +19,13 @@ _live: dict[tuple[str, str], tuple[str, MCPTools]] = {}
 
 
 async def user_mcp_tools(user_id: str | None) -> list[MCPTools]:
-    """Connected toolkits for this user. A failing connector is skipped, never fatal."""
+    """Toolkits for this user's connectors that are switched on. A failing one is skipped."""
     if not user_id:
         return []
     tools = []
-    for connector_id in db.list_connected(user_id):
+    for connector_id, enabled in db.list_connected(user_id).items():
+        if not enabled:
+            continue
         c = CONNECTORS.get(connector_id)
         if c is None:
             continue  # removed from the registry

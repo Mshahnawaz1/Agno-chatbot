@@ -9,6 +9,8 @@ function bindEvents() {
     els.composerInput.addEventListener("input", autosizeComposer);
     els.composerInput.addEventListener("keydown", onComposerKeydown);
     $("logout-btn").addEventListener("click", logout);
+    $("connectors-btn").addEventListener("click", openConnectorsPage);
+    window.addEventListener("hashchange", route);
     els.authForm.addEventListener("submit", login);
     els.signupBtn.addEventListener("click", signup);
     // The app is useless logged out, so Escape must not dismiss the login dialog.
@@ -19,6 +21,7 @@ function init() {
     bindEvents();
     showWelcome();
     handleConnectorRedirect();
+    route(); // chat or connectors page, from the URL hash; loads connectors if needed
 
     if (!settings.token) {
         openAuth();
@@ -26,7 +29,6 @@ function init() {
     }
     // If the stored token has expired, this gets a 401 and api.check opens login.
     loadSessions();
-    loadConnectors();
 }
 
 init();

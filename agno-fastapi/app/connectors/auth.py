@@ -73,6 +73,10 @@ async def _oauth_client(c: Connector) -> dict:
     if meta.registration_endpoint is None:
         raise ConnectorError(f"{c.name} needs a pre-registered OAuth client")
 
+    # Confidential client where allowed; some servers (e.g. Fathom) only accept public ones.
+    methods = meta.token_endpoint_auth_methods_supported
+    auth_method = "none" if methods and "client_secret_post" not in methods else "client_secret_post"
+
     async with httpx.AsyncClient(timeout=TIMEOUT) as http:
         r = await http.post(
             str(meta.registration_endpoint),
@@ -81,7 +85,7 @@ async def _oauth_client(c: Connector) -> dict:
                 "redirect_uris": [redirect_uri(c)],
                 "grant_types": ["authorization_code", "refresh_token"],
                 "response_types": ["code"],
-                "token_endpoint_auth_method": "client_secret_post",
+                "token_endpoint_auth_method": auth_method,
                 "scope": c.scopes or None,
             },
         )

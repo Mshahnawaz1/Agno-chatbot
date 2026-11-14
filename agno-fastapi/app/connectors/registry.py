@@ -58,5 +58,44 @@ CONNECTORS = {
                 "complete-tasks",
             ],
         ),
+        # The next three don't publish tool names, so every tool is exposed for now.
+        # Trim with include_tools once the live tool list is known (Groq token limit).
+        Connector(
+            id="habitify",
+            name="Habitify",
+            url="https://mcp.habitify.me/mcp",
+            scopes="all offline_access",
+            notes="Track habits, log completions, read streaks and progress.",
+        ),
+        Connector(
+            id="sunsama",
+            name="Sunsama",
+            url="https://api.sunsama.com/mcp",
+            scopes="read execute offline_access",
+            notes="Plan the day: pull tasks, time-box them and review.",
+        ),
+        Connector(
+            id="fathom",
+            name="Fathom",
+            url="https://api.fathom.ai/mcp",
+            scopes="mcp",
+            notes="Read meeting recordings, summaries and action items.",
+        ),
+        Connector(
+            id="typeform",
+            name="Typeform",
+            url="https://api.typeform.com/mcp",  # EU accounts: https://api.eu.typeform.com/mcp
+            scopes="accounts:read workspaces:read forms:read forms:write insights:read offline_access",
+            notes="Beta. Create forms and read responses.",
+            # ~100 tools upstream (pages, contacts, automations...); keep forms + responses.
+            include_tools=[
+                "accounts-list_accounts",
+                "workspaces-list_workspaces",
+                "forms-public_list_forms",
+                "forms-public_get_form",
+                "forms-public_get_capabilities",
+                "forms-public_create_form",
+            ],
+        ),
     ]
 }

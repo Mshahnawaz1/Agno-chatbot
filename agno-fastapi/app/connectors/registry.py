@@ -41,5 +41,22 @@ CONNECTORS = {
                 "stop_task",
             ],
         ),
+        Connector(
+            id="todoist",
+            name="Todoist",
+            url="https://ai.todoist.net/mcp",
+            scopes="data:read_write",  # read + edit tasks/projects; no delete or billing
+            notes="Add, schedule and complete tasks.",
+            # 49 tools (~16k tokens) upstream; keep the task essentials (~3k tokens).
+            include_tools=[
+                "get-overview",
+                "find-projects",
+                "find-tasks",
+                "find-tasks-by-date",
+                "add-tasks",
+                "reschedule-tasks",
+                "complete-tasks",
+            ],
+        ),
     ]
 }

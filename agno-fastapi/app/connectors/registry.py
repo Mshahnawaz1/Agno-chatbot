@@ -26,6 +26,20 @@ CONNECTORS = {
             url="https://mcp.reclaim.ai",
             scopes="read write mcp",
             notes="Beta. Needs Reclaim 2.0 with a Google or Outlook calendar connected.",
+            # Reclaim exposes 32 tools (~15k tokens of schemas), more than Groq's
+            # 8k tokens/min free tier allows. Keep a core set (~3k tokens).
+            include_tools=[
+                "get_schedule",
+                "find_open_time",
+                "focus_stats",
+                "get_suggested_tasks",
+                "get_at_risk_tasks",
+                "search_reclaim_tasks",
+                "create_reclaim_task",
+                "update_reclaim_task",
+                "start_task",
+                "stop_task",
+            ],
         ),
     ]
 }

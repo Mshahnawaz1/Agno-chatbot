@@ -32,6 +32,15 @@ def resolve_session(body: ChatRequest, user: dict) -> dict:
     return session
 
 
+def run_metrics(metrics, tools) -> dict:
+    """Metrics shape the frontend expects. Shared with the session history endpoint."""
+    out = metrics.to_dict() if metrics else {}
+    tools = tools or []
+    out["num_tools"] = len(tools)
+    out["tools"] = [{"name": t.tool_name, "args": t.tool_args, "result": t.result} for t in tools]
+    return out
+
+
 def sse(event: str, data: dict) -> str:
     # json.dumps keeps newlines inside tokens from breaking the SSE framing
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
@@ -47,13 +56,9 @@ async def chat(body: ChatRequest, user: CurrentUser):
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The model call failed")
     db.touch_chat_session(session["id"])
 
-    # Adding metrics
-    metrics = run.metrics.to_dict()
-    tools = run.tools or []
-    metrics["num_tools"] = len(tools)
-    metrics["tools_metrics"] = [(t.tool_name, t.result, t.tool_args) for t in tools]
     return ChatResponse(
-        session_id=session["id"], run_id=run.run_id, content=run.content or "", metrics=metrics
+        session_id=session["id"], run_id=run.run_id, content=run.content or "",
+        metrics=run_metrics(run.metrics, run.tools),
     )
 
 
@@ -64,7 +69,7 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
     async def event_stream() -> AsyncIterator[str]:
         run_id = None
         tools = []
-        final_metrics = {}
+        final_metrics = None
         yield sse("session", {"session_id": session["id"]})
         try:
             async for event in agent.arun(
@@ -92,12 +97,10 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
 
                 elif event.event == RunEvent.run_completed:
                     run_id = run_id or event.run_id
-                    final_metrics = event.metrics.to_dict()
+                    final_metrics = run_metrics(event.metrics, tools)
 
-            final_metrics["num_tools"] = len(tools)
-            final_metrics["tools_metrics"] = [(t.tool_name, t.result, t.tool_args) for t in tools]
-            
-            yield sse("metrics", final_metrics)
+            if final_metrics:
+                yield sse("metrics", final_metrics)
             yield sse("done", {"run_id": run_id})
         except Exception as e:
             logger.exception("stream failed")

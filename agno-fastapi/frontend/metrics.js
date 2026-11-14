@@ -14,13 +14,22 @@ const METRIC_FIELDS = [
     ["num_tools", "Tool calls"],
 ];
 
-function stringify(value) {
-    if (typeof value === "string") return value;
-    return JSON.stringify(value, null, 2) ?? "";
+function toText(value) {
+    return typeof value === "string" ? value : JSON.stringify(value, null, 2) ?? "";
 }
 
-function truncate(text, max = 1000) {
-    return text.length > max ? text.slice(0, max) + "…" : text;
+function buildGrid(metrics) {
+    const grid = document.createElement("dl");
+    grid.className = "metrics-grid";
+    for (const [key, label, format] of METRIC_FIELDS) {
+        if (metrics[key] == null) continue;
+        const dt = document.createElement("dt");
+        dt.textContent = label;
+        const dd = document.createElement("dd");
+        dd.textContent = format ? format(metrics[key]) : String(metrics[key]);
+        grid.append(dt, dd);
+    }
+    return grid;
 }
 
 function makeDetails(title, bodyText) {
@@ -33,80 +42,61 @@ function makeDetails(title, bodyText) {
     return details;
 }
 
-function buildMetricsGrid(metrics) {
-    const grid = document.createElement("dl");
-    grid.className = "metrics-grid";
-
-    for (const [key, label, format] of METRIC_FIELDS) {
-        const value = metrics[key];
-        if (value === undefined || value === null) continue;
-
-        const dt = document.createElement("dt");
-        dt.textContent = label;
-        const dd = document.createElement("dd");
-        dd.textContent = format ? format(value) : String(value);
-        grid.append(dt, dd);
-    }
-    return grid;
+function buildTool({ name, args, result }) {
+    const resultText = toText(result);
+    const shortResult = resultText.length > 1000 ? resultText.slice(0, 1000) + "…" : resultText;
+    return makeDetails(name || "tool", `args:\n${toText(args)}\n\nresult:\n${shortResult}`);
 }
 
-function buildToolsSection(tools) {
-    const section = document.createDocumentFragment();
-
-    const title = document.createElement("div");
-    title.className = "metrics-subtitle";
-    title.textContent = "Tools";
-    section.appendChild(title);
-
-    for (const [name, result, args] of tools) {
-        const body = `args:\n${stringify(args)}\n\nresult:\n${truncate(stringify(result))}`;
-        section.appendChild(makeDetails(name || "tool", body));
-    }
-    return section;
-}
-
-function buildMetricsPanel(metrics) {
+function buildPanel(metrics) {
     const panel = document.createElement("div");
     panel.className = "metrics-panel";
     panel.hidden = true;
+    panel.appendChild(buildGrid(metrics));
 
-    panel.appendChild(buildMetricsGrid(metrics));
+    const tools = metrics.tools || [];
+    if (tools.length) {
+        const title = document.createElement("div");
+        title.className = "metrics-subtitle";
+        title.textContent = "Tools";
+        panel.append(title, ...tools.map(buildTool));
+    }
 
-    const tools = Array.isArray(metrics.tools_metrics) ? metrics.tools_metrics : [];
-    if (tools.length) panel.appendChild(buildToolsSection(tools));
-
-    const { tools_metrics, ...rest } = metrics;
+    const { tools: _, ...rest } = metrics;
     panel.appendChild(makeDetails("All metrics (raw)", JSON.stringify(rest, null, 2)));
-
     return panel;
 }
 
-function buildMetricsToggle(panel) {
+function buildToggle(panel) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "metrics-toggle";
     btn.textContent = "ⓘ Metrics";
     btn.title = "Show response metrics";
     btn.setAttribute("aria-expanded", "false");
-
     btn.addEventListener("click", () => {
         panel.hidden = !panel.hidden;
         btn.setAttribute("aria-expanded", String(!panel.hidden));
         btn.title = panel.hidden ? "Show response metrics" : "Hide response metrics";
-        if (!panel.hidden) scrollToBottom();
+        if (!panel.hidden) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
     return btn;
 }
 
-/** Attaches the metrics button and panel below an assistant reply. */
+/**
+ * Adds the metrics button and panel below an assistant reply.
+ * Used both for live replies (chat.js) and for history (sessions.js).
+ * Replies with no metrics (stopped or failed) get no button.
+ */
 function attachMetrics(replyEl, metrics) {
+    if (!metrics) return;
     const wrap = replyEl.closest(".message-wrap");
     if (!wrap || wrap.querySelector(".metrics-toggle")) return;
 
-    const panel = buildMetricsPanel(metrics);
+    const panel = buildPanel(metrics);
     const actions = document.createElement("div");
     actions.className = "message-actions";
-    actions.appendChild(buildMetricsToggle(panel));
+    actions.appendChild(buildToggle(panel));
 
     // Outside assistant-body because its innerHTML is rewritten while streaming.
     wrap.append(actions, panel);

@@ -59,7 +59,10 @@ async function openSession(sessionId) {
     try {
         const messages = await api.listMessages(sessionId);
         if (messages.length === 0) showWelcome();
-        for (const m of messages) addMessage(m.role, m.content);
+        for (const m of messages) {
+            const el = addMessage(m.role, m.content);
+            if (m.role === "assistant") attachMetrics(el, m.metrics);
+        }
         scrollToBottom({ force: true });
     } catch (err) {
         showError(addMessage("assistant"), `Could not load messages: ${err.message}`);

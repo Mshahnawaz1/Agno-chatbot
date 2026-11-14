@@ -53,6 +53,7 @@ class ChatRequest(BaseModel):
 class MessageOut(BaseModel):
     role: str
     content: str
+    metrics: dict | None = None  # assistant replies only
 
 class Token(BaseModel):
     access_token: str

@@ -1,9 +1,11 @@
+from agno.run.base import HISTORY_SKIP_STATUSES
 from fastapi import APIRouter, HTTPException, status
 
 from app import db
 from app.deps import CurrentUser
 from app.schemas import SessionCreate, SessionOut, MessageOut
 from app.agent import agent
+from app.routers.chat import run_metrics
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -32,13 +34,21 @@ async def session_messages(session_id: str, user: CurrentUser):
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
 
-    messages = await agent.aget_chat_history(session_id=session_id)
+    # Read runs (not plain chat history) because each run also stores its metrics
+    # and tool calls, so the frontend can show the Metrics button for old replies.
+    agno_session = await agent.aget_session(session_id=session_id)
+    runs = [
+        r for r in (agno_session.runs if agno_session else None) or []
+        if r.parent_run_id is None and r.status not in HISTORY_SKIP_STATUSES  # same filter as chat history
+    ]
 
     out = []
-    for m in messages or []:
-        if m.role not in ("user", "assistant"):
-            continue
-        content = m.content if isinstance(m.content, str) else str(m.content or "")
-        if content:
-            out.append(MessageOut(role=m.role, content=content))
+    for run in runs:
+        if run.input and run.input.input_content_string():
+            out.append(MessageOut(role="user", content=run.input.input_content_string()))
+        if run.content:
+            out.append(MessageOut(
+                role="assistant", content=str(run.content),
+                metrics=run_metrics(run.metrics, run.tools),
+            ))
     return out

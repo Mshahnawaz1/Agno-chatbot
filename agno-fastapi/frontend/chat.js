@@ -62,10 +62,8 @@ function prepareSend(text) {
 async function finishSend(ctx, wasNewChat) {
     ctx.replyEl.classList.remove("is-streaming");
 
-    if (ctx.metrics) {
-        attachMetrics(ctx.replyEl, ctx.metrics);
-        scrollToBottom();
-    }
+    attachMetrics(ctx.replyEl, ctx.metrics);
+    scrollToBottom();
 
     state.abortController = null;
     setStreaming(false);

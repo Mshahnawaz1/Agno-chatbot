@@ -13,3 +13,5 @@ wheels/
 learn_agno/data
 .env
 data/
+
+.claude/

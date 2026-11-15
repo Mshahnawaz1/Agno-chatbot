@@ -70,13 +70,13 @@ async def callback(connector_id: str, state: str, code: str | None = None):
     """The provider redirects the browser here. No JWT: the user comes from `state`."""
     c = get_connector(connector_id)
     if code is None:  # user denied access, or the provider returned ?error=...
-        return RedirectResponse(f"/?connector_error={c.id}#connectors", status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(f"/settings/connectors?connector_error={c.id}", status.HTTP_303_SEE_OTHER)
     try:
         await auth.complete(c, code, state)
     except (auth.ConnectorError, httpx.HTTPError) as e:
         logger.warning("callback %s failed: %s", c.id, e)
-        return RedirectResponse(f"/?connector_error={c.id}#connectors", status.HTTP_303_SEE_OTHER)
-    return RedirectResponse(f"/?connected={c.id}#connectors", status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(f"/settings/connectors?connector_error={c.id}", status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/settings/connectors?connected={c.id}", status.HTTP_303_SEE_OTHER)
 
 
 @router.put("/{connector_id}/api-key", status_code=status.HTTP_204_NO_CONTENT)

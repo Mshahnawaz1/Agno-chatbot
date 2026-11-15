@@ -5,17 +5,41 @@ uvicorn app.main:app --reload          # run from the agno-fastapi/ root
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import db
 from app.routers import auth, sessions, users, chat, connectors
 from app.connectors import tools as connector_tools
 
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
+logger = logging.getLogger("app")
+
+API_PREFIXES = {"auth", "users", "sessions", "chat", "connectors", "health"}
+DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
+
+class SPAStaticFiles(StaticFiles):
+    """Serve the React build; unknown non-API paths fall back to index.html."""
+
+    @staticmethod
+    def _is_spa_path(path: str) -> bool:
+        first = path.lstrip("/").split("/", 1)[0]
+        return first not in API_PREFIXES
+
+    async def get_response(self, path, scope):
+        try:
+            response = await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code != 404 or not self._is_spa_path(path):
+                raise
+            return await super().get_response("index.html", scope)
+        if response.status_code == 404 and self._is_spa_path(path):
+            return await super().get_response("index.html", scope)
+        return response
 
 
 # uvicorn configures only its own loggers; show ours (run costs, routing, tool calls) too.
@@ -33,8 +57,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Agno + FastAPI", lifespan=lifespan)
-
-from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,5 +78,10 @@ def health():
     return {"status": "ok"}
 
 # must be registered last: a mount at "/" matches every path
-app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
+if DIST_DIR.is_dir():
+    app.mount("/", SPAStaticFiles(directory=DIST_DIR, html=True), name="static")
+else:
+    logger.warning(
+        "frontend/dist not found; run `cd frontend && npm install && npm run build`"
+    )
 

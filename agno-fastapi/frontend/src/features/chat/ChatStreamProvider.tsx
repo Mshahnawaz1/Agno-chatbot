@@ -46,6 +46,8 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
   const runCounter = useRef(0)
   const idCounter = useRef(0)
   const hadTurnsRef = useRef(false)
+  /** Writes the run's buffered tokens into the state now (tokens are batched per frame). */
+  const flushRef = useRef<(() => void) | null>(null)
 
   const abortActive = useCallback(() => {
     activeRunRef.current = null
@@ -87,6 +89,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
     const runId = activeRunRef.current
     if (runId === null) return
     const assistantId = `a${runId}`
+    flushRef.current?.()
     abortActive()
     dispatch({ type: 'finish', runId, assistantId, status: 'stopped' })
   }, [abortActive])
@@ -105,6 +108,19 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       let sessionId = sessionIdRef.current
 
       dispatch({ type: 'start', runId, userId, assistantId, text })
+
+      // Batch tokens into one state update per animation frame. Each update re-parses the whole
+      // reply's markdown, so per-chunk updates made long replies cost O(n^2) to render.
+      let pending = ''
+      let frame = 0
+      const flush = () => {
+        if (frame) cancelAnimationFrame(frame)
+        frame = 0
+        if (!pending) return
+        dispatch({ type: 'token', runId, assistantId, content: pending })
+        pending = ''
+      }
+      flushRef.current = flush
 
       let gotDone = false
       let failed = false
@@ -131,13 +147,16 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
             }
             case 'token':
               if (typeof d.content === 'string' && d.content) {
-                dispatch({ type: 'token', runId, assistantId, content: d.content })
+                pending += d.content
+                if (!frame) frame = requestAnimationFrame(flush)
               }
               break
             case 'metrics':
+              flush()
               dispatch({ type: 'metrics', runId, assistantId, metrics: d as Metrics })
               break
             case 'guardrail_error':
+              flush()
               failed = true
               dispatch({
                 type: 'fail', runId, assistantId, kind: 'guardrail',
@@ -145,6 +164,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
               })
               break
             case 'error':
+              flush()
               failed = true
               dispatch({
                 type: 'fail', runId, assistantId, kind: 'error',
@@ -156,6 +176,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
               break
           }
         }
+        if (isActive()) flush()
         if (isActive() && !gotDone && !failed) {
           failed = true
           dispatch({
@@ -171,6 +192,9 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
           dispatch({ type: 'fail', runId, assistantId, kind: 'error', message: errorText(err) })
         }
       } finally {
+        if (isActive()) flush()
+        else if (frame) cancelAnimationFrame(frame)
+        if (flushRef.current === flush) flushRef.current = null
         if (isActive()) {
           activeRunRef.current = null
           controllerRef.current = null
@@ -189,17 +213,19 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
     navigate('/')
   }, [navigate, reset])
 
+  const streaming = state.activeRun !== null
+
   const value = useMemo<ChatStreamValue>(
     () => ({
       sessionId: state.sessionId,
       turns: state.turns,
-      streaming: state.activeRun !== null,
+      streaming,
       newChatCount,
       send: (text) => void send(text),
       stop,
       newChat,
     }),
-    [state, newChatCount, send, stop, newChat],
+    [state, streaming, newChatCount, send, stop, newChat],
   )
 
   return <ChatStreamContext.Provider value={value}>{children}</ChatStreamContext.Provider>

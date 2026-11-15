@@ -4,6 +4,7 @@ from agno.exceptions import CheckTrigger, InputCheckError, OutputCheckError
 from agno.utils.log import logger
 from agno.tools import tool
 
+import inspect
 import time
 from typing import Any, Callable, Dict
 import httpx
@@ -38,14 +39,18 @@ def input_length_guardrail(run_input: RunInput) -> None:
         )
 
 
-def tool_logger_hook(
+async def tool_logger_hook(
     function_name: str,
     function_call: Callable,
     arguments: Dict[str, Any],
 ):
-    start = time.time()
+    # Async so it times the tool itself: in agno's async chain function_call returns a
+    # coroutine, and a sync hook measured only how long creating it took (~0.00s).
+    start = time.monotonic()
     result = function_call(**arguments)
-    logger.info(f"Function called: {function_name} took {time.time() - start:.2f}s")
+    if inspect.isawaitable(result):
+        result = await result
+    logger.info(f"Function called: {function_name} took {time.monotonic() - start:.2f}s")
     return result
 
 def output_hook_validate(run_output: RunOutput) -> None:

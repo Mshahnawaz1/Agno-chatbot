@@ -3,6 +3,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload          # run from the agno-fastapi/ root
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,6 +16,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app import db
 from app.routers import auth, sessions, users, chat, connectors
 from app.connectors import tools as connector_tools
+from app.agent import warm_embedder
 
 logger = logging.getLogger("app")
 
@@ -53,6 +55,12 @@ logging.getLogger("app").setLevel(logging.INFO)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()  # create tables on startup
+    # Load the embedding model in the background so the first document question doesn't wait for it.
+    warm = asyncio.create_task(asyncio.to_thread(warm_embedder))
+    warm.add_done_callback(
+        lambda t: not t.cancelled() and t.exception()
+        and logger.warning("embedder warm-up failed: %s", t.exception())
+    )
     yield
     await connector_tools.close_all()  # close open MCP connections
 

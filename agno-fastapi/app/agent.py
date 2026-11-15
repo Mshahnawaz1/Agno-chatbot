@@ -50,7 +50,19 @@ vector_db = ChromaDb(
 knowledge = Knowledge(
     name="System Docs Knowledge Base",
     vector_db=vector_db,
+    # The default 10 chunks came to ~10k chars (~2.5k tokens) per search, resent on
+    # every later model call of the run; 5 hybrid-ranked chunks cover these docs.
+    max_results=5,
 )
+
+
+def warm_embedder() -> None:
+    """Load the FastEmbed model now (blocking; run it in a thread at startup).
+
+    It loads lazily on the first knowledge search otherwise, after asking the
+    Hugging Face Hub for its files: 1-12s added to the first document question.
+    """
+    embedder.get_embedding("warm up")
 
 BASE_TOOLS = [primes_below, get_weather, YFinanceTools()]
 
@@ -128,7 +140,7 @@ agent = Agent(
     enable_agentic_memory=True,
     add_memories_to_context=True,
     add_datetime_to_context=True,
-    num_history_runs= 5,
+    num_history_runs= 3,
     # Old tool results (task lists, schedules) are the bulkiest history; keep the last few.
     max_tool_calls_from_history=3,
     tools=agent_tools,

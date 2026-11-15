@@ -17,7 +17,15 @@ type Banner = { kind: 'success' | 'danger'; id: string }
 export function ConnectorsPage() {
   const { data, isPending, error, refetch } = useConnectors()
   const [params, setParams] = useSearchParams()
-  const [banner, setBanner] = useState<Banner | null>(null)
+  // The OAuth redirect lands here with ?connected / ?connector_error on a full page load,
+  // so capturing it once on mount is enough; the effect below then cleans the URL.
+  const [banner, setBanner] = useState<Banner | null>(() => {
+    const ok = params.get('connected')
+    const bad = params.get('connector_error')
+    if (ok) return { kind: 'success', id: ok }
+    if (bad) return { kind: 'danger', id: bad }
+    return null
+  })
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<Tab>('all')
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -26,12 +34,8 @@ export function ConnectorsPage() {
   const [cardError, setCardError] = useState<string | null>(null)
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ all: null, connected: null })
 
-  // Capture the OAuth redirect result during render (no effect), then clean the URL.
   const okId = params.get('connected')
   const badId = params.get('connector_error')
-  if (okId || badId) {
-    setBanner(okId ? { kind: 'success', id: okId } : { kind: 'danger', id: badId! })
-  }
   useEffect(() => {
     if (!okId && !badId) return
     const next = new URLSearchParams(params)

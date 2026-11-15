@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Metrics } from '@/lib/types'
+import type { UiAction } from './a2ui/parse'
 
 export type TurnStatus = 'streaming' | 'done' | 'stopped' | 'error'
 export type ErrorKind = 'guardrail' | 'error'
@@ -103,3 +104,16 @@ export function useChatStream(): ChatStreamValue {
 }
 
 export const MAX_MESSAGE_LENGTH = 4000
+
+/**
+ * For A2UI surfaces: send a click back to the agent. A separate context from the stream state,
+ * whose value changes on every token: this one changes only when a run starts or ends, so
+ * memoized messages don't re-render while a reply streams.
+ */
+export type UiActionsValue = { sendAction: (action: UiAction) => void; busy: boolean }
+
+export const UiActionsContext = createContext<UiActionsValue>({ sendAction: () => {}, busy: false })
+
+export function useUiActions(): UiActionsValue {
+  return useContext(UiActionsContext)
+}

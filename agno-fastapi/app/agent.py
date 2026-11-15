@@ -24,6 +24,7 @@ from app.guardrails import piiGuardrails, input_length_guardrail, tool_logger_ho
 from app.tools import primes_below, get_weather
 from app.connectors.tools import user_connector_tools
 from app.skills import skills
+from app.a2ui import A2UI_INSTRUCTIONS, A2UI_RULE
 
 Path(settings.agno_db_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -153,6 +154,8 @@ agent = Agent(
         "Connected-app tools are named <app>_<tool>, e.g. todoist_find-tasks. If one in "
         "your tool list fits, call it directly. Only when none fits: search_tools, "
         "then get_tool, then call_tool.",
+        A2UI_RULE,
     ],
+    additional_context=A2UI_INSTRUCTIONS,  # interactive UI in replies (app/a2ui.py)
 )
 # agent.print_response("What is the name of my client?")

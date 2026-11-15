@@ -7,9 +7,13 @@ import type { Message, Metrics } from '@/lib/types'
 import {
   ChatStreamContext,
   initialStreamState,
+  MAX_MESSAGE_LENGTH,
   streamReducer,
+  UiActionsContext,
   type ChatStreamValue,
+  type UiActionsValue,
 } from './chatStore'
+import { formatAction, type UiAction } from './a2ui/parse'
 
 /** Route -> session it shows: an id, null for "/" (new chat), or OTHER for non-chat pages. */
 const OTHER = Symbol('other')
@@ -214,6 +218,18 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
   }, [navigate, reset])
 
   const streaming = state.activeRun !== null
+  const sendAction = useCallback(
+    (action: UiAction) => {
+      const text = formatAction(action)
+      if (text.length > MAX_MESSAGE_LENGTH) {
+        console.warn('A2UI action too large to send', action)
+        return
+      }
+      void send(text)
+    },
+    [send],
+  )
+  const uiActions = useMemo<UiActionsValue>(() => ({ sendAction, busy: streaming }), [sendAction, streaming])
 
   const value = useMemo<ChatStreamValue>(
     () => ({
@@ -228,5 +244,9 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
     [state, streaming, newChatCount, send, stop, newChat],
   )
 
-  return <ChatStreamContext.Provider value={value}>{children}</ChatStreamContext.Provider>
+  return (
+    <ChatStreamContext.Provider value={value}>
+      <UiActionsContext.Provider value={uiActions}>{children}</UiActionsContext.Provider>
+    </ChatStreamContext.Provider>
+  )
 }

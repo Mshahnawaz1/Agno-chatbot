@@ -1,10 +1,12 @@
-import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { Check, CircleAlert, Copy, Info, ShieldAlert } from 'lucide-react'
+import { memo, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Check, CircleAlert, Copy, Info, MousePointerClick, ShieldAlert } from 'lucide-react'
 import clsx from 'clsx'
 import { Logo } from '@/components/ui'
 import { Markdown } from '@/components/Markdown'
 import type { Turn } from './chatStore'
 import { MetricsPanel } from './MetricsPanel'
+import { A2uiBlock, A2uiPending } from './a2ui'
+import { parseAction, parseSegments, textOnly, trimPartialTag, type UiAction } from './a2ui/parse'
 
 function Callout({ kind, message }: { kind: 'guardrail' | 'error'; message: string }) {
   const guardrail = kind === 'guardrail'
@@ -63,7 +65,53 @@ const CARET = [
   '[&>*:last-child]:after:bg-fg [&>*:last-child]:after:caret-blink',
 ].join(' ')
 
+function summarize(value: unknown): string {
+  if (value == null || value === '') return '—'
+  if (Array.isArray(value)) return value.map(summarize).join(', ')
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+/** A click on an A2UI surface, shown as what was chosen rather than as raw protocol. */
+function ActionMessage({ action }: { action: UiAction }) {
+  const entries = Object.entries(action.context ?? {})
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[80%] rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-sm text-fg wrap-anywhere">
+        <p className="flex items-center gap-1.5 font-medium">
+          <MousePointerClick className="size-3.5 shrink-0 text-accent" aria-hidden />
+          {action.name.replace(/[_-]+/g, ' ')}
+        </p>
+        {entries.length ? (
+          <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-fg-muted">
+            {entries.map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="text-fg-subtle">{k}</dt>
+                <dd className="min-w-0">{summarize(v)}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/** Markdown and A2UI blocks, in reply order. */
+function ReplyBody({ content, streaming }: { content: string; streaming: boolean }) {
+  const segments = useMemo(() => parseSegments(content), [content])
+  return segments.map((seg, i) => {
+    const last = i === segments.length - 1
+    if (seg.kind === 'ui') return <A2uiBlock key={seg.key} raw={seg.raw} />
+    if (seg.kind === 'pending') return streaming ? <A2uiPending key="pending" /> : null
+    const text = streaming && last ? trimPartialTag(seg.text) : seg.text
+    return text ? <Markdown key={`t${i}`} className={streaming && last ? CARET : undefined}>{text}</Markdown> : null
+  })
+}
+
 function UserMessage({ content }: { content: string }) {
+  const action = useMemo(() => parseAction(content), [content])
+  if (action) return <ActionMessage action={action} />
   return (
     <div className="flex justify-end">
       <div className="max-w-[80%] whitespace-pre-wrap rounded-xl bg-surface-2 px-4 py-2.5 leading-7 text-fg wrap-anywhere">
@@ -87,7 +135,7 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(turn.content)
+      await navigator.clipboard.writeText(textOnly(turn.content))
       setCopied(true)
       clearTimeout(timer.current)
       timer.current = setTimeout(() => setCopied(false), 1500)
@@ -103,7 +151,7 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
         {thinking ? (
           <p className="shimmer leading-7">Thinking…</p>
         ) : turn.content ? (
-          <Markdown className={streaming ? CARET : undefined}>{turn.content}</Markdown>
+          <ReplyBody content={turn.content} streaming={streaming} />
         ) : null}
 
         {turn.status === 'stopped' ? (

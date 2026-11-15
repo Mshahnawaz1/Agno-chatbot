@@ -1,0 +1,35 @@
+/* The basic catalog reads only CSS variables (defined with zero specificity), so mapping
+   them onto the app's tokens here is the whole theme. */
+.a2ui-host {
+  color-scheme: dark;
+  accent-color: var(--color-accent);
+  --a2ui-color-background: var(--color-surface);
+  --a2ui-color-on-background: var(--color-fg);
+  --a2ui-color-surface: var(--color-surface-2);
+  --a2ui-color-on-surface: var(--color-fg);
+  --a2ui-color-input: var(--color-bg);
+  --a2ui-color-on-input: var(--color-fg);
+  --a2ui-color-border: var(--color-border-strong);
+  --a2ui-color-primary: var(--color-accent);
+  --a2ui-color-on-primary: #ffffff;
+  --a2ui-color-secondary: var(--color-surface-3);
+  --a2ui-color-on-secondary: var(--color-fg);
+  --a2ui-border-radius: var(--radius-sm);
+  --a2ui-font-family-title: var(--font-display);
+  --a2ui-font-family-monospace: var(--font-mono);
+  font-family: var(--font-sans);
+  color: var(--color-fg);
+}
+
+.a2ui-host[inert] {
+  opacity: 0.6;
+  transition: opacity 150ms;
+}
+
+/* Markdown inside Text components: no block margins, the surface's layout spaces things. */
+.a2ui-markdown > :first-child {
+  margin-top: 0;
+}
+.a2ui-markdown > :last-child {
+  margin-bottom: 0;
+}

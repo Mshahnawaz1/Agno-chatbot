@@ -9,10 +9,14 @@ class Settings(BaseSettings):
     tool_cache_ttl: int = 3600 #seconds
     tool_cache_dir: str = "data/tools"
 
-    # LLMs: Groq first; Gemini takes over when Groq rate-limits (free tier: 8k
-    # tokens/min) or fails. No GEMINI_API_KEY = no fallback.
+    # LLMs: one provider answers, the other is the fallback (rate limit, overflow,
+    # 5xx). No GEMINI_API_KEY = Groq only.
+    # "gemini" (default) or "groq". The other provider becomes the fallback.
+    # Gemini: 1M context and no 429s in a 72k-tokens-in-10s burst test on the free
+    # tier (2026-11-15); Groq gpt-oss-120b: 131k context, 8k tokens/minute.
+    primary_model: str = "gemini"
     groq_model: str = "openai/gpt-oss-120b"
-    groq_timeout: float = 20  # seconds; a stalled Groq call falls over to Gemini
+    groq_timeout: float = 20  # seconds; a stalled Groq call fails over instead of hanging
     # Tried in order. Availability varies: on 2026-11-14 gemini-3.6/3.7/3.8-flash
     # were overloaded (503/504) and 2.5-flash is closed to new keys.
     gemini_models: str = "gemini-3.5-flash-lite,gemini-3.5-flash"

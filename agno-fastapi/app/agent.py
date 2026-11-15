@@ -89,7 +89,9 @@ async def agent_tools(run_context) -> list:
 
 
 agent = Agent(
-    model=Groq(id=settings.groq_model),
+    # No SDK retries: on a 429 the Groq SDK would sleep for `retry-after` (up to 60s,
+    # twice) before agno ever tried the Gemini fallback. Fail fast and fall over instead.
+    model=Groq(id=settings.groq_model, max_retries=0, timeout=settings.groq_timeout),
     fallback_config=fallback_config(),
     db=agent_db,
     knowledge=knowledge,

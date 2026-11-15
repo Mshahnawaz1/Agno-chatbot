@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # LLMs: Groq first; Gemini takes over when Groq rate-limits (free tier: 8k
     # tokens/min) or fails. No GEMINI_API_KEY = no fallback.
     groq_model: str = "openai/gpt-oss-120b"
+    groq_timeout: float = 20  # seconds; a stalled Groq call falls over to Gemini
     # Tried in order. Availability varies: on 2026-11-14 gemini-3.6/3.7/3.8-flash
     # were overloaded (503/504) and 2.5-flash is closed to new keys.
     gemini_models: str = "gemini-3.5-flash-lite,gemini-3.5-flash"

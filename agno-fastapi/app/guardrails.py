@@ -10,7 +10,7 @@ import httpx
 import re
 
 
-MAX_INPUT_CHARS = 300
+MAX_INPUT_CHARS = 4000  # same as ChatRequest.message and the composer's limit
 BLOCKED_WORD = re.compile(r"\bhello\b", re.IGNORECASE)
 
 

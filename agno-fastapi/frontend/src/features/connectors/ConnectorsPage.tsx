@@ -84,7 +84,7 @@ export function ConnectorsPage() {
       <div className="mx-auto w-full max-w-[1040px] px-4 py-8 sm:px-6 sm:py-10">
         <header className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
-            <h1 className="font-display text-3xl font-semibold tracking-tight text-fg">Connectors</h1>
+            <h1 className="text-display text-4xl text-fg sm:text-5xl">Connectors</h1>
             {data && <Badge aria-label={`${list.length} connectors`}>{list.length}</Badge>}
           </div>
           <p className="text-fg-muted">

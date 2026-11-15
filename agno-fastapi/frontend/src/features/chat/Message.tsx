@@ -146,7 +146,7 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
 
   return (
     <div className="group flex gap-3 sm:gap-4">
-      <Logo size={24} className="mt-0.5 shrink-0" />
+      <Logo size={24} className="mt-0.5 shrink-0 self-start" />
       <div className="min-w-0 flex-1" aria-live={streaming ? 'polite' : undefined} aria-busy={streaming || undefined}>
         {thinking ? (
           <p className="shimmer leading-7">Thinking…</p>

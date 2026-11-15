@@ -6,6 +6,7 @@ import clsx from 'clsx'
 import * as api from '@/lib/api'
 import { ApiError } from '@/lib/api'
 import { Button } from '@/components/ui'
+import { Backdrop } from '@/components/site'
 import { useChatStream, type Turn } from './chatStore'
 import { Composer } from './Composer'
 import { MessageList, type MessageListHandle } from './MessageList'
@@ -117,14 +118,17 @@ export function ChatPage() {
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
+    <div className="relative isolate flex h-full min-h-0 flex-col">
       {isEmpty ? (
-        <div className="relative flex flex-1 flex-col items-center justify-end px-4 pb-8">
-          <div aria-hidden className="bg-glow pointer-events-none absolute inset-0 opacity-70 [background-position:center_bottom]" />
-          <h1 className="relative text-center font-display text-[32px] font-semibold leading-tight tracking-tight text-fg">
-            What can I help with?
-          </h1>
-        </div>
+        <>
+          <Backdrop orbClassName="top-1/2 w-[min(900px,150vw)] -translate-y-[55%]" fadeAt="70%" fadeTop />
+          <div className="flex flex-1 flex-col items-center justify-end px-4 pb-8">
+            <h1 className="text-display text-center text-[clamp(2.5rem,6vw,4.5rem)] text-fg [text-shadow:0_4px_40px_rgb(0_0_0/0.35)]">
+              What can I help with?
+            </h1>
+            <p className="mt-3 text-center font-display text-lg text-fg-muted">Ask about your tasks, calendar, meetings or habits</p>
+          </div>
+        </>
       ) : (
         <MessageList ref={listRef} turns={turns} footer={footer} />
       )}
@@ -146,7 +150,7 @@ export function ChatPage() {
                 <button
                   type="button"
                   onClick={() => pickSuggestion(s)}
-                  className="rounded-full border border-border bg-surface px-3.5 py-2 text-sm text-fg-muted transition-colors hover:border-border-strong hover:bg-surface-2 hover:text-fg"
+                  className="rounded-full border border-white/10 bg-surface/70 px-4 py-2 text-sm text-fg-muted backdrop-blur transition-colors hover:border-white/20 hover:bg-surface-2 hover:text-fg"
                 >
                   {s}
                 </button>

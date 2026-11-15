@@ -76,8 +76,8 @@ export function Composer({
         if (!streaming && !sendDisabled) onSubmit()
       }}
       className={clsx(
-        'flex items-end gap-2 rounded-3xl border bg-surface-2 py-2 pl-4 pr-2 transition-colors',
-        'border-border focus-within:border-border-strong',
+        'glass flex items-end gap-2 rounded-3xl py-2 pl-5 pr-2 transition-colors',
+        'shadow-[0_-10px_60px_-10px_rgb(124_58_237/0.3)] focus-within:border-white/20',
       )}
     >
       <textarea

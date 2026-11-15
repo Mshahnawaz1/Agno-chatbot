@@ -59,8 +59,7 @@ export function SignupPage() {
     <AuthLayout
       title="Create your account"
       subtitle="Start chatting with your tools in Agno"
-      navLabel="Log in"
-      navTo={loginTo}
+      loginTo={loginTo}
       footer={
         <>
           Already have an account?{' '}

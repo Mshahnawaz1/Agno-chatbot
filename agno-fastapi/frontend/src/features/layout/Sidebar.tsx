@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, NavLink } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { PanelLeftClose, Plug, Search, SquarePen } from 'lucide-react'
+import { ArrowUpRight, PanelLeftClose, Plug, Search } from 'lucide-react'
 import clsx from 'clsx'
 import * as api from '@/lib/api'
 import { groupSessionsByDate } from '@/lib/format'
@@ -13,7 +13,7 @@ import { IS_MAC } from './useMediaQuery'
 const SHORTCUT = IS_MAC ? '⇧⌘O' : 'Ctrl+Shift+O'
 
 const rowBase =
-  'flex h-9 w-full items-center gap-2.5 rounded-sm px-2.5 text-sm transition-colors'
+  'flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-sm transition-colors'
 
 function SessionList({ query, onNavigate }: { query: string; onNavigate: () => void }) {
   const sessions = useQuery({ queryKey: ['sessions'], queryFn: api.listSessions })
@@ -95,7 +95,7 @@ export function Sidebar({ onClose, onNavigate }: { onClose: () => void; onNaviga
   const connectedCount = connectors.data?.filter((c) => c.connected).length ?? 0
 
   return (
-    <nav aria-label="Chats" className="flex h-full w-[260px] flex-col bg-surface">
+    <nav aria-label="Chats" className="flex h-full w-[260px] flex-col bg-surface/80 backdrop-blur-xl">
       <div className="flex h-14 shrink-0 items-center justify-between px-3">
         <Link
           to="/"
@@ -104,7 +104,7 @@ export function Sidebar({ onClose, onNavigate }: { onClose: () => void; onNaviga
             newChat()
             onNavigate()
           }}
-          className="rounded-sm"
+          className="rounded-full"
           aria-label="Agno, new chat"
         >
           <Logo wordmark size={26} />
@@ -121,12 +121,14 @@ export function Sidebar({ onClose, onNavigate }: { onClose: () => void; onNaviga
             newChat()
             onNavigate()
           }}
-          className={clsx(rowBase, 'text-fg hover:bg-surface-2')}
+          className="group flex h-10 w-full items-center gap-2 rounded-full bg-white pl-1 pr-4 text-sm font-medium text-black transition-colors hover:bg-white/90 active:bg-white/80"
           aria-keyshortcuts={IS_MAC ? 'Meta+Shift+O' : 'Control+Shift+O'}
         >
-          <SquarePen className="size-4 shrink-0" aria-hidden />
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-black text-white">
+            <ArrowUpRight className="size-4 transition-transform group-hover:-translate-y-px group-hover:translate-x-px" aria-hidden />
+          </span>
           <span className="flex-1 text-left">New chat</span>
-          <kbd className="hidden font-sans text-xs text-fg-subtle md:inline">{SHORTCUT}</kbd>
+          <kbd className="hidden font-sans text-xs text-black/50 md:inline">{SHORTCUT}</kbd>
         </button>
         <label className="relative block">
           <span className="sr-only">Search chats</span>
@@ -136,7 +138,7 @@ export function Sidebar({ onClose, onNavigate }: { onClose: () => void; onNaviga
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
-            className="h-9 w-full rounded-sm border border-border bg-surface-2 pl-8 pr-2.5 text-sm text-fg placeholder:text-fg-subtle transition-colors hover:border-border-strong focus-visible:border-border-strong"
+            className="h-9 w-full rounded-full border border-border bg-surface-2 pl-8 pr-2.5 text-sm text-fg placeholder:text-fg-subtle transition-colors hover:border-border-strong focus-visible:border-border-strong"
           />
         </label>
       </div>
@@ -145,7 +147,7 @@ export function Sidebar({ onClose, onNavigate }: { onClose: () => void; onNaviga
         <SessionList query={query} onNavigate={onNavigate} />
       </div>
 
-      <div className="flex shrink-0 flex-col gap-1 border-t border-border p-2">
+      <div className="flex shrink-0 flex-col gap-1 border-t border-white/10 p-2">
         <NavLink
           to="/settings/connectors"
           onClick={onNavigate}

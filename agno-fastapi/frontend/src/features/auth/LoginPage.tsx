@@ -46,8 +46,7 @@ export function LoginPage() {
     <AuthLayout
       title="Welcome back"
       subtitle="Log in to continue to Agno"
-      navLabel="Sign up"
-      navTo={signupTo}
+      signupTo={signupTo}
       footer={
         <>
           Don&apos;t have an account?{' '}

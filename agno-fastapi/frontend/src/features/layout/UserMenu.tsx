@@ -19,7 +19,7 @@ export function UserMenu({ onNavigate }: { onNavigate: () => void }) {
 
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger className="flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-surface-2 data-[state=open]:bg-surface-2">
+      <DropdownMenu.Trigger className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-surface-2 data-[state=open]:bg-surface-2">
         <span
           aria-hidden
           className="grid size-8 shrink-0 place-items-center rounded-full bg-linear-to-br from-accent to-accent-2 text-sm font-semibold text-white"
@@ -44,7 +44,7 @@ export function UserMenu({ onNavigate }: { onNavigate: () => void }) {
           side="top"
           align="start"
           sideOffset={6}
-          className="z-50 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] rounded-md border border-border-strong bg-surface-2 p-1 shadow-2xl"
+          className="z-50 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] rounded-xl border border-white/10 bg-surface-2/95 backdrop-blur-xl p-1 shadow-2xl"
         >
           {email ? (
             <div className="truncate px-2.5 py-2 text-xs text-fg-subtle">{email}</div>

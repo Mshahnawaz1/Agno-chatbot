@@ -27,13 +27,13 @@ export function TopBar({
   const title = useTitle()
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-1 px-2 sm:px-3">
+    <header className="relative z-10 flex h-14 shrink-0 items-center gap-1 px-2 sm:px-3">
       {showToggle ? (
         <IconButton aria-label="Open sidebar" onClick={onToggle}>
           {isMobile ? <Menu className="size-5" aria-hidden /> : <PanelLeftOpen className="size-5" aria-hidden />}
         </IconButton>
       ) : null}
-      <p className="min-w-0 flex-1 truncate px-2 text-base font-medium text-fg">
+      <p className="min-w-0 flex-1 truncate px-2 font-display text-base font-medium tracking-tight text-fg">
         {title}
       </p>
       {showToggle ? (

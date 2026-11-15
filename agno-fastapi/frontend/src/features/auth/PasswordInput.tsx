@@ -19,7 +19,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(fu
         onClick={() => setShown((s) => !s)}
         aria-label={shown ? 'Hide password' : 'Show password'}
         aria-pressed={shown}
-        className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-md text-fg-subtle transition-colors hover:text-fg"
+        className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-xl text-fg-subtle transition-colors hover:text-fg"
       >
         {shown ? <EyeOff className="size-[18px]" aria-hidden /> : <Eye className="size-[18px]" aria-hidden />}
       </button>

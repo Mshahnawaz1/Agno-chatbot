@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
-import { PublicOnly, RequireAuth } from '@/auth'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
+import { PublicOnly, RequireAuth, useAuth } from '@/auth'
 import { Spinner } from '@/components/ui'
 import { AppShell } from '@/features/layout/AppShell'
 import { ChatPage } from '@/features/chat/ChatPage'
@@ -8,6 +8,7 @@ import { ChatPage } from '@/features/chat/ChatPage'
 // Chat is the main page and stays in the main bundle; the rest load when first opened.
 const LoginPage = lazy(() => import('@/features/auth/LoginPage').then((m) => ({ default: m.LoginPage })))
 const SignupPage = lazy(() => import('@/features/auth/SignupPage').then((m) => ({ default: m.SignupPage })))
+const LandingPage = lazy(() => import('@/features/landing/LandingPage').then((m) => ({ default: m.LandingPage })))
 const ConnectorsPage = lazy(() =>
   import('@/features/connectors/ConnectorsPage').then((m) => ({ default: m.ConnectorsPage })),
 )
@@ -26,6 +27,14 @@ function Page({ children }: { children: ReactNode }) {
   )
 }
 
+/** Logged-out visitors on "/" see the landing page; every other protected path needs a login. */
+function HomeOrAuth() {
+  const { isAuthed } = useAuth()
+  const { pathname } = useLocation()
+  if (!isAuthed && pathname === '/') return <Page><LandingPage /></Page>
+  return <RequireAuth />
+}
+
 export function App() {
   return (
     <Routes>
@@ -33,7 +42,7 @@ export function App() {
         <Route path="/login" element={<Page><LoginPage /></Page>} />
         <Route path="/signup" element={<Page><SignupPage /></Page>} />
       </Route>
-      <Route element={<RequireAuth />}>
+      <Route element={<HomeOrAuth />}>
         <Route element={<AppShell />}>
           <Route index element={<ChatPage />} />
           <Route path="c/:sessionId" element={<ChatPage />} />

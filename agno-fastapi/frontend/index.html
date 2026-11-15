@@ -1,85 +1,15 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chat</title>
-  <link rel="stylesheet" href="index.css">
-  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-</head>
-<body>
-
-  <aside class="sidebar" id="sidebar">
-    <button class="sidebar-btn" id="new-chat-btn">✎ New chat</button>
-    <div class="session-list" id="session-list"></div>
-    <button class="sidebar-btn" id="connectors-btn">⚡ Connectors</button>
-    <button class="sidebar-btn" id="logout-btn">⎋ Log out</button>
-  </aside>
-
-  <div class="main">
-    <header class="topbar">
-      <button class="icon-btn" id="toggle-sidebar-btn" title="Toggle sidebar">☰</button>
-      <div class="chat-title" id="chat-title">New chat</div>
-    </header>
-
-    <main class="messages" id="messages"></main>
-
-    <section class="connectors-page" id="connectors-page" hidden>
-      <div class="connectors-wrap">
-        <h2>Connectors</h2>
-        <p class="connectors-intro">Connect apps so the assistant can use them. Switch one off to stop the assistant using it without logging out.</p>
-        <div id="connectors-note" role="status"></div>
-        <div class="connector-cards" id="connector-cards"></div>
-      </div>
-    </section>
-
-    <footer class="composer" id="composer">
-      <div class="composer-box">
-        <textarea class="composer-input" id="composer-input" rows="1" placeholder="Message…"></textarea>
-        <button class="send-btn" id="send-btn" title="Send">↑</button>
-      </div>
-      <div class="composer-hint">Enter to send · Shift+Enter for a new line</div>
-    </footer>
-  </div>
-
-  <dialog class="dialog" id="auth-dialog">
-    <form id="auth-form">
-      <h3>Log in or sign up</h3>
-      <div class="auth-error" id="auth-error" role="alert" hidden></div>
-      <label for="auth-email-input">Email</label>
-      <input id="auth-email-input" type="email" autocomplete="username" required>
-      <label for="auth-password-input">Password</label>
-      <input id="auth-password-input" type="password" autocomplete="current-password" minlength="8" required>
-      <label for="auth-name-input">Name (sign up only, optional)</label>
-      <input id="auth-name-input" autocomplete="name">
-      <div class="dialog-actions">
-        <button type="button" id="signup-btn">Sign up</button>
-        <button type="submit" class="primary" id="login-btn">Log in</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog class="dialog skill-dialog" id="skill-dialog">
-    <div class="skill-dialog-head">
-      <h3 id="skill-dialog-title">SKILL.md</h3>
-      <button type="button" class="icon-btn" id="skill-dialog-close" title="Close">✕</button>
-    </div>
-    <p class="connectors-intro" id="skill-dialog-description"></p>
-    <div class="assistant-body skill-body" id="skill-dialog-body"></div>
-  </dialog>
-
-  <script src="settings.js"></script>
-  <script src="api.js"></script>
-  <script src="sse.js"></script>
-  <script src="state.js"></script>
-  <script src="messages.js"></script>
-  <script src="metrics.js"></script>
-  <script src="sessions.js"></script>
-  <script src="connectors.js"></script>
-  <script src="chat.js"></script>
-  <script src="composer.js"></script>
-  <script src="auth.js"></script>
-  <script src="main.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050507" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%238b5cf6'/%3E%3Cpath d='M9 23 16 8l7 15M12 18h8' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <title>Agno</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

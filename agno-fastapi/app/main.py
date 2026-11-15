@@ -27,8 +27,9 @@ class SPAStaticFiles(StaticFiles):
 
     @staticmethod
     def _is_spa_path(path: str) -> bool:
-        first = path.lstrip("/").split("/", 1)[0]
-        return first not in API_PREFIXES
+        parts = path.strip("/").split("/")
+        # API paths and missing files (e.g. /assets/x.js) keep their 404.
+        return parts[0] not in API_PREFIXES and "." not in parts[-1]
 
     async def get_response(self, path, scope):
         try:

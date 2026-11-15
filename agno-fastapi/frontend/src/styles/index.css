@@ -48,17 +48,29 @@
 
 @utility bg-glow {
   background-image:
-    radial-gradient(ellipse 60% 50% at 30% 0%, rgb(124 58 237 / 0.35), transparent 70%),
-    radial-gradient(ellipse 50% 45% at 75% 10%, rgb(79 107 255 / 0.2), transparent 70%);
+    radial-gradient(ellipse 55% 45% at 50% 38%, rgb(124 58 237 / 0.42), transparent 70%),
+    radial-gradient(ellipse 45% 40% at 72% 70%, rgb(79 107 255 / 0.22), transparent 70%),
+    radial-gradient(ellipse 40% 35% at 25% 15%, rgb(139 92 246 / 0.18), transparent 70%);
   background-repeat: no-repeat;
 }
 
+/* The grid lives on a ::before layer so its fade mask never touches the content,
+   and so it stacks with .bg-glow instead of replacing its background-image. */
 @utility bg-grid {
-  background-image:
-    linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 80%);
+  position: relative;
+  isolation: isolate;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 80%);
+  }
 }
 
 @keyframes caret-blink {

@@ -1,0 +1,16 @@
+{
+  "guide": "ChartGallery(title?, types, subtitle?) — a 2-column menu of chart types, each with a small sample picture and caption: scatter, histogram, heatmap, radar, gauge, waterfall, bar, line, area, donut. Offer only types that suit the user's data (2 to 6). Use it when the user asks what other charts exist or lets you choose. Sends event pick_chart with context {type, name} when a tile is tapped (the others then disable); answer by drawing that type from the user's data. Example: card = ChartGallery(types=[\"scatter\", \"histogram\", \"gauge\"])",
+  "components": {
+    "ChartGallery": {
+      "type": "object",
+      "description": "A menu of chart types shown as tiles with sample pictures; tapping one sends pick_chart.",
+      "properties": {
+        "component": {"const": "ChartGallery"},
+        "title": {"type": "string", "description": "Card title. Defaults to \"More chart types\"."},
+        "types": {"type": "array", "items": {"enum": ["scatter", "histogram", "heatmap", "radar", "gauge", "waterfall", "bar", "line", "area", "donut"]}, "description": "Chart types to offer, only those that suit the data (2 to 6)."},
+        "subtitle": {"type": "string", "description": "Line under the title. Defaults to \"Each one is offered only when the data suits it.\""}
+      },
+      "required": ["component", "types"]
+    }
+  }
+}

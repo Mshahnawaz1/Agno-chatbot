@@ -1,0 +1,17 @@
+{
+  "guide": "RankList(title, items, subtitle?, confirmLabel?) — a short list (3-7 strings) the user drags into priority order. Use it to let the user rank or prioritise before you plan. Event: use_order {items} with the items in the user's order (plan from that). Example: card = RankList(\"Your priorities\", [\"Design review\", \"Client feedback session\", \"Project kickoff\", \"Workout\"])",
+  "components": {
+    "RankList": {
+      "type": "object",
+      "description": "A drag-to-reorder ranked list.",
+      "properties": {
+        "component": {"const": "RankList"},
+        "title": {"type": "string", "description": "Card title, e.g. \"Your priorities\"."},
+        "items": {"type": "array", "description": "The things to rank, in the proposed order.", "items": {"type": "string"}},
+        "subtitle": {"type": "string", "description": "Line under the title. Defaults to \"Top of the list gets the best hours.\""},
+        "confirmLabel": {"type": "string", "description": "Primary button text. Defaults to \"Use this order\"."}
+      },
+      "required": ["component", "title", "items"]
+    }
+  }
+}

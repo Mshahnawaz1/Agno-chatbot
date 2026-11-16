@@ -13,6 +13,9 @@ const ConnectorsPage = lazy(() =>
   import('@/features/connectors/ConnectorsPage').then((m) => ({ default: m.ConnectorsPage })),
 )
 
+// Dev only: chat blocks drawn from samples, no server (src/features/chat/a2ui/dev).
+const BlocksGallery = import.meta.env.DEV ? lazy(() => import('@/features/chat/a2ui/dev/BlocksGallery')) : null
+
 function Page({ children }: { children: ReactNode }) {
   return (
     <Suspense
@@ -49,6 +52,7 @@ export function App() {
           <Route path="settings/connectors" element={<Page><ConnectorsPage /></Page>} />
         </Route>
       </Route>
+      {BlocksGallery && <Route path="/dev/blocks" element={<Page><BlocksGallery /></Page>} />}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

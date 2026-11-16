@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* shadcn/ui's `dark:` styles follow a `.dark` ancestor (the A2UI host sets it), not the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-bg: #050507;
   --color-surface: #111116;
@@ -24,6 +27,22 @@
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* shadcn/ui tokens (components/shadcn). Only A2UI surfaces use those components, and they
+     set their own values (features/chat/a2ui/a2ui.css); these defaults let Tailwind generate
+     the utilities. `accent` and `border` above are shared with shadcn under the same names. */
+  --color-background: #050507;
+  --color-foreground: #ffffff;
+  --color-primary: #ffffff;
+  --color-primary-foreground: #0d0d0d;
+  --color-secondary: #2a2a2a;
+  --color-secondary-foreground: #ffffff;
+  --color-muted: #212121;
+  --color-muted-foreground: #afafaf;
+  --color-accent-foreground: #ffffff;
+  --color-destructive: #f87171;
+  --color-input: rgb(255 255 255 / 0.16);
+  --color-ring: rgb(255 255 255 / 0.4);
 }
 
 @layer base {

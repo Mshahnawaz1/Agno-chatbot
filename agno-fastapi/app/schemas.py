@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field, field_validator
+from typing import Any
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 def normalize_email(email: str) -> str:
@@ -46,14 +48,26 @@ class ChatResponse(BaseModel):
     metrics: dict
 
 class ChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=4000)   # rejects empty / huge input
+    """A typed message, or a click on an A2UI surface (a v1.0 renderer-to-agent `action` message)."""
+    message: str | None = Field(default=None, min_length=1, max_length=4000)  # rejects empty / huge input
+    action: dict[str, Any] | None = None
     session_id: str | None = None
+
+    @model_validator(mode="after")
+    def one_input(self):
+        if (self.message is None) == (self.action is None):
+            raise ValueError("Send either a message or an action.")
+        return self
 
 
 class MessageOut(BaseModel):
     role: str
     content: str
     metrics: dict | None = None  # assistant replies only
+    # Assistant replies: what the turn showed, in order ({"type": "text" | "a2ui", ...}).
+    parts: list[dict[str, Any]] | None = None
+    # User turns started by a click: the action that was sent.
+    action: dict[str, Any] | None = None
 
 class Token(BaseModel):
     access_token: str

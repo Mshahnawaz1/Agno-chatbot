@@ -4,16 +4,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import * as api from '@/lib/api'
 import { readSseEvents } from '@/lib/sse'
 import type { Message, Metrics } from '@/lib/types'
-import {
-  ChatStreamContext,
-  initialStreamState,
-  MAX_MESSAGE_LENGTH,
-  streamReducer,
-  UiActionsContext,
-  type ChatStreamValue,
-  type UiActionsValue,
-} from './chatStore'
-import { formatAction, type UiAction } from './a2ui/parse'
+import { ChatStreamContext, initialStreamState, streamReducer, type ChatStreamValue, type TurnInput } from './chatStore'
+import { actionMessage, type A2uiMessage, type UiAction } from './a2ui/protocol'
 
 /** Route -> session it shows: an id, null for "/" (new chat), or OTHER for non-chat pages. */
 const OTHER = Symbol('other')
@@ -99,7 +91,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
   }, [abortActive])
 
   const send = useCallback(
-    async (text: string) => {
+    async (input: TurnInput) => {
       if (activeRunRef.current !== null) return
       const runId = ++runCounter.current
       const assistantId = `a${runId}`
@@ -111,7 +103,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       const isActive = () => activeRunRef.current === runId
       let sessionId = sessionIdRef.current
 
-      dispatch({ type: 'start', runId, userId, assistantId, text })
+      dispatch({ type: 'start', runId, userId, assistantId, input })
 
       // Batch tokens into one state update per animation frame. Each update re-parses the whole
       // reply's markdown, so per-chunk updates made long replies cost O(n^2) to render.
@@ -129,7 +121,11 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       let gotDone = false
       let failed = false
       try {
-        const res = await api.openChatStream(text, sessionId, controller.signal)
+        const res = await api.openChatStream(
+          'text' in input ? { message: input.text } : { action: input.action },
+          sessionId,
+          controller.signal,
+        )
         for await (const { event, data } of readSseEvents(res)) {
           if (!isActive()) break
           const d = (data ?? {}) as Record<string, unknown>
@@ -154,6 +150,17 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
                 pending += d.content
                 if (!frame) frame = requestAnimationFrame(flush)
               }
+              break
+            case 'a2ui':
+              // Keep text and surfaces in arrival order: write buffered text first.
+              flush()
+              if (d.message && typeof d.message === 'object') {
+                dispatch({ type: 'a2ui', runId, assistantId, message: d.message as A2uiMessage })
+              }
+              break
+            case 'a2ui_error':
+              // A block the server rejected; it never reaches the screen (a repair run follows).
+              console.debug('A2UI block rejected by the server:', d.error)
               break
             case 'metrics':
               flush()
@@ -218,18 +225,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
   }, [navigate, reset])
 
   const streaming = state.activeRun !== null
-  const sendAction = useCallback(
-    (action: UiAction) => {
-      const text = formatAction(action)
-      if (text.length > MAX_MESSAGE_LENGTH) {
-        console.warn('A2UI action too large to send', action)
-        return
-      }
-      void send(text)
-    },
-    [send],
-  )
-  const uiActions = useMemo<UiActionsValue>(() => ({ sendAction, busy: streaming }), [sendAction, streaming])
+  const sendAction = useCallback((action: UiAction) => void send({ action: actionMessage(action) }), [send])
 
   const value = useMemo<ChatStreamValue>(
     () => ({
@@ -237,16 +233,15 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       turns: state.turns,
       streaming,
       newChatCount,
-      send: (text) => void send(text),
+      send: (text) => void send({ text }),
+      sendAction,
       stop,
       newChat,
     }),
-    [state, streaming, newChatCount, send, stop, newChat],
+    [state, streaming, newChatCount, send, sendAction, stop, newChat],
   )
 
   return (
-    <ChatStreamContext.Provider value={value}>
-      <UiActionsContext.Provider value={uiActions}>{children}</UiActionsContext.Provider>
-    </ChatStreamContext.Provider>
+    <ChatStreamContext.Provider value={value}>{children}</ChatStreamContext.Provider>
   )
 }

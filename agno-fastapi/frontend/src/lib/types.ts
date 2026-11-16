@@ -13,6 +13,16 @@ export type Message = {
   role: 'user' | 'assistant'
   content: string
   metrics?: Metrics | null
+  /** Assistant replies since A2UI v1.0: text and A2UI wire messages, in order. */
+  parts?: ({ type: 'text'; text: string } | { type: 'a2ui'; message: Record<string, unknown> & { version: string } })[] | null
+  /** User turns started by a click on a surface. */
+  action?: {
+    name: string
+    surfaceId: string
+    sourceComponentId: string
+    timestamp: string
+    context: Record<string, unknown>
+  } | null
 }
 
 export type Session = {

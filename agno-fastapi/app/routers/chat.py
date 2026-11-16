@@ -7,12 +7,20 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from app import db
+from app.a2ui.actions import InvalidAction, action_prompt, read_action
+from app.a2ui.turn import A2uiTurn
 from app.agent import agent
 from app.deps import CurrentUser
 from app.schemas import ChatRequest, ChatResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+# A reply whose A2UI block the compiler rejects gets this many hidden runs to correct it.
+REPAIR_ATTEMPTS = 1
+
+# agno's error types for guardrail checks; any other run error is a failure, not a block.
+GUARDRAIL_ERRORS = {"input_check_error", "output_check_error"}
 
 
 def make_title(text: str, limit: int = 40) -> str:
@@ -25,7 +33,8 @@ def make_title(text: str, limit: int = 40) -> str:
 def resolve_session(body: ChatRequest, user: dict) -> dict:
     """None => new chat. A given id must exist AND belong to this user, else 404."""
     if body.session_id is None or len(body.session_id) == 0:
-        return db.create_chat_session(user["id"], make_title(body.message))
+        title = body.message or str((body.action or {}).get("action", {}).get("name", "New chat"))
+        return db.create_chat_session(user["id"], make_title(title))
     session = db.get_chat_session(body.session_id, user["id"])
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
@@ -60,6 +69,9 @@ def sse(event: str, data: dict) -> str:
 
 @router.post("", response_model=ChatResponse)
 async def chat(body: ChatRequest, user: CurrentUser):
+    """Plain request/response, no A2UI compiling: typed messages only (the UI uses /stream)."""
+    if body.message is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Actions go through /chat/stream")
     session = resolve_session(body, user)
     try:
         run = await agent.arun(
@@ -78,52 +90,83 @@ async def chat(body: ChatRequest, user: CurrentUser):
     )
 
 
+async def model_pass(
+    model_input: str, user: dict, session_id: str, turn: A2uiTurn, run: dict, repair: bool = False
+) -> AsyncIterator[str]:
+    """One agent run streamed through the A2UI compiler. Fills `run` with its outcome."""
+    turn.start_pass()
+    # `query` lets the tool router pick connector tools for the message. A repair run only fixes
+    # UI, so it gets none: routing its prompt ("create ... form") attached unrelated tools.
+    metadata = {"query": "" if repair else model_input}
+    if repair:
+        metadata["a2ui_repair"] = True  # hidden from the history endpoint
+    async for event in agent.arun(
+        model_input, user_id=user["id"], session_id=session_id,
+        stream=True, stream_events=True, metadata=metadata,
+    ):
+        if event.event == RunEvent.run_error:
+            # Guardrail failures (InputCheckError/OutputCheckError) and model/provider errors
+            # both arrive here as an event, not as a raised exception.
+            error_type = getattr(event, "error_type", None)
+            logger.warning("run error: %s (%s)", event.content, error_type)
+            run["stopped"] = True
+            if error_type in GUARDRAIL_ERRORS:
+                yield sse("guardrail_error", {"message": str(event.content), "type": error_type})
+            else:
+                yield sse("error", {"message": f"Generation failed. Error {event.content}"})
+            return
+        if event.event == RunEvent.run_content:
+            run["run_id"] = run.get("run_id") or event.run_id
+            if event.content:
+                for name, data in turn.feed(str(event.content)):
+                    yield sse(name, data)
+        elif event.event == RunEvent.tool_call_completed:
+            run["tools"].append(event.tool)
+        elif event.event == RunEvent.run_completed:
+            run["run_id"] = run.get("run_id") or event.run_id
+            if not repair:
+                run["metrics"] = run_metrics(event.metrics, run["tools"])
+            log_run(event.run_id, event.metrics, run["tools"])
+    for name, data in turn.close():
+        yield sse(name, data)
+
+
 @router.post("/stream")
 async def chat_stream(body: ChatRequest, user: CurrentUser):
     session = resolve_session(body, user)      # 404 is raised here, before streaming
+    turn = A2uiTurn(session["id"])
+    if body.action is not None:
+        try:
+            action = await read_action(body.action)  # a bad action is a plain 400
+        except InvalidAction as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid action: {e}")
+        prompt = action_prompt(action, turn.surface_ids)
+    else:
+        prompt = body.message
 
     async def event_stream() -> AsyncIterator[str]:
-        run_id = None
-        tools = []
-        final_metrics = None
+        # run_id is the reply's run: the repair run's parts are stored under it too.
+        run: dict = {"run_id": None, "tools": [], "metrics": None, "stopped": False}
         yield sse("session", {"session_id": session["id"]})
         try:
-            async for event in agent.arun(
-                body.message,
-                user_id=user["id"],
-                session_id=session["id"],
-                stream=True,
-                stream_events=True,
-                metadata={"query": body.message},  # lets the tool router see the message
-            ):
-                if event.event == RunEvent.run_error:
-                    # Guardrail failures (InputCheckError/OutputCheckError) arrive here as
-                    # an event, not as a raised exception.
-                    logger.warning("run error: %s (%s)", event.content, getattr(event, "error_type", None))
-                    yield sse("guardrail_error", {
-                        "message": str(event.content),
-                        "type": getattr(event, "error_type", None),
-                    })
-                    return  # stop streaming; finally still touches the session
-                if event.event == RunEvent.run_content:
-                    run_id = run_id or event.run_id
-                    if event.content:
-                        yield sse("token", {"content": str(event.content)})
-                elif event.event == RunEvent.tool_call_completed:
-                    tools.append(event.tool)
-
-                elif event.event == RunEvent.run_completed:
-                    run_id = run_id or event.run_id
-                    final_metrics = run_metrics(event.metrics, tools)
-                    log_run(run_id, event.metrics, tools)
-
-            if final_metrics:
-                yield sse("metrics", final_metrics)
-            yield sse("done", {"run_id": run_id})
+            model_input, repair = prompt, False
+            for attempt in range(REPAIR_ATTEMPTS + 1):
+                async for chunk in model_pass(model_input, user, session["id"], turn, run, repair):
+                    yield chunk
+                if run["stopped"] or not turn.rejected or attempt == REPAIR_ATTEMPTS:
+                    break
+                yield sse("a2ui_repair", {"attempt": attempt + 1})
+                model_input, repair = turn.repair_prompt(), True
+            if run["stopped"]:
+                return
+            if run["metrics"]:
+                yield sse("metrics", run["metrics"])
+            yield sse("done", {"run_id": run["run_id"]})
         except Exception as e:
             logger.exception("stream failed")
             yield sse("error", {"message": f"Generation failed. Error {e}"})
         finally:
+            turn.save(run["run_id"])
             db.touch_chat_session(session["id"])
 
     return StreamingResponse(

@@ -1,24 +1,35 @@
-/* The basic catalog reads only CSS variables (defined with zero specificity), so mapping
-   them onto the app's tokens here is the whole theme. */
+/*
+ * The look of A2UI surfaces: close to ChatGPT's dark UI. Surfaces sit on the page without a
+ * fill, cards are hairline-bordered, text is white with grey secondary text, and the primary
+ * colour is white (white buttons, white selected radios and chips).
+ *
+ * Every component is shadcn/ui + Tailwind (catalog/), so the theme is just these tokens, set on
+ * the surface host so they don't leak into the rest of the app.
+ */
 .a2ui-host {
   color-scheme: dark;
-  accent-color: var(--color-accent);
-  --a2ui-color-background: var(--color-surface);
-  --a2ui-color-on-background: var(--color-fg);
-  --a2ui-color-surface: var(--color-surface-2);
-  --a2ui-color-on-surface: var(--color-fg);
-  --a2ui-color-input: var(--color-bg);
-  --a2ui-color-on-input: var(--color-fg);
-  --a2ui-color-border: var(--color-border-strong);
-  --a2ui-color-primary: var(--color-accent);
-  --a2ui-color-on-primary: #ffffff;
-  --a2ui-color-secondary: var(--color-surface-3);
-  --a2ui-color-on-secondary: var(--color-fg);
-  --a2ui-border-radius: var(--radius-sm);
-  --a2ui-font-family-title: var(--font-display);
-  --a2ui-font-family-monospace: var(--font-mono);
-  font-family: var(--font-sans);
+  --color-fg: #f5f5f5;
+  --color-fg-muted: #afafaf;
+  --color-fg-subtle: #8f8f8f;
+  --color-border: rgb(255 255 255 / 0.1);
+  --color-background: transparent;
+  --color-foreground: #f5f5f5;
+  --color-primary: #ffffff;
+  --color-primary-foreground: #0d0d0d;
+  --color-secondary: #2a2a2a;
+  --color-secondary-foreground: #ffffff;
+  --color-muted: #212121;
+  --color-muted-foreground: #afafaf;
+  /* shadcn's hover grey; the app's violet accent stays outside surfaces. */
+  --color-accent: #2a2a2a;
+  --color-accent-foreground: #ffffff;
+  --color-input: rgb(255 255 255 / 0.16);
+  --color-ring: rgb(255 255 255 / 0.4);
+  --color-destructive: #f87171;
   color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .a2ui-host[inert] {
@@ -26,10 +37,88 @@
   transition: opacity 150ms;
 }
 
-/* Markdown inside Text components: no block margins, the surface's layout spaces things. */
-.a2ui-markdown > :first-child {
-  margin-top: 0;
+/* ---- text ---- */
+.a2ui-markdown > :first-child { margin-top: 0; }
+.a2ui-markdown > :last-child { margin-bottom: 0; }
+.a2ui-markdown p { line-height: 1.5; margin-block: 0.25rem; }
+/* Headings: the body font, as ChatGPT draws card titles; the app's display font is for pages. */
+.a2ui-markdown :is(h1, h2, h3, h4) {
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
 }
-.a2ui-markdown > :last-child {
-  margin-bottom: 0;
+.a2ui-markdown h1 { font-size: 1.875rem; line-height: 1.2; }
+.a2ui-markdown h2 { font-size: 1.375rem; line-height: 1.3; }
+.a2ui-markdown h3 { font-size: 1.125rem; line-height: 1.4; }
+.a2ui-markdown h4 { font-size: 1rem; }
+.a2ui-caption :is(.a2ui-markdown, .a2ui-markdown *) { font-size: 0.875rem; color: var(--color-fg-muted); }
+.a2ui-caption .a2ui-markdown p { line-height: 1.4; margin: 0; }
+/* Tables (Markdown in a Text): hairline rows, no outer frame or header fill. */
+.a2ui-markdown div:has(> table) { border: 0; border-radius: 0; margin-block: 0.25rem; }
+.a2ui-markdown thead { background: transparent; }
+.a2ui-markdown table { font-size: 1rem; }
+.a2ui-markdown :is(th, td) { padding: 0.75rem 0; }
+.a2ui-markdown :is(th, td) + :is(th, td) { padding-left: 1.5rem; }
+
+/* ---- inputs ---- */
+.a2ui-label { font-size: 1rem; font-weight: 600; color: var(--color-fg); }
+.a2ui-option { font-size: 1rem; font-weight: 400; color: var(--color-fg); cursor: pointer; }
+
+/* A field the user hasn't used yet doesn't show its failing checks. */
+.a2ui-field:not([data-touched]) [aria-invalid="true"] {
+  border-color: var(--color-input);
+  box-shadow: none;
+}
+
+/* Selected radio: a white disc with a dark centre. */
+.a2ui-radio { border-color: rgb(255 255 255 / 0.35); }
+.a2ui-radio[data-state="checked"] {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.a2ui-radio[data-state="checked"] svg {
+  fill: var(--color-primary-foreground);
+  color: var(--color-primary-foreground);
+}
+
+/* Selected chip: white pill, dark text. */
+.a2ui-chip[data-state="on"] {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+
+/* A Button's child is a Text: it takes the button's colour and stays on one line. */
+.a2ui-button :is(.a2ui-text, .a2ui-markdown) { color: inherit; font-size: 0.875rem; font-weight: 500; }
+.a2ui-button .a2ui-markdown p { margin: 0; line-height: 1.25; white-space: nowrap; }
+
+/* ---- charts (VegaChart) ---- */
+/* vega-embed's own wrapper class: let the chart fill the card. */
+.a2ui-chart .vega-embed { width: 100%; display: block; }
+/* A spec's bound params are drawn by Vega under the chart: style them like the surface's sliders. */
+.a2ui-chart .vega-bindings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: var(--color-fg);
+}
+.a2ui-chart .vega-bind label { display: flex; align-items: center; gap: 0.75rem; }
+.a2ui-chart .vega-bind-name { min-width: 9rem; font-weight: 600; }
+.a2ui-chart .vega-bind input[type="range"] { flex: 1; accent-color: var(--color-primary); }
+.a2ui-chart .vega-bind input[type="range"] + span {
+  min-width: 4rem;
+  text-align: right;
+  color: var(--color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.a2ui-chart .vega-bind :is(select, input[type="text"], input[type="number"]) {
+  background: transparent;
+  color: var(--color-fg);
+  border: 1px solid var(--color-input);
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.5rem;
 }

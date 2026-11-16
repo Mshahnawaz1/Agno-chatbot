@@ -264,6 +264,24 @@ def compact_json(schema: dict) -> str:
     return json.dumps(schema, separators=(",", ":"))
 
 
+def model_safe_schema(schema):
+    """The tool's JSON schema without `null` in `enum` lists.
+
+    MCP servers write optional enums as `"type": ["string", "null"], "enum": [..., null]`;
+    Gemini's schema type accepts only string enum values and fails the whole run on a None
+    (seen with typeform_forms-public_get_form: `enum.3 Input should be a valid string`). The
+    nullable `type` still allows null, so dropping it from `enum` changes nothing else.
+    """
+    if isinstance(schema, list):
+        return [model_safe_schema(v) for v in schema]
+    if not isinstance(schema, dict):
+        return schema
+    out = {k: model_safe_schema(v) for k, v in schema.items()}
+    if isinstance(out.get("enum"), list):
+        out["enum"] = [v for v in out["enum"] if v is not None]
+    return out
+
+
 def _native(user_id: str, spec: ToolSpec, usage: _Usage) -> Function:
     async def run(**kwargs) -> str:
         args = {k: v for k, v in kwargs.items() if not k.startswith("_agno_")}
@@ -273,7 +291,7 @@ def _native(user_id: str, spec: ToolSpec, usage: _Usage) -> Function:
     return Function(
         name=spec.name,
         description=spec.description,
-        parameters=spec.schema,
+        parameters=model_safe_schema(spec.schema),
         entrypoint=run,
         skip_entrypoint_processing=True,
     )

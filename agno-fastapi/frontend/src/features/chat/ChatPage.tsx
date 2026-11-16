@@ -7,7 +7,10 @@ import * as api from '@/lib/api'
 import { ApiError } from '@/lib/api'
 import { Button } from '@/components/ui'
 import { Backdrop } from '@/components/site'
+import type { Message } from '@/lib/types'
 import { useChatStream, type Turn } from './chatStore'
+import { SurfaceFeedContext, type SurfaceFeed } from './a2ui/feed'
+import { legacyParts, type A2uiMessage, type Part } from './a2ui/protocol'
 import { Composer } from './Composer'
 import { MessageList, type MessageListHandle } from './MessageList'
 
@@ -31,6 +34,33 @@ function HistorySkeleton() {
   )
 }
 
+/** A stored message's parts; replies from before A2UI v1.0 only have their raw text. */
+function historyParts(m: Message): Part[] {
+  if (m.role !== 'assistant') return []
+  if (m.parts) {
+    return m.parts.map((p) => (p.type === 'text' ? { kind: 'text', text: p.text } : { kind: 'a2ui', message: p.message }))
+  }
+  return legacyParts(m.content ?? '')
+}
+
+/**
+ * The feed of A2UI messages the chat's surfaces replay. The list is rebuilt on every streamed
+ * token, so keep the previous array (and the context value) until a message is added.
+ */
+function useSurfaceFeed(
+  key: string,
+  turns: Turn[],
+  sendAction: SurfaceFeed['sendAction'],
+  busy: boolean,
+): SurfaceFeed {
+  const all = turns.flatMap((t) => t.parts.flatMap((p) => (p.kind === 'a2ui' ? [p.message] : [])))
+  const last = all.at(-1)
+  const count = all.length
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const messages = useMemo<A2uiMessage[]>(() => all, [key, count, last])
+  return useMemo(() => ({ key, messages, sendAction, busy }), [key, messages, sendAction, busy])
+}
+
 export function ChatPage() {
   const { sessionId: routeId = null } = useParams()
   const stream = useChatStream()
@@ -50,15 +80,21 @@ export function ChatPage() {
 
   const historyTurns = useMemo<Turn[]>(
     () =>
-      (routeId ? (history.data ?? []) : []).map((m, i) => ({
+      (routeId ? (history.data ?? []) : []).map((m, i) => {
+        const parts = historyParts(m)
+        return {
         id: `h${i}`,
         role: m.role,
-        content: m.content ?? '',
+        // Copy takes the text only (old replies kept their UI JSON inside the text).
+        content: m.role === 'assistant' ? parts.flatMap((p) => (p.kind === 'text' ? [p.text] : [])).join('\n\n') : (m.content ?? ''),
+        parts,
+        action: m.action ?? undefined,
         metrics: m.metrics ?? null,
         error: null,
         errorKind: null,
-        status: 'done',
-      })),
+        status: 'done' as const,
+        }
+      }),
     [routeId, history.data],
   )
 
@@ -68,6 +104,7 @@ export function ChatPage() {
     () => (ownsTurns ? [...historyTurns, ...stream.turns] : historyTurns),
     [ownsTurns, historyTurns, stream.turns],
   )
+  const feed = useSurfaceFeed(routeId ?? 'new', turns, stream.sendAction, stream.streaming)
   const isEmpty = routeId === null && (!ownsTurns || stream.turns.length === 0)
   const loadingHistory = routeId !== null && history.isPending
 
@@ -130,7 +167,9 @@ export function ChatPage() {
           </div>
         </>
       ) : (
-        <MessageList ref={listRef} turns={turns} footer={footer} />
+        <SurfaceFeedContext.Provider value={feed}>
+          <MessageList ref={listRef} turns={turns} footer={footer} />
+        </SurfaceFeedContext.Provider>
       )}
 
       <div className={clsx('mx-auto w-full max-w-[768px] px-4 sm:px-6', isEmpty ? 'pb-4' : 'pb-3')}>

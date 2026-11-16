@@ -1,12 +1,12 @@
-import { memo, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Check, CircleAlert, Copy, Info, MousePointerClick, ShieldAlert } from 'lucide-react'
 import clsx from 'clsx'
 import { Logo } from '@/components/ui'
 import { Markdown } from '@/components/Markdown'
 import type { Turn } from './chatStore'
 import { MetricsPanel } from './MetricsPanel'
-import { A2uiBlock, A2uiPending } from './a2ui'
-import { parseAction, parseSegments, textOnly, trimPartialTag, type UiAction } from './a2ui/parse'
+import { LegacySurface, Surface } from './a2ui'
+import { createdSurfaceId, type Part, type UiAction } from './a2ui/protocol'
 
 function Callout({ kind, message }: { kind: 'guardrail' | 'error'; message: string }) {
   const guardrail = kind === 'guardrail'
@@ -97,25 +97,30 @@ function ActionMessage({ action }: { action: UiAction }) {
   )
 }
 
-/** Markdown and A2UI blocks, in reply order. */
-function ReplyBody({ content, streaming }: { content: string; streaming: boolean }) {
-  const segments = useMemo(() => parseSegments(content), [content])
-  return segments.map((seg, i) => {
-    const last = i === segments.length - 1
-    if (seg.kind === 'ui') return <A2uiBlock key={seg.key} raw={seg.raw} />
-    if (seg.kind === 'pending') return streaming ? <A2uiPending key="pending" /> : null
-    const text = streaming && last ? trimPartialTag(seg.text) : seg.text
-    return text ? <Markdown key={`t${i}`} className={streaming && last ? CARET : undefined}>{text}</Markdown> : null
+/** Text and surfaces, in reply order. A surface is drawn where it was created; later messages
+ *  for it (updates, deletes) change it in place, so they draw nothing here. */
+function ReplyBody({ parts, streaming }: { parts: Part[]; streaming: boolean }) {
+  return parts.map((part, i) => {
+    if (part.kind === 'legacy') return <LegacySurface key={i} />
+    if (part.kind === 'a2ui') {
+      const id = createdSurfaceId(part.message)
+      return id ? <Surface key={`s:${id}`} surfaceId={id} /> : null
+    }
+    const caret = streaming && i === parts.length - 1
+    return part.text.trim() ? (
+      <Markdown key={i} className={caret ? CARET : undefined}>
+        {part.text}
+      </Markdown>
+    ) : null
   })
 }
 
-function UserMessage({ content }: { content: string }) {
-  const action = useMemo(() => parseAction(content), [content])
-  if (action) return <ActionMessage action={action} />
+function UserMessage({ turn }: { turn: Turn }) {
+  if (turn.action) return <ActionMessage action={turn.action} />
   return (
     <div className="flex justify-end">
       <div className="max-w-[80%] whitespace-pre-wrap rounded-xl bg-surface-2 px-4 py-2.5 leading-7 text-fg wrap-anywhere">
-        {content}
+        {turn.content}
       </div>
     </div>
   )
@@ -129,13 +134,13 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
   useEffect(() => () => clearTimeout(timer.current), [])
 
   const streaming = turn.status === 'streaming'
-  const thinking = streaming && turn.content === ''
+  const thinking = streaming && turn.parts.length === 0
   const finished = !streaming
-  const hasActions = finished && (turn.content !== '' || turn.metrics != null)
+  const hasActions = finished && (turn.content.trim() !== '' || turn.metrics != null)
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(textOnly(turn.content))
+      await navigator.clipboard.writeText(turn.content.trim())
       setCopied(true)
       clearTimeout(timer.current)
       timer.current = setTimeout(() => setCopied(false), 1500)
@@ -150,12 +155,12 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
       <div className="min-w-0 flex-1" aria-live={streaming ? 'polite' : undefined} aria-busy={streaming || undefined}>
         {thinking ? (
           <p className="shimmer leading-7">Thinking…</p>
-        ) : turn.content ? (
-          <ReplyBody content={turn.content} streaming={streaming} />
-        ) : null}
+        ) : (
+          <ReplyBody parts={turn.parts} streaming={streaming} />
+        )}
 
         {turn.status === 'stopped' ? (
-          <p className="mt-2 text-xs text-fg-subtle">{turn.content ? 'Stopped' : 'Stopped before a reply'}</p>
+          <p className="mt-2 text-xs text-fg-subtle">{turn.parts.length ? 'Stopped' : 'Stopped before a reply'}</p>
         ) : null}
 
         {turn.error && turn.errorKind ? <Callout kind={turn.errorKind} message={turn.error} /> : null}
@@ -168,7 +173,7 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
               !isLast && !showMetrics && '[@media(hover:hover)]:opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
             )}
           >
-            {turn.content ? (
+            {turn.content.trim() ? (
               <ActionButton onClick={copy}>
                 {copied ? <Check className="size-3.5 text-success" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
                 <span aria-live="polite">{copied ? 'Copied' : 'Copy'}</span>
@@ -194,5 +199,5 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
 }
 
 export const Message = memo(function Message({ turn, isLast }: { turn: Turn; isLast: boolean }) {
-  return turn.role === 'user' ? <UserMessage content={turn.content} /> : <AssistantMessage turn={turn} isLast={isLast} />
+  return turn.role === 'user' ? <UserMessage turn={turn} /> : <AssistantMessage turn={turn} isLast={isLast} />
 })

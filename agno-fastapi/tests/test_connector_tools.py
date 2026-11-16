@@ -216,5 +216,23 @@ class SkillsTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("No skill", await skills.get_skill_instructions("nope", rc))
 
 
+
+class ModelSafeSchemaTest(unittest.TestCase):
+    def test_null_is_dropped_from_enums_only(self):
+        schema = {
+            "type": "object",
+            "properties": {
+                "view": {"type": ["string", "null"], "enum": ["skeleton", "fields", "full", None]},
+                "nested": {"items": [{"enum": [None, "a"]}]},
+                "keep": {"type": "string", "default": None},
+            },
+        }
+        out = tools.model_safe_schema(schema)
+        self.assertEqual(out["properties"]["view"]["enum"], ["skeleton", "fields", "full"])
+        self.assertEqual(out["properties"]["view"]["type"], ["string", "null"])
+        self.assertEqual(out["properties"]["nested"]["items"][0]["enum"], ["a"])
+        self.assertIsNone(out["properties"]["keep"]["default"])
+        self.assertIn(None, schema["properties"]["view"]["enum"])  # input left as it was
+
 if __name__ == "__main__":
     unittest.main()

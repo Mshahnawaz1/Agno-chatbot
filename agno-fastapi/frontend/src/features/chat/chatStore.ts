@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Metrics } from '@/lib/types'
-import type { UiAction } from './a2ui/parse'
+import type { A2uiMessage, ActionMessage, Part, UiAction } from './a2ui/protocol'
 
 export type TurnStatus = 'streaming' | 'done' | 'stopped' | 'error'
 export type ErrorKind = 'guardrail' | 'error'
@@ -9,7 +9,12 @@ export type ErrorKind = 'guardrail' | 'error'
 export type Turn = {
   id: string
   role: 'user' | 'assistant'
+  /** The turn's text (assistant: its text parts joined, for copy). */
   content: string
+  /** Assistant turns: text and A2UI messages in the order they arrived. */
+  parts: Part[]
+  /** User turns started by a click on a surface. */
+  action?: UiAction
   metrics: Metrics | null
   error: string | null
   errorKind: ErrorKind | null
@@ -30,12 +35,16 @@ export type StreamState = {
 
 export type StreamAction =
   | { type: 'reset'; sessionId: string | null }
-  | { type: 'start'; runId: number; userId: string; assistantId: string; text: string }
+  | { type: 'start'; runId: number; userId: string; assistantId: string; input: TurnInput }
   | { type: 'session'; runId: number; sessionId: string }
   | { type: 'token'; runId: number; assistantId: string; content: string }
+  | { type: 'a2ui'; runId: number; assistantId: string; message: A2uiMessage }
   | { type: 'metrics'; runId: number; assistantId: string; metrics: Metrics }
   | { type: 'fail'; runId: number; assistantId: string; message: string; kind: ErrorKind }
   | { type: 'finish'; runId: number; assistantId: string; status: Exclude<TurnStatus, 'streaming'> }
+
+/** What a turn sends: typed text, or a click on a surface. */
+export type TurnInput = { text: string } | { action: ActionMessage }
 
 export const initialStreamState = (sessionId: string | null): StreamState => ({
   sessionId,
@@ -45,6 +54,13 @@ export const initialStreamState = (sessionId: string | null): StreamState => ({
 
 function updateTurn(state: StreamState, id: string, patch: (t: Turn) => Partial<Turn>): StreamState {
   return { ...state, turns: state.turns.map((t) => (t.id === id ? { ...t, ...patch(t) } : t)) }
+}
+
+/** Adds streamed text to the turn's last text part, or starts one after a surface. */
+function appendText(parts: Part[], text: string): Part[] {
+  const last = parts.at(-1)
+  if (last?.kind === 'text') return [...parts.slice(0, -1), { kind: 'text', text: last.text + text }]
+  return [...parts, { kind: 'text', text }]
 }
 
 export function streamReducer(state: StreamState, action: StreamAction): StreamState {
@@ -57,8 +73,11 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       activeRun: action.runId,
       turns: [
         ...state.turns,
-        { id: action.userId, role: 'user', content: action.text, metrics: null, error: null, errorKind: null, status: 'done' },
-        { id: action.assistantId, role: 'assistant', content: '', metrics: null, error: null, errorKind: null, status: 'streaming' },
+        {
+          id: action.userId, role: 'user', parts: [], metrics: null, error: null, errorKind: null, status: 'done',
+          ...('text' in action.input ? { content: action.input.text } : { content: '', action: action.input.action.action }),
+        },
+        { id: action.assistantId, role: 'assistant', content: '', parts: [], metrics: null, error: null, errorKind: null, status: 'streaming' },
       ],
     }
   }
@@ -70,7 +89,14 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
     case 'session':
       return { ...state, sessionId: action.sessionId }
     case 'token':
-      return updateTurn(state, action.assistantId, (t) => ({ content: t.content + action.content }))
+      return updateTurn(state, action.assistantId, (t) => ({
+        content: t.content + action.content,
+        parts: appendText(t.parts, action.content),
+      }))
+    case 'a2ui':
+      return updateTurn(state, action.assistantId, (t) => ({
+        parts: [...t.parts, { kind: 'a2ui', message: action.message }],
+      }))
     case 'metrics':
       return updateTurn(state, action.assistantId, () => ({ metrics: action.metrics }))
     case 'fail':
@@ -91,6 +117,8 @@ export type ChatStreamValue = {
   /** Bumps on every "New chat" so the page can refocus the composer even when already on "/". */
   newChatCount: number
   send: (text: string) => void
+  /** A click on an A2UI surface: sent to the agent as the next turn. */
+  sendAction: (action: UiAction) => void
   stop: () => void
   newChat: () => void
 }
@@ -104,16 +132,3 @@ export function useChatStream(): ChatStreamValue {
 }
 
 export const MAX_MESSAGE_LENGTH = 4000
-
-/**
- * For A2UI surfaces: send a click back to the agent. A separate context from the stream state,
- * whose value changes on every token: this one changes only when a run starts or ends, so
- * memoized messages don't re-render while a reply streams.
- */
-export type UiActionsValue = { sendAction: (action: UiAction) => void; busy: boolean }
-
-export const UiActionsContext = createContext<UiActionsValue>({ sendAction: () => {}, busy: false })
-
-export function useUiActions(): UiActionsValue {
-  return useContext(UiActionsContext)
-}

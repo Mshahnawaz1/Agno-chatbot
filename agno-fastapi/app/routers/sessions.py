@@ -2,6 +2,8 @@ from agno.run.base import HISTORY_SKIP_STATUSES
 from fastapi import APIRouter, HTTPException, status
 
 from app import db
+from app.a2ui.actions import parse_action_prompt
+from app.a2ui.store import parts_by_run
 from app.deps import CurrentUser
 from app.schemas import SessionCreate, SessionOut, MessageOut
 from app.agent import agent
@@ -40,15 +42,23 @@ async def session_messages(session_id: str, user: CurrentUser):
     runs = [
         r for r in (agno_session.runs if agno_session else None) or []
         if r.parent_run_id is None and r.status not in HISTORY_SKIP_STATUSES  # same filter as chat history
+        and not (r.metadata or {}).get("a2ui_repair")  # a hidden A2UI correction run
     ]
+    parts = parts_by_run(session_id)
 
     out = []
     for run in runs:
-        if run.input and run.input.input_content_string():
-            out.append(MessageOut(role="user", content=run.input.input_content_string()))
-        if run.content:
+        text = run.input.input_content_string() if run.input else ""
+        if text:
+            action = parse_action_prompt(text)
+            out.append(MessageOut(role="user", content="" if action else text, action=action))
+        turn_parts = parts.get(run.run_id)
+        if turn_parts or run.content:
             out.append(MessageOut(
-                role="assistant", content=str(run.content),
+                role="assistant",
+                # Replies stored before A2UI v1.0 have no parts: their raw text is all there is.
+                content="".join(p["text"] for p in turn_parts if p["type"] == "text") if turn_parts else str(run.content),
+                parts=turn_parts,
                 metrics=run_metrics(run.metrics, run.tools),
             ))
     return out

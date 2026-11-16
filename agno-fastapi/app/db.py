@@ -44,6 +44,15 @@ CREATE TABLE IF NOT EXISTS user_connectors (
     created_at   TEXT DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, connector_id)
 );
+-- what an assistant turn showed, in order: text and A2UI messages (JSON), see app/a2ui/store.py
+CREATE TABLE IF NOT EXISTS chat_parts (
+    session_id  TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+    run_id      TEXT NOT NULL,
+    seq         INTEGER NOT NULL,
+    kind        TEXT NOT NULL,   -- 'text' | 'a2ui'
+    payload     TEXT NOT NULL,
+    PRIMARY KEY (session_id, run_id, seq)
+);
 -- each connector's MCP tool list (JSON), so a run needn't contact the server to know it
 CREATE TABLE IF NOT EXISTS connector_catalog (
     connector_id TEXT PRIMARY KEY,
@@ -77,6 +86,30 @@ def init_db() -> None:
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(user_connectors)")}
         if "enabled" not in cols:
             conn.execute("ALTER TABLE user_connectors ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
+
+
+# ---- chat parts (A2UI turns) ----
+def add_chat_parts(session_id: str, run_id: str, parts: list[tuple[str, str]]) -> None:
+    """Appends (kind, payload) rows to a turn, after any it already has."""
+    with get_conn() as conn:
+        start = conn.execute(
+            "SELECT COALESCE(MAX(seq) + 1, 0) FROM chat_parts WHERE session_id = ? AND run_id = ?",
+            (session_id, run_id),
+        ).fetchone()[0]
+        conn.executemany(
+            "INSERT INTO chat_parts (session_id, run_id, seq, kind, payload) VALUES (?, ?, ?, ?, ?)",
+            [(session_id, run_id, start + i, kind, payload) for i, (kind, payload) in enumerate(parts)],
+        )
+
+
+def list_chat_parts(session_id: str) -> list[dict]:
+    """Every part of a session, oldest turn first (rowid keeps insertion order across turns)."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT run_id, kind, payload FROM chat_parts WHERE session_id = ? ORDER BY rowid",
+            (session_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 # ---- users ----

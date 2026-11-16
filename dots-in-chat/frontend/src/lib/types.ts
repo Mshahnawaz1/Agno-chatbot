@@ -15,6 +15,8 @@ export type Message = {
   metrics?: Metrics | null
   /** Assistant replies since A2UI v1.0: text and A2UI wire messages, in order. */
   parts?: ({ type: 'text'; text: string } | { type: 'a2ui'; message: Record<string, unknown> & { version: string } })[] | null
+  /** Assistant replies: the model's thoughts, if it shared any. */
+  reasoning?: string | null
   /** User turns started by a click on a surface. */
   action?: {
     name: string

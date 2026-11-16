@@ -88,6 +88,8 @@ export function ChatPage() {
         // Copy takes the text only (old replies kept their UI JSON inside the text).
         content: m.role === 'assistant' ? parts.flatMap((p) => (p.kind === 'text' ? [p.text] : [])).join('\n\n') : (m.content ?? ''),
         parts,
+        reasoning: m.reasoning ?? '',
+        reasoningMs: null,
         action: m.action ?? undefined,
         metrics: m.metrics ?? null,
         error: null,

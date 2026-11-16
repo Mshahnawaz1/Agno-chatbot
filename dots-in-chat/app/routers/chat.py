@@ -117,6 +117,10 @@ async def model_pass(
             return
         if event.event == RunEvent.run_content:
             run["run_id"] = run.get("run_id") or event.run_id
+            # The model's thoughts (Gemini include_thoughts, Groq gpt-oss reasoning) arrive
+            # before its answer; a repair run's thoughts are about fixing UI, so stay hidden.
+            if event.reasoning_content and not repair:
+                yield sse("reasoning", {"content": event.reasoning_content})
             if event.content:
                 for name, data in turn.feed(str(event.content)):
                     yield sse(name, data)

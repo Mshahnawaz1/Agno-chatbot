@@ -2,7 +2,7 @@ import { useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Check, Copy } from 'lucide-react'
-import clsx from 'clsx'
+import { cn } from '@/lib/utils'
 
 function textOf(node: ReactNode): string {
   if (node == null || typeof node === 'boolean') return ''
@@ -103,7 +103,7 @@ const components: Components = {
 
 export function Markdown({ children, className }: { children: string; className?: string }) {
   return (
-    <div className={clsx('min-w-0 break-words text-fg', className)}>
+    <div className={cn('min-w-0 break-words text-fg', className)}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {children}
       </ReactMarkdown>

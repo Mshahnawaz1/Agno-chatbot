@@ -60,5 +60,6 @@ async def session_messages(session_id: str, user: CurrentUser):
                 content="".join(p["text"] for p in turn_parts if p["type"] == "text") if turn_parts else str(run.content),
                 parts=turn_parts,
                 metrics=run_metrics(run.metrics, run.tools),
+                reasoning=run.reasoning_content or None,
             ))
     return out

@@ -108,10 +108,23 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       // Batch tokens into one state update per animation frame. Each update re-parses the whole
       // reply's markdown, so per-chunk updates made long replies cost O(n^2) to render.
       let pending = ''
+      let pendingReasoning = ''
       let frame = 0
+      // Thinking time: first reasoning chunk -> first piece of the answer (or the end).
+      let reasoningStart: number | null = null
+      let reasoningDone = false
+      const endReasoning = () => {
+        if (reasoningStart === null || reasoningDone) return
+        reasoningDone = true
+        dispatch({ type: 'reasoningDone', runId, assistantId, ms: performance.now() - reasoningStart })
+      }
       const flush = () => {
         if (frame) cancelAnimationFrame(frame)
         frame = 0
+        if (pendingReasoning) {
+          dispatch({ type: 'reasoning', runId, assistantId, content: pendingReasoning })
+          pendingReasoning = ''
+        }
         if (!pending) return
         dispatch({ type: 'token', runId, assistantId, content: pending })
         pending = ''
@@ -145,14 +158,23 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
               }
               break
             }
+            case 'reasoning':
+              if (typeof d.content === 'string' && d.content) {
+                reasoningStart ??= performance.now()
+                pendingReasoning += d.content
+                if (!frame) frame = requestAnimationFrame(flush)
+              }
+              break
             case 'token':
               if (typeof d.content === 'string' && d.content) {
+                endReasoning()
                 pending += d.content
                 if (!frame) frame = requestAnimationFrame(flush)
               }
               break
             case 'a2ui':
               // Keep text and surfaces in arrival order: write buffered text first.
+              endReasoning()
               flush()
               if (d.message && typeof d.message === 'object') {
                 dispatch({ type: 'a2ui', runId, assistantId, message: d.message as A2uiMessage })
@@ -203,7 +225,10 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
           dispatch({ type: 'fail', runId, assistantId, kind: 'error', message: errorText(err) })
         }
       } finally {
-        if (isActive()) flush()
+        if (isActive()) {
+          flush()
+          endReasoning()
+        }
         else if (frame) cancelAnimationFrame(frame)
         if (flushRef.current === flush) flushRef.current = null
         if (isActive()) {

@@ -43,6 +43,20 @@
   --color-destructive: #f87171;
   --color-input: rgb(255 255 255 / 0.16);
   --color-ring: rgb(255 255 255 / 0.4);
+
+  /* Radix Collapsible open/close (shadcn trace) */
+  --animate-collapsible-down: collapsible-down 200ms ease-out;
+  --animate-collapsible-up: collapsible-up 200ms ease-out;
+}
+
+@keyframes collapsible-down {
+  from { height: 0; }
+  to { height: var(--radix-collapsible-content-height); }
+}
+
+@keyframes collapsible-up {
+  from { height: var(--radix-collapsible-content-height); }
+  to { height: 0; }
 }
 
 @layer base {
@@ -161,6 +175,13 @@
   -webkit-background-clip: text;
   color: transparent;
   animation: shimmer 2s linear infinite;
+}
+
+/* shadcn trace: no shimmer for reduced motion (applied with motion-reduce:) */
+@utility shimmer-none {
+  animation: none;
+  background: none;
+  color: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {

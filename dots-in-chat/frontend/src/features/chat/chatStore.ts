@@ -13,6 +13,10 @@ export type Turn = {
   content: string
   /** Assistant turns: text and A2UI messages in the order they arrived. */
   parts: Part[]
+  /** Assistant turns: the model's thoughts, streamed before (and between) its answer. */
+  reasoning: string
+  /** How long the model thought before answering; null while thinking or when unknown (history). */
+  reasoningMs: number | null
   /** User turns started by a click on a surface. */
   action?: UiAction
   metrics: Metrics | null
@@ -38,6 +42,8 @@ export type StreamAction =
   | { type: 'start'; runId: number; userId: string; assistantId: string; input: TurnInput }
   | { type: 'session'; runId: number; sessionId: string }
   | { type: 'token'; runId: number; assistantId: string; content: string }
+  | { type: 'reasoning'; runId: number; assistantId: string; content: string }
+  | { type: 'reasoningDone'; runId: number; assistantId: string; ms: number }
   | { type: 'a2ui'; runId: number; assistantId: string; message: A2uiMessage }
   | { type: 'metrics'; runId: number; assistantId: string; metrics: Metrics }
   | { type: 'fail'; runId: number; assistantId: string; message: string; kind: ErrorKind }
@@ -74,10 +80,10 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       turns: [
         ...state.turns,
         {
-          id: action.userId, role: 'user', parts: [], metrics: null, error: null, errorKind: null, status: 'done',
+          id: action.userId, role: 'user', parts: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'done',
           ...('text' in action.input ? { content: action.input.text } : { content: '', action: action.input.action.action }),
         },
-        { id: action.assistantId, role: 'assistant', content: '', parts: [], metrics: null, error: null, errorKind: null, status: 'streaming' },
+        { id: action.assistantId, role: 'assistant', content: '', parts: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'streaming' },
       ],
     }
   }
@@ -93,6 +99,10 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
         content: t.content + action.content,
         parts: appendText(t.parts, action.content),
       }))
+    case 'reasoning':
+      return updateTurn(state, action.assistantId, (t) => ({ reasoning: t.reasoning + action.content }))
+    case 'reasoningDone':
+      return updateTurn(state, action.assistantId, (t) => (t.reasoningMs === null ? { reasoningMs: action.ms } : {}))
     case 'a2ui':
       return updateTurn(state, action.assistantId, (t) => ({
         parts: [...t.parts, { kind: 'a2ui', message: action.message }],

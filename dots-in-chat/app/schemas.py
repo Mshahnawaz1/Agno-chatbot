@@ -66,6 +66,8 @@ class MessageOut(BaseModel):
     metrics: dict | None = None  # assistant replies only
     # Assistant replies: what the turn showed, in order ({"type": "text" | "a2ui", ...}).
     parts: list[dict[str, Any]] | None = None
+    # Assistant replies: the model's thoughts before/while answering, if it shared any.
+    reasoning: str | None = None
     # User turns started by a click: the action that was sent.
     action: dict[str, Any] | None = None
 

@@ -5,7 +5,6 @@ dots-in-chat/app/agent.py
 """
 from agno.agent import Agent
 from agno.models.fallback import FallbackConfig
-from agno.models.groq import Groq
 from agno.utils.log import logger
 from agno.db.sqlite import SqliteDb
 from agno.tools.yfinance import YFinanceTools
@@ -25,6 +24,7 @@ from app.tools import primes_below, get_weather
 from app.connectors.tools import user_connector_tools
 from app.skills import skills
 from app.a2ui import A2UI_INSTRUCTIONS, A2UI_RULE
+from app.reasoning_groq import ReasoningGroq
 
 Path(settings.agno_db_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -80,7 +80,13 @@ def gemini_models() -> list:
         logger.warning("google-genai not installed: only Groq is available")
         return []
     return [
-        Gemini(id=model_id.strip(), api_key=api_key, timeout=settings.gemini_timeout)
+        Gemini(
+            id=model_id.strip(), api_key=api_key, timeout=settings.gemini_timeout,
+            # Thought summaries stream as reasoning_content before the answer (the UI
+            # shows them as "Thinking"). flash-lite only thinks with a thinking level set.
+            include_thoughts=True,
+            thinking_level=settings.gemini_thinking_level or None,
+        )
         for model_id in settings.gemini_models.split(",") if model_id.strip()
     ]
 
@@ -94,7 +100,7 @@ def model_chain():
     """
     # No SDK retries: on a 429 the Groq SDK would sleep for `retry-after` (up to 60s,
     # twice) before agno ever tried a fallback. Fail fast and fall over instead.
-    groq = Groq(id=settings.groq_model, max_retries=0, timeout=settings.groq_timeout)
+    groq = ReasoningGroq(id=settings.groq_model, max_retries=0, timeout=settings.groq_timeout)
     gemini = gemini_models()
 
     if settings.primary_model == "gemini" and gemini:

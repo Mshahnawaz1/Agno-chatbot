@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     gemini_models: str = "gemini-3.5-flash-lite,gemini-3.5-flash"
     gemini_timeout: float = 30  # seconds per attempt, so an overloaded model fails over
     gemini_api_key: str = ""
+    # "low" | "high" | "" (model default). flash-lite shares no thoughts by default;
+    # "low" makes it think (and stream its thoughts) on questions that need it.
+    gemini_thinking_level: str = "low"
 
     # Auth. No default for the secret: the app refuses to start without one.
     jwt_secret: str

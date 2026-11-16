@@ -320,6 +320,34 @@ Total about 2–3 working days of build, plus the live-test days.
 5. Text markdown: keep the app's react-markdown (recommended) or add `@a2ui/markdown-it` 0.2.2?
 6. Results file in git (`dots-in-chat/A2UI_RESULTS.md`) or local only?
 
+## Phase 7: Chat blocks from the Figma design (done 2026-11-16, not committed)
+Source: "Interactive & generative chat blocks — proposal for the UI team" (Figma export
+`C:\Users\shahn\Downloads\Pritam's Proposal.png`). Only the interactive chat components; no
+changes to `a2ui-poc/`.
+- [x] 7.1 Foundation: glass theme tokens + Poppins (`a2ui.css`), block kit
+  (`frontend/src/features/chat/a2ui/blocks/kit.tsx`), hooks (`hooks.ts`: live state mirrored to the
+  data model at `/blocks/<id>`, block events), server loads `app/a2ui/catalogs/blocks/*.json` into
+  the catalog and prompt (`catalog.py`), `say` action for Suggestions (`actions.py`, shown as a
+  plain user message in `Message.tsx`), dev-only gallery `/dev/blocks` with an "Agent update" button.
+- [x] 7.2 GrowthCalculator (SIP) + Suggestions (main session)
+- [x] 7.3 BudgetSplit (draggable ring), QuadraticExplorer (Sonnet subagent)
+- [x] 7.4 ChartSwitcher (bar/line/area/pie/donut, greys out dishonest styles), ChartGallery (Sonnet)
+- [x] 7.5 OrderReview (hold 1.5 s to pay), ReminderPicker, RankList (drag + keyboard) (Sonnet)
+- [x] 7.6 MessageApproval (8 s undo before sending), DraftDiff, BatchSend (Haiku)
+- [x] 7.7 Review and tests:
+  - offline server: `PYTHONPATH=. python -m unittest tests.test_blocks tests.test_a2ui` → 17/17
+    (every guide's Express example compiles; update in place; `say` prompt)
+  - browser, no model: `node e2e/blocks.mjs <vite url>` → 15/15 (zod ↔ JSON schema sync, all
+    samples render with no console errors, each block's maths/events, agent update, 360 px)
+  - live, gemini-3.5-flash-lite through the real UI: `node e2e/live_blocks.mjs <vite url> <out>`
+    → 5/5 (SIP, budget, message, weekly spending, quadratic each answered with the right block);
+    SIP: dragged years to 20 in the browser, tapped a suggestion, the agent updated the same card
+    keeping 20 years. Found and fixed: new suggestions stayed disabled after an agent update.
+  - tsc, eslint, build pass. Main bundle unchanged; lazy Surface chunk +17 kB gzip.
+- Open: flash-lite still sometimes writes its sentence after the block; prompt is now 39k chars
+  (blocks add ~7k); an in-place update redraws the card in the earlier message, so the new reply
+  can be text only. A test user `blocks-e2e-…@example.com` was created in `data/app.db`.
+
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and
   the lost shadcn catalog are replaced.

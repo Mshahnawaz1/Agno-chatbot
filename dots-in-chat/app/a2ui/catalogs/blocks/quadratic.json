@@ -1,0 +1,16 @@
+{
+  "guide": "QuadraticExplorer(a, b, c) — y = ax² + bx + c with sliders for a, b, c (−10..10); the plot, roots, vertex, discriminant and the quadratic formula with numbers substituted recompute live in the browser. a must not be 0. Use it for any 'show me / explore this quadratic' question instead of a VegaChart. Sends no events. Example: card = QuadraticExplorer(1, -2, -3)",
+  "components": {
+    "QuadraticExplorer": {
+      "type": "object",
+      "description": "An interactive quadratic y = ax² + bx + c with live plot, roots and vertex.",
+      "properties": {
+        "component": {"const": "QuadraticExplorer"},
+        "a": {"type": "number", "description": "Coefficient of x². Not 0."},
+        "b": {"type": "number", "description": "Coefficient of x."},
+        "c": {"type": "number", "description": "Constant term."}
+      },
+      "required": ["component", "a", "b", "c"]
+    }
+  }
+}

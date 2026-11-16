@@ -1,6 +1,6 @@
 # Task in hand: A2UI research → knowledge base → POC → integration
 
-Goal: understand A2UI properly before building more of it into `agno-fastapi/`.
+Goal: understand A2UI properly before building more of it into `dots-in-chat/`.
 Each phase ends with a check; the next phase starts only when the check passes.
 
 Outputs:
@@ -59,7 +59,7 @@ Status legend: `[ ]` to do · `[~]` in progress · `[x]` done
 - Check: user signs off. → The user moved straight to integration on 2026-11-16 (approved the
       6.1 plan with changes: v1.0 only, shadcn for every component, a ChatGPT-like theme).
 
-## Phase 6: Integrate into `agno-fastapi/` (only after Phase 5 sign-off)
+## Phase 6: Integrate into `dots-in-chat/` (only after Phase 5 sign-off)
 - [x] 6.1 Plan the integration from what the KB and POC showed. → Plan below; approved
       2026-11-16 with changes: remove v0.9, draw every component with shadcn, theme like ChatGPT,
       otherwise follow the recommendations (no Badge, react-markdown for Text, old v0.9 replies
@@ -67,7 +67,7 @@ Status legend: `[ ]` to do · `[~]` in progress · `[x]` done
 - [x] 6.2 Implement and test (2026-11-16). Not committed. Results in 6.2 below.
 
 ### 6.2 What was built, and the test results
-Server (`agno-fastapi/app/a2ui/`, replaces `app/a2ui.py`):
+Server (`dots-in-chat/app/a2ui/`, replaces `app/a2ui.py`):
 - `catalog.py` basic v1.0 catalog pruned to 15 components, SDK generator (Express);
   `prompt.py` judgement + generated snippet (23.7k chars, ~6k tokens per request);
   `turn.py` compiles the streamed reply; `store.py` keeps each turn's parts in the new
@@ -100,7 +100,7 @@ Follow-up (2026-11-16, user's SIP "drag and see the curve" chat):
   `enum: [..., null]` fails Gemini's schema check; any run error was also labelled a guardrail;
   (3) misleading compiler errors (`root = card`, orphaned components, `surface(...)` before a delete)
   that the repair couldn't fix. Details: `a2ui-kb/05-catalogs-and-skills.md` §8.
-- Fixes: chat catalog = basic + official VegaChart, own id `agno-fastapi/chat/v1`, with catalog
+- Fixes: chat catalog = basic + official VegaChart, own id `dots-in-chat/chat/v1`, with catalog
   instructions for live Vega-Lite params (`app/a2ui/catalog.py`, `catalogs/vegachart_v1.json`);
   client `catalog/chart.tsx` + `ChartView.tsx` (vega-embed 7.3.0, vega 6.4.0, vega-lite 6.5.0,
   lazy; external data blocked); repair runs get no tool routing; null dropped from tool enums
@@ -113,7 +113,7 @@ Open points:
 - Groq can't carry this prompt on the free tier: it works only as a last resort for a short turn.
 - flash-lite sometimes writes its sentence after the block, so text shows under the card.
 - A model error during a run is still shown as "Blocked by guardrail" (existing `run_error` path).
-- A local test user `a2ui-e2e@example.com` and its chats were created in `agno-fastapi/data/app.db`.
+- A local test user `a2ui-e2e@example.com` and its chats were created in `dots-in-chat/data/app.db`.
 
 ### 6.1 Integration plan
 
@@ -122,7 +122,7 @@ Open points:
   holds only the committed v0.9 files (`A2uiBlock.tsx`, `a2ui.css`, `index.tsx`, `parse.ts`).
   `genui.tsx`, `Field.tsx`, `aria.ts` are missing, `src/components/shadcn/` is empty,
   `components.json` and the added npm deps (radix slider, checkbox, ...) are gone, and
-  `app/a2ui.py` still names the v0.9 basic catalog, not `agno-fastapi/genui@1`. The files were
+  `app/a2ui.py` still names the v0.9 basic catalog, not `dots-in-chat/genui@1`. The files were
   never staged, so git has no copy (checked `git fsck --lost-found`, stashes, reflog).
   What caused it is unknown; that session's transcript has no git checkout/clean/reset.
   **Recoverable:** `genui.tsx` was made by one Write plus 4 Edits, and `Field.tsx`/`aria.ts`
@@ -222,7 +222,7 @@ Pattern: `a2ui-poc/server/app.py`.
   go. A `Turn` gets ordered `parts: ({kind:'text', text} | {kind:'surface', surfaceId})[]`.
   `token` events append text, and a `createSurface` message adds a surface part where it
   arrived. Surfaces render as their statements arrive, which replaces "Building interface…"
-  (now: whole block after `</a2ui>`, `03` "Compared with agno-fastapi/ today").
+  (now: whole block after `</a2ui>`, `03` "Compared with dots-in-chat/ today").
 - **One `MessageProcessor` per chat session** (held next to `ChatStreamProvider`, reset on
   chat switch), not one per block. A later turn's `updateDataModel`/`updateComponents` changes
   the surface **where it first appeared**. A `deleteSurface` replaces it with a small "removed"
@@ -284,7 +284,7 @@ Pattern: `a2ui-poc/server/app.py`.
 | End to end, live | `scenarios.json` through the real app UI: logged-in test user, Playwright; expected messages, fill + submit, action reaches agent | `a2ui-poc/tests/run_scenarios.mjs` |
 | App-only scenarios | form inside a tool flow (weather city picker); reload restores surfaces; update after reload; action after reload; repair hidden from history; old v0.9 session shows the note | new |
 | Frontend checks | `npx tsc -b`, `npx eslint .`, `npm run build` | CLAUDE.md |
-Results go into `agno-fastapi/A2UI_RESULTS.md` (or kept local like the POC; your call).
+Results go into `dots-in-chat/A2UI_RESULTS.md` (or kept local like the POC; your call).
 
 #### 6.1.7 Risks, effort, order of work
 Risks:
@@ -318,8 +318,8 @@ Total about 2–3 working days of build, plus the live-test days.
 3. Keep Badge (needs a custom catalog document) or drop it?
 4. Old v0.9 sessions: static note (recommended) or keep a read-only v0.9 renderer?
 5. Text markdown: keep the app's react-markdown (recommended) or add `@a2ui/markdown-it` 0.2.2?
-6. Results file in git (`agno-fastapi/A2UI_RESULTS.md`) or local only?
+6. Results file in git (`dots-in-chat/A2UI_RESULTS.md`) or local only?
 
 ## Notes
-- `agno-fastapi/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and
+- `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and
   the lost shadcn catalog are replaced.

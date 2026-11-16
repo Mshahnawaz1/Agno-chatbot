@@ -1,4 +1,4 @@
-# Agno chatbot
+# Dots-in Chat
 
 A chatbot project built using [Agno](https://www.agno.com/), exploring AI agent development and integration with FastAPI.
 
@@ -12,7 +12,7 @@ Agno-chatbot/
 │
 ├── learn_agno/
 │   └── ... 
-├── agno-fastapi/
+├── dots-in-chat/
 │   ├── frontend/
 │   │   └── ...
 │   ├── requirements.txt
@@ -28,9 +28,9 @@ Agno-chatbot/
 | Directory / File | Description |
 |---|---|
 | [`learn_agno/`](learn_agno/) | Initial implementation, learning, and experimentation with Agno modules and concepts. |
-| [`agno-fastapi/`](agno-fastapi/) | Main directory containing the chatbot application built with Agno and FastAPI. |
-| [`agno-fastapi/frontend/`](agno-fastapi/frontend/) | Simple chatbot UI developed using HTML, CSS, and plain JavaScript. |
-| [`agno-fastapi/requirements.txt`](agno-fastapi/requirements.txt) | Python dependencies required to run the chatbot backend. |
+| [`dots-in-chat/`](dots-in-chat/) | Main directory containing the chatbot application built with Agno and FastAPI. |
+| [`dots-in-chat/frontend/`](dots-in-chat/frontend/) | Simple chatbot UI developed using HTML, CSS, and plain JavaScript. |
+| [`dots-in-chat/requirements.txt`](dots-in-chat/requirements.txt) | Python dependencies required to run the chatbot backend. |
 | [`pyproject.toml`](pyproject.toml) | Project configuration and dependency management. |
 | [`uv.lock`](uv.lock) | Lockfile containing pinned dependency versions. |
 
@@ -39,7 +39,7 @@ Agno-chatbot/
 Navigate to the main application directory:
 
 ```bash
-cd agno-fastapi
+cd dots-in-chat
 pip install -r requirements.txt
 
 uvicorn app.main:app --reload 

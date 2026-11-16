@@ -2,6 +2,9 @@ import { A2uiSurface } from '@a2ui/react/v0_9'
 import { useSurfaceFeed } from './feed'
 import { isSynced, useProcessor } from './processor'
 import { SurfaceNote } from './notes'
+import '@fontsource/poppins/400.css'
+import '@fontsource/poppins/500.css'
+import '@fontsource/poppins/600.css'
 import './a2ui.css'
 
 /**

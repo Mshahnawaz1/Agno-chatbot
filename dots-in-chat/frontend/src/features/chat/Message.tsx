@@ -158,11 +158,13 @@ function Reasoning({ text, running, ms }: { text: string; running: boolean; ms: 
 }
 
 function UserMessage({ turn }: { turn: Turn }) {
-  if (turn.action) return <ActionMessage action={turn.action} />
+  // A tapped suggestion reads as what the user said.
+  const said = turn.action?.name === 'say' ? turn.action.context?.text : undefined
+  if (turn.action && typeof said !== 'string') return <ActionMessage action={turn.action} />
   return (
     <div className="flex justify-end">
       <div className="max-w-[80%] whitespace-pre-wrap rounded-xl bg-surface-2 px-4 py-2.5 leading-7 text-fg wrap-anywhere">
-        {turn.content}
+        {typeof said === 'string' ? said : turn.content}
       </div>
     </div>
   )

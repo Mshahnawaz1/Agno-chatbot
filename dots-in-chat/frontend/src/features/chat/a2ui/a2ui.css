@@ -1,34 +1,51 @@
 /*
- * The look of A2UI surfaces: close to ChatGPT's dark UI. Surfaces sit on the page without a
- * fill, cards are hairline-bordered, text is white with grey secondary text, and the primary
- * colour is white (white buttons, white selected radios and chips).
+ * The look of A2UI surfaces: the chat's glass language from the design reference
+ * ("Interactive & generative chat blocks"): Poppins, #252636 glass cards, soft pills and an
+ * indigo primary. Basic components (catalog/) and chat blocks (blocks/) share these tokens.
  *
- * Every component is shadcn/ui + Tailwind (catalog/), so the theme is just these tokens, set on
- * the surface host so they don't leak into the rest of the app.
+ * Every component is shadcn/ui + Tailwind, so the theme is just these tokens, set on the
+ * surface host so they don't leak into the rest of the app.
  */
 .a2ui-host {
   color-scheme: dark;
-  --color-fg: #f5f5f5;
-  --color-fg-muted: #afafaf;
-  --color-fg-subtle: #8f8f8f;
-  --color-border: rgb(255 255 255 / 0.1);
+  /* block palette */
+  --blk-card: rgb(37 38 54 / 0.55);
+  --blk-card-border: rgb(255 255 255 / 0.07);
+  --blk-inset: rgb(255 255 255 / 0.035);
+  --blk-inset-border: rgb(255 255 255 / 0.06);
+  --blk-accent: #5b6cf0;
+  --blk-accent-hi: #7c8af5;
+  --blk-teal: #2fb9a1;
+  --blk-green: #5fe0a8;
+  --blk-amber: #e8a33d;
+  --blk-rose: #f0697f;
+  --blk-violet: #9b7cf5;
+  --blk-sky: #56b6f0;
+  --blk-text: #f4f5fb;
+  --blk-muted: #a3a6bd;
+  --blk-subtle: #74778f;
+  --blk-font: "Poppins", var(--font-sans);
+
+  --color-fg: var(--blk-text);
+  --color-fg-muted: var(--blk-muted);
+  --color-fg-subtle: var(--blk-subtle);
+  --color-border: rgb(255 255 255 / 0.08);
   --color-background: transparent;
-  --color-foreground: #f5f5f5;
-  --color-primary: #ffffff;
-  --color-primary-foreground: #0d0d0d;
-  --color-secondary: #2a2a2a;
+  --color-foreground: var(--blk-text);
+  --color-primary: var(--blk-accent);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: rgb(255 255 255 / 0.06);
   --color-secondary-foreground: #ffffff;
-  --color-muted: #212121;
-  --color-muted-foreground: #afafaf;
-  /* shadcn's hover grey; the app's violet accent stays outside surfaces. */
-  --color-accent: #2a2a2a;
+  --color-muted: rgb(255 255 255 / 0.08);
+  --color-muted-foreground: var(--blk-muted);
+  --color-accent: rgb(255 255 255 / 0.06);
   --color-accent-foreground: #ffffff;
-  --color-input: rgb(255 255 255 / 0.16);
-  --color-ring: rgb(255 255 255 / 0.4);
-  --color-destructive: #f87171;
+  --color-input: rgb(255 255 255 / 0.12);
+  --color-ring: rgb(91 108 240 / 0.6);
+  --color-destructive: var(--blk-rose);
   color: var(--color-fg);
-  font-family: var(--font-sans);
-  font-size: 1rem;
+  font-family: var(--blk-font);
+  font-size: 0.9375rem;
   line-height: 1.5;
 }
 
@@ -41,9 +58,9 @@
 .a2ui-markdown > :first-child { margin-top: 0; }
 .a2ui-markdown > :last-child { margin-bottom: 0; }
 .a2ui-markdown p { line-height: 1.5; margin-block: 0.25rem; }
-/* Headings: the body font, as ChatGPT draws card titles; the app's display font is for pages. */
+/* Headings: the surface font (Poppins), as the design draws card titles. */
 .a2ui-markdown :is(h1, h2, h3, h4) {
-  font-family: var(--font-sans);
+  font-family: var(--blk-font);
   letter-spacing: normal;
   font-weight: 600;
   margin-top: 0.5rem;
@@ -72,7 +89,7 @@
   box-shadow: none;
 }
 
-/* Selected radio: a white disc with a dark centre. */
+/* Selected radio: an indigo disc with a white centre. */
 .a2ui-radio { border-color: rgb(255 255 255 / 0.35); }
 .a2ui-radio[data-state="checked"] {
   background-color: var(--color-primary);
@@ -83,7 +100,7 @@
   color: var(--color-primary-foreground);
 }
 
-/* Selected chip: white pill, dark text. */
+/* Selected chip: indigo pill, white text. */
 .a2ui-chip[data-state="on"] {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
@@ -122,3 +139,164 @@
   border-radius: 0.5rem;
   padding: 0.25rem 0.5rem;
 }
+
+/* ---- basic Card in the glass look ---- */
+.a2ui-card {
+  background: var(--blk-card);
+  border-color: var(--blk-card-border) !important;
+  backdrop-filter: blur(18px);
+  border-radius: 1.25rem !important;
+}
+
+/* ================= chat blocks (blocks/) ================= */
+.blk-card {
+  background: var(--blk-card);
+  border: 1px solid var(--blk-card-border);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 20px 40px -24px rgb(0 0 0 / 0.6);
+  max-width: 34rem;
+}
+.blk-title { font-size: 1.25rem; font-weight: 500; line-height: 1.3; color: var(--blk-text); }
+.blk-sub { font-size: 0.75rem; color: var(--blk-muted); }
+.blk-micro { font-size: 0.75rem; color: var(--blk-muted); }
+.blk-value { font-size: 0.8125rem; font-weight: 500; color: var(--blk-text); }
+.blk-stat { font-size: 1.0625rem; font-weight: 500; color: var(--blk-text); }
+.blk-foot { font-size: 0.6875rem; line-height: 1.45; color: var(--blk-subtle); }
+.blk-inset {
+  background: var(--blk-inset);
+  border: 1px solid var(--blk-inset-border);
+  border-radius: 0.875rem;
+}
+.blk-formula { font-size: 0.75rem; color: var(--blk-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+.blk-text-accent { color: var(--blk-accent-hi); }
+.blk-text-success { color: var(--blk-green); }
+.blk-text-warn { color: var(--blk-amber); }
+.blk-text-danger { color: var(--blk-rose); }
+.blk-text-muted { color: var(--blk-muted); }
+
+.blk-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  border: 1px solid;
+  padding: 0.0625rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.blk-tone-accent { color: #aab3ff; border-color: rgb(91 108 240 / 0.45); background: rgb(91 108 240 / 0.14); }
+.blk-tone-success { color: var(--blk-green); border-color: rgb(95 224 168 / 0.4); background: rgb(95 224 168 / 0.1); }
+.blk-tone-warn { color: #f4c06d; border-color: rgb(232 163 61 / 0.45); background: rgb(232 163 61 / 0.12); }
+.blk-tone-danger { color: #ff9aa9; border-color: rgb(240 105 127 / 0.45); background: rgb(240 105 127 / 0.12); }
+.blk-tone-muted { color: var(--blk-muted); border-color: rgb(255 255 255 / 0.12); background: rgb(255 255 255 / 0.04); }
+
+.blk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  width: 100%;
+  border-radius: 999px;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color 150ms, border-color 150ms, opacity 150ms, transform 100ms;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+}
+.blk-btn:active:not(:disabled) { transform: scale(0.99); }
+.blk-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.blk-btn:focus-visible { outline: 2px solid var(--blk-accent-hi); outline-offset: 2px; }
+.blk-btn-primary { background: var(--blk-accent); color: #fff; box-shadow: 0 8px 24px -12px rgb(91 108 240 / 0.8); }
+.blk-btn-primary:hover:not(:disabled) { background: #6878f3; }
+.blk-btn-secondary { background: rgb(255 255 255 / 0.035); border: 1px solid rgb(255 255 255 / 0.1); color: var(--blk-text); }
+.blk-btn-secondary:hover:not(:disabled) { background: rgb(255 255 255 / 0.07); }
+.blk-btn-ghost { color: var(--blk-muted); min-height: 2rem; }
+.blk-btn-ghost:hover:not(:disabled) { color: var(--blk-text); }
+
+.blk-seg { background: rgb(255 255 255 / 0.05); border: 1px solid rgb(255 255 255 / 0.06); border-radius: 999px; }
+.blk-seg-item {
+  border-radius: 999px;
+  padding: 0.1875rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--blk-muted);
+  transition: background-color 150ms, color 150ms;
+}
+.blk-seg-item[data-on] { background: var(--blk-accent); color: #fff; }
+.blk-seg-item:hover:not([data-on]):not(:disabled) { color: var(--blk-text); }
+.blk-seg-item:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.blk-chip {
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background: rgb(255 255 255 / 0.03);
+  padding: 0.3125rem 0.875rem;
+  font-size: 0.75rem;
+  color: var(--blk-text);
+  transition: background-color 150ms, border-color 150ms;
+}
+.blk-chip:hover:not([data-on]) { background: rgb(255 255 255 / 0.07); }
+.blk-chip[data-on] { background: var(--blk-accent); border-color: var(--blk-accent); color: #fff; }
+
+.blk-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: var(--blk-accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.blk-done {
+  border-radius: 0.875rem;
+  border: 1px solid rgb(95 224 168 / 0.35);
+  background: rgb(95 224 168 / 0.08);
+  color: var(--blk-green);
+  font-size: 0.8125rem;
+}
+
+/* Slider: indigo range, white thumb with an indigo ring. */
+.blk-slider [data-slot="slider-track"] { background: rgb(255 255 255 / 0.1); height: 0.25rem; }
+.blk-slider [data-slot="slider-range"] { background: var(--blk-accent); }
+.blk-slider [data-slot="slider-thumb"] {
+  width: 0.875rem;
+  height: 0.875rem;
+  background: #fff;
+  border: 3px solid var(--blk-accent);
+  box-shadow: 0 0 0 4px rgb(91 108 240 / 0.2);
+}
+
+/* Follow-up suggestions under a block. */
+.blk-suggest {
+  align-self: flex-start;
+  min-width: 12rem;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.03);
+  padding: 0.5rem 1.5rem;
+  font-size: 0.8125rem;
+  color: var(--blk-text);
+  transition: background-color 150ms, border-color 150ms;
+}
+.blk-suggest:hover { background: rgb(91 108 240 / 0.14); border-color: rgb(91 108 240 / 0.45); }
+
+/* Chart text drawn in SVG. */
+.blk-svg-label { fill: var(--blk-subtle); font-size: 10px; font-family: var(--blk-font); }
+
+@media (prefers-reduced-motion: reduce) {
+  .blk-btn, .blk-chip, .blk-seg-item, .blk-suggest { transition: none; }
+}
+.blk-suggest:disabled { opacity: 0.5; cursor: default; }
+.blk-suggest[data-on] { opacity: 1; border-color: rgb(91 108 240 / 0.6); background: rgb(91 108 240 / 0.18); }

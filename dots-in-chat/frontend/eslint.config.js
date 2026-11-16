@@ -17,4 +17,11 @@ export default defineConfig([
     ],
     languageOptions: { ecmaVersion: 2022, globals: globals.browser },
   },
+  {
+    // A2UI catalog components are made with createComponentImplementation.
+    files: ['src/features/chat/a2ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': ['error', { extraHOCs: ['createComponentImplementation'] }],
+    },
+  },
 ])

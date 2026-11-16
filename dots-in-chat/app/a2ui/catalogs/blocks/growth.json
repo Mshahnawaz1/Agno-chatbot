@@ -1,0 +1,20 @@
+{
+  "guide": "GrowthCalculator(monthly, rate, years, lumpSum?, inflation?, title?, currency?) — a monthly investment (SIP) or recurring deposit the user drags; future value, invested, gain and the curve recompute live in the browser. rate is yearly % (12 = 12%). Pass lumpSum or inflation only when the user asked for them (each adds a slider). Use it for any 'what if I invest X a month' question instead of a VegaChart. Example: calc = GrowthCalculator(10000, 12, 15)",
+  "components": {
+    "GrowthCalculator": {
+      "type": "object",
+      "description": "A monthly investment (SIP) calculator with sliders; every number and the curve recompute live.",
+      "properties": {
+        "component": {"const": "GrowthCalculator"},
+        "monthly": {"type": "number", "description": "Monthly amount invested."},
+        "rate": {"type": "number", "description": "Expected yearly return, in percent (12 = 12%)."},
+        "years": {"type": "number", "description": "How many years the plan runs."},
+        "lumpSum": {"type": "number", "description": "One-time amount invested at the start."},
+        "inflation": {"type": "number", "description": "Yearly inflation in percent; adds a value in today's money."},
+        "title": {"type": "string", "description": "Card title. Defaults to \"Monthly SIP\"."},
+        "currency": {"type": "string", "description": "ISO currency code. Defaults to INR."}
+      },
+      "required": ["component", "monthly", "rate", "years"]
+    }
+  }
+}

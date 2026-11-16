@@ -1,0 +1,27 @@
+{
+  "guide": "DraftDiff(subject, segments, recipients?) — an email the agent drafted, shown as a diff against the user's edits, for them to approve, keep editing or discard; nothing is sent without Approve. Use it for any email draft the user will approve. segments is a list of {text, change} where change is \"added\" or \"removed\" (omit it for text that stays). Events: approve_send {subject, body, recipients} with body = the final text (unchanged and added, no removed); keep_editing {}; discard_draft {}. Example: mail = DraftDiff(\"Weekly report\", [{text: \"Hi team, here is the report. \"}, {text: \"Numbers are low.\", change: \"removed\"}, {text: \"Revenue is up 8%.\", change: \"added\"}], [\"Ananya Reddy\", \"Vikram Patel\"])",
+  "components": {
+    "DraftDiff": {
+      "type": "object",
+      "description": "An email draft as a diff: removed text struck through, added text underlined; the user approves, keeps editing or discards it.",
+      "properties": {
+        "component": {"const": "DraftDiff"},
+        "subject": {"type": "string", "description": "The email subject line."},
+        "segments": {
+          "type": "array",
+          "description": "The body in order, split into pieces. Removed pieces are shown but not sent.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {"type": "string", "description": "A piece of the body. Keep the spaces and line breaks in it."},
+              "change": {"type": "string", "enum": ["added", "removed"], "description": "\"added\" for new text, \"removed\" for text to delete. Omit it for text that stays."}
+            },
+            "required": ["text"]
+          }
+        },
+        "recipients": {"type": "array", "items": {"type": "string"}, "description": "Names of the people it goes to. Shows a \"To N people\" badge."}
+      },
+      "required": ["component", "subject", "segments"]
+    }
+  }
+}

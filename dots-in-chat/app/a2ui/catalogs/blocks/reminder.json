@@ -1,0 +1,28 @@
+{
+  "guide": "ReminderPicker(title, options?, remindBefore?, repeatDays?) — a reminder card: when (quick chips + pick a date), how many minutes before (0-120), repeat every N days. title is what to remind about; options = [{label, at}] with at a local ISO datetime (\"2026-11-16T18:00\"), first is preselected; defaults to today 6 pm / tomorrow 9 am. Use it when the user asks to be reminded. Events: set_reminder {title, at, remindBefore, repeatDays}, add_to_calendar {same}, dismiss_reminder {}. Example: card = ReminderPicker(\"Review the report\", [{label: \"Today 6 pm\", at: \"2026-11-16T18:00\"}, {label: \"Tomorrow 9 am\", at: \"2026-11-17T09:00\"}], 45, 2)",
+  "components": {
+    "ReminderPicker": {
+      "type": "object",
+      "description": "A reminder picker with time chips, a lead-time slider and a repeat stepper.",
+      "properties": {
+        "component": {"const": "ReminderPicker"},
+        "title": {"type": "string", "description": "What to remind about, e.g. \"Review the report\"."},
+        "options": {
+          "type": "array",
+          "description": "Quick time choices; the first is selected. Defaults to today 6 pm and tomorrow 9 am.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {"type": "string", "description": "Chip text, e.g. \"Today 6 pm\"."},
+              "at": {"type": "string", "description": "Local ISO datetime, e.g. \"2026-11-16T18:00\"."}
+            },
+            "required": ["label", "at"]
+          }
+        },
+        "remindBefore": {"type": "number", "description": "Minutes before the time to remind (0-120). Default 0."},
+        "repeatDays": {"type": "number", "description": "Repeat every N days; 0 = never. Default 0."}
+      },
+      "required": ["component", "title"]
+    }
+  }
+}

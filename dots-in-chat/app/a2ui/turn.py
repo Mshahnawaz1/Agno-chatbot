@@ -1,9 +1,15 @@
 """One assistant turn, compiled while it streams.
 
 The model's text goes in chunk by chunk. Out come chat events: plain text, compiled A2UI wire
-messages (one per finished Express statement, so surfaces render progressively), and the
-errors of blocks the compiler rejected. A rejected block never reaches the client; its errors
-drive one repair round (see app/routers/chat.py).
+messages, and the errors of blocks the compiler rejected. Its errors drive one repair round
+(see app/routers/chat.py).
+
+Progressive rendering: a block that creates a NEW surface streams its messages as each Express
+statement compiles, so components appear while the model is still writing. If the block then
+fails, the surface is retracted (an `a2ui_retract` event; the client drops its messages) and
+leaves no trace in the stored parts, so a rejected block never leaves a half-built surface.
+A block that changes an existing surface (update, replace) cannot be undone on the client, so
+its messages wait until the block ends, and a failing block drops them.
 """
 
 import re
@@ -120,6 +126,9 @@ class A2uiTurn:
         self._pending: list[dict] = []
         self._boundary = 0  # where the current block's messages start in _pending
         self._closed = 0  # `</a2ui>` tags seen in _raw
+        self._live: dict[str, list[Part]] = {}  # surfaces the open block streams, with their parts
+        self._base_ids: set[str] = set()  # surfaces that existed when the pass started
+        self._failed = False  # the open block failed: the rest of it is ignored
         self._dirty = False  # a block failed: the renderer state may hold its half-built surface
 
     def _rebuilt_state(self):
@@ -143,20 +152,28 @@ class A2uiTurn:
         self._raw = ""
         self._pending, self._boundary, self._closed = [], 0, 0
         self._line = ""
+        self._live, self._failed = {}, False
+        self._base_ids = set(self._state.surface_ids)
         self._stream = self._processor.open_stream(state=self._state, after_rejected_block="continue")
 
     def feed(self, chunk: str) -> list[Event]:
-        self._raw += chunk
-        out = self._events(self._stream.feed(self._upgrade(chunk)))
-        if self._raw.count("</a2ui>") > self._closed:  # a block ended: its messages are final
-            self._closed = self._raw.count("</a2ui>")
-            self._boundary = len(self._pending)
+        out: list[Event] = []
+        # One piece per block end, so a chunk holding the end of one block and the start of the
+        # next never lets the second block's messages count as final.
+        for piece in re.split(r"(?<=</a2ui>)", chunk):
+            self._raw += piece
+            out += self._events(self._stream.feed(self._upgrade(piece)))
+            if self._raw.count("</a2ui>") > self._closed:  # a block ended: its messages are final
+                self._closed = self._raw.count("</a2ui>")
+                self._boundary = len(self._pending)
+                self._live, self._failed = {}, False
         return out
 
     def close(self) -> list[Event]:
         tail, self._line = self._line, ""
         out = self._events(self._stream.feed(self._fix_line(tail)) + self._stream.close())
         self._flush(out)
+        self._live = {}
         return out
 
     def autofix(self) -> list[Event]:
@@ -232,6 +249,9 @@ class A2uiTurn:
         return out
 
     def save(self, run_id: str | None) -> None:
+        for parts in self._live.values():  # the stream ended inside a block: its surface is unfinished
+            self.parts[:] = [p for p in self.parts if not any(p is q for q in parts)]
+        self._live = {}
         if run_id:
             save_parts(self.session_id, run_id, self.parts)
 
@@ -249,16 +269,42 @@ class A2uiTurn:
                     for error in bad:
                         self.rejected.append(error)
                         out.append(("a2ui_error", {"error": error[:2000]}))
-                    del self._pending[self._boundary :]
-                    self._dirty = True
-                else:
-                    self._pending.extend(messages)
+                    self._fail_block(out)
+                elif not self._failed:
+                    for message in messages:
+                        self._route(message, out)
             elif isinstance(part, ErrorPart):
                 self.rejected.append(str(part.error))
-                del self._pending[self._boundary :]  # this block's messages: drop them all
-                self._dirty = True
                 out.append(("a2ui_error", {"error": str(part.error)[:2000]}))
+                self._fail_block(out)
         return out
+
+    def _fail_block(self, out: list[Event]) -> None:
+        """The open block failed: drop its waiting messages and retract the surfaces it streamed."""
+        del self._pending[self._boundary :]
+        for surface_id, parts in self._live.items():
+            self.parts[:] = [p for p in self.parts if not any(p is q for q in parts)]
+            out.append(("a2ui_retract", {"surfaceId": surface_id}))
+        self._live, self._failed, self._dirty = {}, True, True
+
+    def _route(self, message: dict, out: list[Event]) -> None:
+        """Streams a message of a new surface now; anything else waits for the block to end."""
+        body = next((v for k, v in message.items() if k != "version" and isinstance(v, dict)), {})
+        surface_id = body.get("surfaceId")
+        is_new = (
+            "createSurface" in message
+            and surface_id not in self._base_ids
+            and surface_id not in self._live
+            and not any(h["message"]["deleteSurface"]["surfaceId"] == surface_id for h in self._held)
+        )
+        if is_new:
+            self._live[surface_id] = []
+        if surface_id in self._live:
+            before = len(self.parts)
+            self._emit(message, out)
+            self._live[surface_id] += self.parts[before:]
+        else:
+            self._pending.append(message)
 
     def _emit(self, message: dict, out: list[Event]) -> None:
         if "deleteSurface" in message:

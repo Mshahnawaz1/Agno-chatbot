@@ -45,6 +45,7 @@ export type StreamAction =
   | { type: 'reasoning'; runId: number; assistantId: string; content: string }
   | { type: 'reasoningDone'; runId: number; assistantId: string; ms: number }
   | { type: 'a2ui'; runId: number; assistantId: string; message: A2uiMessage }
+  | { type: 'a2uiRetract'; runId: number; assistantId: string; surfaceId: string }
   | { type: 'metrics'; runId: number; assistantId: string; metrics: Metrics }
   | { type: 'fail'; runId: number; assistantId: string; message: string; kind: ErrorKind }
   | { type: 'finish'; runId: number; assistantId: string; status: Exclude<TurnStatus, 'streaming'> }
@@ -67,6 +68,14 @@ function appendText(parts: Part[], text: string): Part[] {
   const last = parts.at(-1)
   if (last?.kind === 'text') return [...parts.slice(0, -1), { kind: 'text', text: last.text + text }]
   return [...parts, { kind: 'text', text }]
+}
+
+/** The surface an A2UI message is about (every message body carries a surfaceId). */
+function messageSurfaceId(message: A2uiMessage): string | undefined {
+  for (const [key, body] of Object.entries(message)) {
+    if (key !== 'version' && body && typeof body === 'object' && 'surfaceId' in body) return String(body.surfaceId)
+  }
+  return undefined
 }
 
 export function streamReducer(state: StreamState, action: StreamAction): StreamState {
@@ -106,6 +115,12 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
     case 'a2ui':
       return updateTurn(state, action.assistantId, (t) => ({
         parts: [...t.parts, { kind: 'a2ui', message: action.message }],
+      }))
+    case 'a2uiRetract':
+      // A block failed after its surface streamed: forget the surface's messages, so nothing
+      // half-built stays on screen (the processor is rebuilt from the shorter feed).
+      return updateTurn(state, action.assistantId, (t) => ({
+        parts: t.parts.filter((p) => p.kind !== 'a2ui' || messageSurfaceId(p.message) !== action.surfaceId),
       }))
     case 'metrics':
       return updateTurn(state, action.assistantId, () => ({ metrics: action.metrics }))

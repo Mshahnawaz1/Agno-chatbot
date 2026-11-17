@@ -180,6 +180,11 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
                 dispatch({ type: 'a2ui', runId, assistantId, message: d.message as A2uiMessage })
               }
               break
+            case 'a2ui_retract':
+              // A block failed after its surface streamed in: take the surface back.
+              flush()
+              if (typeof d.surfaceId === 'string') dispatch({ type: 'a2uiRetract', runId, assistantId, surfaceId: d.surfaceId })
+              break
             case 'a2ui_error':
               // A block the server rejected; it never reaches the screen (a repair run follows).
               console.debug('A2UI block rejected by the server:', d.error)

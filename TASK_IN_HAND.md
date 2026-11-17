@@ -479,7 +479,12 @@ Tracks (parallel, one worktree each):
 - [ ] 12.A Audit of the Unknown rows by running them + replay all 43 official examples through the app's renderer and server compiler (tests + results table).
 - [ ] 12.B Feedback channel: renderer `error` -> agent (+ repair), `sendDataModel`, capabilities handshake, then function RPC (both directions, allowedCallers, requiresUserActivation).
 - [ ] 12.C Catalogs: mixed catalogs (per-component catalogId), register upstream catalogs, macros, blueprints; skills + check scripts.
-- [ ] 12.D Progressive rendering while the model streams (turn.py / feed).
+- [x] 12.D Progressive rendering while the model streams (turn.py / feed). Measured first: NOT progressive (a whole
+  block's messages were held until `</a2ui>`). Now a block that creates a new surface streams statement by statement
+  (the SDK also re-sends a component as it grows); if the block then fails, `a2ui_retract` makes the client drop the
+  surface and the stored parts never hold it. Blocks that change an existing surface stay all-or-nothing (cannot be
+  undone client-side). Tests: `tests/test_a2ui_progressive.py` (chunk sizes 1..5000, invalid mid-stream, repair and
+  autofix after partial render, several surfaces, cut stream).
 - [ ] 12.E Merge, full scenario suite, tsc/eslint/build, update a2ui-kb.
 Results: (fill in per track)
 - 12.F (media + accessibility): Modal, Video, AudioPlayer added (shadcn Dialog / native media) on client + server catalog + skill references; `accessibility` (label/description/live) now becomes aria-label/aria-description/aria-live for every chat-catalog component (Button/Image directly, others via a display:contents group wrapper; blocks excluded); Image draws nothing until its url arrives (no empty-src console error). known_gaps.json renderer entries shrank from 13 to 2, server from 5 to 2 (only the `@checks` examples). `@checks`/`@accessibility`: pinned SDK 0.11.0 / web_core 0.15.0 reject the prefixed spelling, Express cannot set accessibility; documented, not normalized. `@index`: works in formatString as `${@index(offset: 1)}` (named arg); `${@index(1)}` is invalid upstream (parser takes named args only); the earlier "1. Ann" failure was Markdown list syntax in Text, not a bug.

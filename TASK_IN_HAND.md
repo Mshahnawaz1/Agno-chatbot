@@ -479,7 +479,12 @@ Tracks (parallel, one worktree each):
 - [ ] 12.A Audit of the Unknown rows by running them + replay all 43 official examples through the app's renderer and server compiler (tests + results table).
 - [ ] 12.B Feedback channel: renderer `error` -> agent (+ repair), `sendDataModel`, capabilities handshake, then function RPC (both directions, allowedCallers, requiresUserActivation).
 - [ ] 12.C Catalogs: mixed catalogs (per-component catalogId), register upstream catalogs, macros, blueprints; skills + check scripts.
-- [ ] 12.D Progressive rendering while the model streams (turn.py / feed).
+- [x] 12.D Progressive rendering while the model streams (turn.py / feed). Measured first: NOT progressive (a whole
+  block's messages were held until `</a2ui>`). Now a block that creates a new surface streams statement by statement
+  (the SDK also re-sends a component as it grows); if the block then fails, `a2ui_retract` makes the client drop the
+  surface and the stored parts never hold it. Blocks that change an existing surface stay all-or-nothing (cannot be
+  undone client-side). Tests: `tests/test_a2ui_progressive.py` (chunk sizes 1..5000, invalid mid-stream, repair and
+  autofix after partial render, several surfaces, cut stream).
 - [ ] 12.E Merge, full scenario suite, tsc/eslint/build, update a2ui-kb.
 Results: (fill in per track)
 

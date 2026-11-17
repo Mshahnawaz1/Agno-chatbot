@@ -92,7 +92,10 @@ class RobustnessTest(unittest.TestCase):
         for chunk in (3, 9, 1000):
             turn = A2uiTurn(new_session())
             events = run_reply(turn, "Here is your tracker.\n\n" + HALF_BAD, chunk=chunk)
-            self.assertEqual(a2ui_kinds(events), [], chunk)
+            # The surface may have streamed before the failing line, but it is retracted.
+            if chunk < 100:  # fed in one piece, nothing was shown before the error
+                self.assertIn("a2ui_retract", [n for n, _ in events], chunk)
+            self.assertFalse([p for p in turn.parts if p["type"] == "a2ui"], chunk)
             self.assertTrue(turn.rejected, chunk)
             self.assertEqual(turn.surface_ids, [], "the half-built surface must not stay in the state")
 

@@ -16,7 +16,7 @@ os.environ["APP_DB_PATH"] = os.path.join(_tmp, "app.db")  # before app.config is
 
 from app import db  # noqa: E402
 from app.a2ui.actions import InvalidAction, action_prompt, parse_action_prompt, read_action  # noqa: E402
-from app.a2ui.catalog import BASIC_COMPONENTS, CATALOG_ID  # noqa: E402
+from app.a2ui.catalog import BASIC_COMPONENTS, BASIC_ID  # noqa: E402
 from app.a2ui.skill_build import SKILL_DIR, build  # noqa: E402
 from app.a2ui.store import parts_by_run  # noqa: E402
 from app.a2ui.turn import A2uiTurn, fix_named_args  # noqa: E402
@@ -156,7 +156,7 @@ class PromptTest(unittest.TestCase):
         refs = build()
         self.assertIn("A2UI Express", refs["grammar.md"])
         self.assertIn("ChoicePicker(", refs["components.md"])
-        self.assertNotIn("AudioPlayer(", "".join(refs.values()))
+        self.assertIn("AudioPlayer(", refs["components.md"])  # the whole basic catalog is registered
         self.assertIn("DateTimeInput", BASIC_COMPONENTS)
         self.assertIn("VegaChart(spec, height?)", refs["chart.md"])
         self.assertIn("When to show UI", (SKILL_DIR / "SKILL.md").read_text())
@@ -173,7 +173,8 @@ class TurnTest(unittest.TestCase):
         self.assertTrue(all(m["version"] == "1.0" for m in messages))
         created = [m["createSurface"] for m in messages if "createSurface" in m]
         self.assertEqual(created[0]["surfaceId"], "trip_prefs")
-        self.assertEqual(created[0]["catalogId"], CATALOG_ID)
+        self.assertNotIn("catalogId", created[0])  # mixed catalogs: each component names its own
+        self.assertEqual({c["catalogId"] for c in created[0]["components"]}, {BASIC_ID})
         text = "".join(data["content"] for name, data in events if name == "token")
         self.assertIn("Tell me a bit about the trip.", text)
         self.assertNotIn("<a2ui>", text)

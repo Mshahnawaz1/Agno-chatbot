@@ -29,11 +29,6 @@ PROTOCOL_VERSION = "1.0"
 # Our own id: the catalog is a derived one, not the basic catalog.
 CATALOG_ID = "dots-in-chat/chat/v1"
 
-BASIC_COMPONENTS = [
-    "Text", "Image", "Icon",
-    "Row", "Column", "List", "Card", "Tabs", "Divider",
-    "Button", "TextField", "CheckBox", "ChoicePicker", "Slider", "DateTimeInput",
-]
 
 # Catalog-level instructions go into the generated prompt under "Catalog Instructions".
 INSTRUCTIONS = """VegaChart draws a Vega-Lite v5 chart from `spec` (a JSON object). Use it for any chart,
@@ -86,30 +81,66 @@ def _catalog_doc(catalog_id: str, components: dict) -> dict:
     }
 
 
-def _chat_catalog() -> Catalog:
-    basic = BasicCatalog(ProtocolVersion.V1_0)
-    vega = Catalog.from_json(json.loads((CATALOGS_DIR / "vegachart_v1.json").read_text()))
-    blocks = Catalog.from_json(_catalog_doc("dots-in-chat/blocks/v1", BLOCK_COMPONENTS))
-    return basic.derive(
+BASIC = BasicCatalog(ProtocolVersion.V1_0)
+BASIC_ID = BASIC.catalog_id
+BASIC_COMPONENTS = list(BASIC.components)
+# The official VegaChart catalog, with this app's usage notes as its instructions.
+VEGA = Catalog.from_json(json.loads((CATALOGS_DIR / "vegachart_v1.json").read_text()))
+VEGA = VEGA.derive(catalog_id=VEGA.catalog_id, instructions=INSTRUCTIONS)
+VEGA_ID = VEGA.catalog_id
+BLOCKS_ID = "dots-in-chat/blocks/v1"
+BLOCKS = Catalog.from_json(_catalog_doc(BLOCKS_ID, BLOCK_COMPONENTS))
+
+# Every catalog the chat renders, each under its own id. A surface has no catalog of its own:
+# each component names the catalog it is from (`catalogId` on the wire), so one card can mix
+# a basic Column, a VegaChart and a chat block.
+CATALOGS = [BASIC, VEGA, BLOCKS]
+CATALOG_IDS = [c.catalog_id for c in CATALOGS]
+
+
+def _merged_catalog() -> Catalog:
+    """All components under CATALOG_ID, the one catalog the chat had before mixed catalogs.
+
+    Surfaces stored back then name this id in createSurface; the client still renders it and
+    `upgrade_message` rewrites them for the server. It also lists the component names
+    (turn.py) and validates renderer messages (actions.py).
+    """
+    return BASIC.derive(
         catalog_id=CATALOG_ID,
-        components=[
-            *BASIC_COMPONENTS,
-            vega.components["VegaChart"],
-            *(blocks.components[name] for name in BLOCK_COMPONENTS),
-        ],
-        instructions=INSTRUCTIONS,
+        components=[*BASIC.components.values(), *VEGA.components.values(), *BLOCKS.components.values()],
     )
 
 
-CATALOG = _chat_catalog()
+CATALOG = _merged_catalog()
+COMPONENT_CATALOG = {name: cat.catalog_id for cat in CATALOGS for name in cat.components}
 
-# The chat frontend renders this catalog only, so every request has the same capabilities.
-CAPABILITIES = {PROTOCOL_VERSION: {"supportedCatalogIds": [CATALOG_ID]}}
+
+def _tag(component: dict) -> dict:
+    cid = COMPONENT_CATALOG.get(component.get("component"))
+    return {**component, "catalogId": cid} if cid and "catalogId" not in component else component
+
+
+def upgrade_message(message: dict) -> dict:
+    """A stored surface message from before mixed catalogs, in today's shape.
+
+    `createSurface` named the one merged catalog; now it names none and each component names
+    its own. Anything else passes through unchanged.
+    """
+    body = message.get("createSurface")
+    if not isinstance(body, dict) or body.get("catalogId") != CATALOG_ID:
+        return message
+    body = {k: v for k, v in body.items() if k != "catalogId"}
+    body["components"] = [_tag(c) for c in body.get("components", [])]
+    return {**message, "createSurface": body}
+
 
 GENERATOR = A2uiGenerator(
-    catalogs=[CatalogConfig(catalog=CATALOG)],
+    catalogs=[CatalogConfig(catalog=c) for c in CATALOGS],
     inference_format_factory=ExpressFormatFactory(),
 )
+
+# The chat frontend renders all of them, so every request has the same capabilities.
+CAPABILITIES = {PROTOCOL_VERSION: {"supportedCatalogIds": CATALOG_IDS}}
 
 
 def new_processor() -> A2uiRequestProcessor:

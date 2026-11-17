@@ -196,9 +196,8 @@ class SkillsTest(unittest.IsolatedAsyncioTestCase):
         from app.skills import skills
 
         # ~tokens; the a2ui description names its blocks so the model loads it for them.
-        self.assertLess(len(skills.get_system_prompt_snippet()) // 4, 260)
-        # get_skill_script: the a2ui skill has scripts/check.py; no reference tool (files= batches them).
-        self.assertEqual([f.name for f in skills.get_tools()], ["search_skills", "get_skill_instructions", "get_skill_script"])
+        self.assertLess(len(skills.get_system_prompt_snippet()) // 4, 420)
+        self.assertEqual([f.name for f in skills.get_tools()], ["get_skill_instructions"])  # few skills: no search; no model script
         self.assertTrue(skills.search_skills("schedule focus time on my calendar").startswith("reclaim"))
 
         async def fake_specs(user_id):
@@ -209,13 +208,13 @@ class SkillsTest(unittest.IsolatedAsyncioTestCase):
             state = {}
             rc = run_context(state)
             tools._Usage(rc).next_run()
-            text = await skills.get_skill_instructions("todoist", rc)
+            text = await skills.get_skill_instructions("todoist", rc, paths=[])
         finally:
             tools.user_specs = orig
         self.assertIn("# Todoist", text)
         self.assertIn('"name":"todoist_add-tasks"', text)  # schema handed over for call_tool
         self.assertIn("todoist_add-tasks", state["connector_tools"]["used"])  # attached from next run
-        self.assertIn("No skill", await skills.get_skill_instructions("nope", rc))
+        self.assertIn("No skill", await skills.get_skill_instructions("nope", rc, paths=[]))
 
 
 

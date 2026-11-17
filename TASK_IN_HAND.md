@@ -460,7 +460,7 @@ Report: "monthly tracker" said "here is your tracker" and showed nothing; radar 
 - [x] 11.3 Skill: `references/chart-choice.md` has verified recipes (bar, line, donut, stacked, scatter,
   histogram, radar, gauge, heatmap, waterfall, area); SKILL.md states the `=` rule and sends radar/gauge/...
   to VegaChart recipes.
-- [x] 11.4 Tests: dev pages `/dev/chart` and `/dev/surface`; `frontend/e2e/charts.mjs` (every recipe draws),
+- [x] 11.4 Tests (the bench, e2e scripts and dev pages used for these checks were deleted afterwards, not committed): dev pages `/dev/chart` and `/dev/surface`; `frontend/e2e/charts.mjs` (every recipe draws),
   `frontend/e2e/pipeline.mjs` (every skill example: server compile -> real renderer, 26/26; `WIRE_JSON` renders a
   model's actual output), `blocks.mjs` 15/15; 55 offline tests; tsc, eslint, build pass. Found while testing: a
   gauge recipe that "drew" a full ring (checked by eye, screenshots), and `{...}` in a hint breaking `.format`.

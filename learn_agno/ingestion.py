@@ -5,79 +5,54 @@ python3 learn_agno/ingestion.py
 """
 
 
-from agno.db.sqlite import SqliteDb
+"""Run: python3 learn_agno/ingestion.py"""
+import logging
+from pathlib import Path
+
+from agno.knowledge.embedder.fastembed import FastEmbedEmbedder
 from agno.knowledge.knowledge import Knowledge
-from agno.knowledge.embedder.openai import OpenAIEmbedder
 from agno.knowledge.reader.pdf_reader import PDFReader
 from agno.vectordb.chroma import ChromaDb
 from agno.vectordb.search import SearchType
-from rich.pretty import pprint
-
-
-
 import httpx
-import os
-from dotenv import load_dotenv
-load_dotenv()
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL")
-EMBEDDING_MODEL = "liquid/lfm-2.5-embedding-350m:free"
+BASE = Path(__file__).parent
+PDF_PATH = BASE / "data" / "mp.pdf"
+CHROMA_PATH = BASE / "data" / "chroma"
+COLLECTION = "system_docs_vectors"
 
-PDF1 = "learn_agno/data/mp.pdf"
-CHROMA_DB = "learn_agno/data/chroma"
+log = logging.getLogger(__name__)
 
-def ingestion_pipeline():
-    from agno.knowledge.embedder.fastembed import FastEmbedEmbedder
-    embedder = FastEmbedEmbedder()
 
+def build_knowledge() -> Knowledge:
+    """Construct the knowledge base (reusable by your agent, no ingestion)."""
     vector_db = ChromaDb(
-        collection="groq_knowledge_vectors",
-        path=CHROMA_DB,
+        collection=COLLECTION,
+        path=str(CHROMA_PATH),
         persistent_client=True,
-        embedder=embedder,
+        embedder=FastEmbedEmbedder(),
         search_type=SearchType.hybrid,
-        hybrid_rrf_k=60,  # default
+        hybrid_rrf_k=60,
     )
+    return Knowledge(name="System Docs Knowledge Base", vector_db=vector_db)
 
-    # 3. Knowledge Base: Load and index your content
-    knowledge = Knowledge(
-        name="System Docs Knowledge Base",
-        vector_db=vector_db,            
-    )
-    return knowledge
 
-def ingest_knowledge(knowledge):
-    knowledge.insert(
-        text_content="""
-    The name of my client is Gobta pvt. ltd.
-        """,
-        skip_if_exists=True
-    )
+def ingest(knowledge: Knowledge) -> None:
+    if not PDF_PATH.exists():
+        raise FileNotFoundError(PDF_PATH)
 
-    pdf_reader = PDFReader(
-        chunk=True,             # Enable automatic chunking, can be changed to recursive or other.
-        chunk_size=3000,        # Number of characters per chunk
-        split_on_pages=True,    # Preserve page-level document boundaries
-        # password="secret",    # Optional: for encrypted PDFs
-    )
+    reader = PDFReader(chunk=True, chunk_size=1200, split_on_pages=True)
+    knowledge.insert(path=str(PDF_PATH), reader=reader, skip_if_exists=True)
 
-    knowledge.insert(
-        path=PDF1,
-        reader=pdf_reader,
-        skip_if_exists=True
-    )
-def ingestion():
-    knowledge = ingestion_pipeline()
-    ingest_knowledge(knowledge=knowledge)
 
-    # # Check how many chunks exist in your collection
-    # print("Total vectors stored:", vector_db.client.get_collection("groq_knowledge_vectors").count())
-    # results = knowledge.search(query="Types of noise")
-    # for doc in results:
-    #     print("Found chunk:", doc.content[:150])
+def verify(knowledge: Knowledge, query: str = "Types of noise") -> None:
+    results = knowledge.search(query=query)
+    log.info("Query %r returned %d chunks", query, len(results))
+    for doc in results[:3]:
+        log.info("  %s", doc.content[:150])
 
-def get_weather(city: str) -> str:
-    """Get the current weather for a city."""
-    r = httpx.get(f"https://wttr.in/{city}?format=3")
-    return r.text
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    kb = build_knowledge()
+    ingest(kb)
+    verify(kb)

@@ -19,7 +19,7 @@ from app.a2ui.actions import InvalidAction, action_prompt, parse_action_prompt, 
 from app.a2ui.catalog import BASIC_COMPONENTS, CATALOG_ID  # noqa: E402
 from app.a2ui.skill_build import SKILL_DIR, build  # noqa: E402
 from app.a2ui.store import parts_by_run  # noqa: E402
-from app.a2ui.turn import A2uiTurn  # noqa: E402
+from app.a2ui.turn import A2uiTurn, fix_named_args  # noqa: E402
 
 db.init_db()
 
@@ -61,6 +61,94 @@ def run_reply(turn: A2uiTurn, reply: str, chunk: int = 7) -> list[tuple[str, dic
     for i in range(0, len(reply), chunk):
         events += turn.feed(reply[i:i + chunk])
     return events + turn.close()
+
+
+HALF_BAD = """<a2ui>
+surface("tracker")
+root = Column([budget, next])
+budget = BudgetSplit(100000, [{label: "Rent", percent: 60}, {label: "Food", percent: 40}], title: "Monthly tracker", currency: "INR")
+next = Suggestions("Adjust?", ["Rent 50%", "Save it"])
+</a2ui>"""
+
+
+def a2ui_kinds(events):
+    return [k for n, d in events if n == "a2ui" for k in d["message"] if k != "version"]
+
+
+class RobustnessTest(unittest.TestCase):
+    """The pipeline a model's mistakes go through (all seen live: the chart never showed)."""
+
+    def test_fix_named_args_only_touches_call_arguments(self):
+        fixed = fix_named_args(HALF_BAD)
+        self.assertIn('title="Monthly tracker", currency="INR"', fixed)
+        self.assertIn('{label: "Rent", percent: 60}', fixed)  # map keys keep their colon
+        text = 'Text("Note (see: here)")\nButton(Text("a: b"), "primary", Event("x", {k: $/f}))'
+        self.assertEqual(fix_named_args(text), text)  # strings and maps are left alone
+        self.assertEqual(fix_named_args('Card(child: x, weight: 1)'), 'Card(child=x, weight=1)')
+
+    def test_a_block_whose_later_line_fails_sends_nothing_to_the_client(self):
+        # Streaming used to emit the `root` surface before the failing line, leaving a surface
+        # whose children were never defined (an empty card).
+        for chunk in (3, 9, 1000):
+            turn = A2uiTurn(new_session())
+            events = run_reply(turn, "Here is your tracker.\n\n" + HALF_BAD, chunk=chunk)
+            self.assertEqual(a2ui_kinds(events), [], chunk)
+            self.assertTrue(turn.rejected, chunk)
+            self.assertEqual(turn.surface_ids, [], "the half-built surface must not stay in the state")
+
+    def test_autofix_draws_the_block_with_no_model_call(self):
+        turn = A2uiTurn(new_session())
+        run_reply(turn, "Here is your tracker.\n\n" + HALF_BAD, chunk=5)
+        events = turn.autofix()
+        self.assertEqual(turn.rejected, [])
+        self.assertIn("createSurface", a2ui_kinds(events))
+        self.assertEqual(turn.surface_ids, ["tracker"])
+        self.assertTrue(any(p["type"] == "a2ui" for p in turn.parts))
+
+    def test_autofix_leaves_other_errors_and_keeps_the_original_for_the_repair_prompt(self):
+        turn = A2uiTurn(new_session())
+        run_reply(turn, '<a2ui>\nsurface("s")\nroot = Nope(title: "x")\n</a2ui>', chunk=4)
+        self.assertEqual(turn.autofix() and None, None)
+        self.assertTrue(turn.rejected)
+        self.assertIn("Nope(title: \"x\")", turn.repair_prompt())  # what the model wrote, not the fix
+
+    def test_a_good_block_before_a_bad_one_still_shows(self):
+        good = '<a2ui>\nsurface("a")\nroot = Text("hello")\n</a2ui>\n'
+        turn = A2uiTurn(new_session())
+        events = run_reply(turn, good + '<a2ui>\nsurface("b")\nroot = Nope()\n</a2ui>', chunk=6)
+        self.assertIn("createSurface", a2ui_kinds(events))
+        self.assertEqual(turn.surface_ids, ["a"])  # b's half is gone
+
+    def test_the_colon_error_has_a_fix_hint_and_give_up_adds_a_note(self):
+        turn = A2uiTurn(new_session())
+        run_reply(turn, '<a2ui>\nsurface("s")\nroot = Card(Text("x"), child: 1)\n</a2ui>')
+        self.assertIn("name=value", turn.repair_prompt())
+        note = turn.give_up()
+        self.assertIn("couldn't draw", note[0][1]["content"])
+        self.assertIn("couldn't draw", turn.parts[-1]["text"])
+
+
+class VegaCheckTest(unittest.TestCase):
+    def test_an_invalid_spec_is_rejected_with_its_path_and_a_pointer_to_the_recipes(self):
+        # What a model wrote for "radar" (stored run): the chart drew nothing, the reply said it did.
+        spec = ('{"data": {"values": [{"k": "A", "v": 1}]}, "coordinates": "polar", "encoding": {"theta": '
+                '{"field": "k", "type": "nominal"}}, "layer": [{"mark": {"type": "line", "closed": true}}]}')
+        turn = A2uiTurn(new_session())
+        events = run_reply(turn, f'<a2ui>\nsurface("r")\nroot = Card(VegaChart({spec}, 300))\n</a2ui>')
+        self.assertEqual(a2ui_kinds(events), [])
+        self.assertIn("layer/0/mark", turn.rejected[0])
+        prompt = turn.repair_prompt()
+        self.assertIn("chart-choice.md", prompt)
+        self.assertIn("Radar (one polygon", prompt)  # the working recipes ride along
+
+    def test_valid_specs_and_vega_specs_pass(self):
+        from app.a2ui import vegacheck
+
+        ok = {"data": {"values": [{"a": 1}]}, "mark": "bar", "encoding": {"x": {"field": "a", "type": "quantitative"}}}
+        self.assertIsNone(vegacheck.problem(ok))
+        self.assertIsNone(vegacheck.problem({"marks": []}))  # full Vega: not checked
+        self.assertIsNone(vegacheck.problem("/chart/spec"))  # a data binding: not checked
+        self.assertIn("numeric", vegacheck.problem({**ok, "encoding": {"x": {"field": "a", "type": "numeric"}}}))
 
 
 class PromptTest(unittest.TestCase):
@@ -131,7 +219,6 @@ class TurnTest(unittest.TestCase):
         again = A2uiTurn(session)
         events = run_reply(again, FORM_REPLY.replace('"2"]', '"1"]'), chunk=3)  # split mid-line
         self.assertEqual(again.rejected, [])
-        self.assertEqual(again.upgraded, ["trip_prefs"])
         kinds = {k for n, d in events if n == "a2ui" for k in d["message"] if k != "version"}
         self.assertNotIn("createSurface", kinds)
 

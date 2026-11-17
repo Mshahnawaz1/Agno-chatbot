@@ -148,6 +148,10 @@
   border-radius: 1.25rem !important;
 }
 
+/* Cards side by side in a Row share the line in equal columns (each wrapper is the flex item). */
+.a2ui-row > div:has(> a2ui-react-card) { flex: 1 1 11rem; }
+.a2ui-row > div:has(> a2ui-react-card) > a2ui-react-card > .a2ui-card { height: 100%; }
+
 /* ================= chat blocks (blocks/) ================= */
 .blk-card {
   background: var(--blk-card);

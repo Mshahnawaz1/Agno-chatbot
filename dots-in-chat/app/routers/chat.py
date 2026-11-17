@@ -9,8 +9,9 @@ from fastapi.responses import StreamingResponse
 
 from app import db
 from app.a2ui.actions import InvalidAction, action_prompt, read_action
+from app.a2ui import capabilities
 from app.a2ui.catalog import new_processor
-from app.a2ui.feedback import InvalidError, data_model_context, error_prompt, read_data_model, read_errors
+from app.a2ui.feedback import InvalidError, data_model_context, error_prompt, negotiate, read_data_model, read_errors
 from app.a2ui.store import load_state
 from app.a2ui.turn import A2uiTurn
 from app.agent import agent
@@ -152,10 +153,17 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
     is_new = not body.session_id
     if body.errors is not None and is_new:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Renderer errors belong to an existing chat")
+    caps = None
+    if body.renderer_capabilities is not None:  # the renderer's handshake; else the default catalog
+        try:
+            caps = negotiate(body.renderer_capabilities)
+        except InvalidError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
     session = resolve_session(body, user)      # 404 is raised here, before streaming
     # A new chat gets an LLM-written title, generated alongside the first reply.
     title_task = asyncio.create_task(generate_title(body.message)) if is_new and body.message else None
-    turn = A2uiTurn(session["id"])
+    with capabilities.use(caps):  # every processor this turn makes is bound to them
+        turn = A2uiTurn(session["id"])
     if body.action is not None:
         try:
             action = await read_action(body.action)  # a bad action is a plain 400
@@ -175,7 +183,8 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
     context = None
     if body.renderer_data_model is not None:
         try:
-            state = load_state(session["id"], new_processor())
+            with capabilities.use(caps):
+                state = load_state(session["id"], new_processor())
             context = data_model_context(read_data_model(body.renderer_data_model, state))
         except InvalidError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))

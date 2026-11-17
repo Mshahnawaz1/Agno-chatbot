@@ -12,12 +12,13 @@ repair turn: the model sees what the renderer rejected and sends a corrected blo
 import json
 from typing import Any
 
-from a2ui.core.schema.v1_0 import A2uiRendererDataModel
+from a2ui.core import A2uiCatalogError, A2uiValidationError
+from a2ui.core.schema.v1_0 import A2uiRendererCapabilities, A2uiRendererDataModel
 from a2ui.rpc import RendererToAgentMessageProcessor
 from a2ui.utils import RendererState
 from pydantic import ValidationError
 
-from app.a2ui.catalog import CATALOG
+from app.a2ui.catalog import CATALOG, GENERATOR
 
 # A turn started by renderer errors is stored with this input; history hides it.
 ERROR_PREFIX = "Renderer error: "
@@ -61,6 +62,21 @@ def error_prompt(errors: list[dict[str, Any]], surface_ids: list[str]) -> str:
         '`surface("<id>", update=true)` if it exists, else create it). If the error has no '
         "surface or you cannot fix it, say so in one sentence. Don't apologise."
     )
+
+
+def negotiate(raw: dict[str, Any]) -> dict[str, Any]:
+    """Checks an `a2uiRendererCapabilities` against the agent's catalogs and returns it.
+
+    Raises InvalidError if it is malformed, or if the renderer supports none of the catalogs the
+    agent can write for (the SDK's catalog negotiation decides).
+    """
+    try:
+        A2uiRendererCapabilities.model_validate(raw)
+        GENERATOR.create_processor(raw)
+    except (A2uiCatalogError, A2uiValidationError, ValidationError) as e:
+        text = e.errors()[0]["msg"] if isinstance(e, ValidationError) else str(e)
+        raise InvalidError(f"Unusable a2uiRendererCapabilities: {text}") from e
+    return raw
 
 
 DATA_MODEL_MAX = 64_000  # chars of JSON: a form's values, not a document

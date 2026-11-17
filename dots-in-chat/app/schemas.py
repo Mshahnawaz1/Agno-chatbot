@@ -56,6 +56,7 @@ class ChatRequest(BaseModel):
     # What the renderer reports with a request (A2UI v1.0): the data models of surfaces that set
     # `sendDataModel` (app/a2ui/feedback.py) and its capabilities (app/a2ui/catalog.py).
     renderer_data_model: dict[str, Any] | None = Field(default=None, alias="a2uiRendererDataModel")
+    renderer_capabilities: dict[str, Any] | None = Field(default=None, alias="a2uiRendererCapabilities")
     session_id: str | None = None
 
     model_config = {"populate_by_name": True}

@@ -184,5 +184,72 @@ class SendDataModelTest(unittest.TestCase):
         self.assertIn("larger", body["detail"])
 
 
+def caps(*ids, **extra):
+    return {"1.0": {"supportedCatalogIds": list(ids), **extra}}
+
+
+class CapabilitiesTest(unittest.TestCase):
+    def setUp(self):
+        from unittest import mock
+        from app.a2ui import catalog
+
+        self.h = Harness()
+        self.catalog = catalog
+        self.created = []
+        real = catalog.GENERATOR.create_processor
+
+        def spy(capabilities, *a, **k):
+            self.created.append(capabilities)
+            return real(capabilities, *a, **k)
+
+        patcher = mock.patch.object(catalog.GENERATOR, "create_processor", spy)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def tearDown(self):
+        self.h.close()
+
+    def test_the_processor_is_negotiated_with_what_the_client_sent(self):
+        sent = caps("some/other/catalog", self.catalog.CATALOG_ID)
+        self.h.agent.replies = ["Hi."]
+        events = self.h.post({"message": "hi", "a2uiRendererCapabilities": sent})
+        self.assertEqual(events[-1][0], "done")
+        self.assertIn(sent, self.created)
+        self.assertNotIn(self.catalog.CAPABILITIES, self.created, "the constant is not used when the client sent its own")
+
+    def test_a_request_without_capabilities_falls_back_to_the_default_catalog(self):
+        self.h.agent.replies = ["Hi."]
+        self.h.post({"message": "hi"})
+        self.assertIn(self.catalog.CAPABILITIES, self.created)
+
+    def test_a_renderer_that_does_not_know_our_catalog_is_refused_before_anything_runs(self):
+        body = self.h.post({"message": "hi", "a2uiRendererCapabilities": caps("some/other/catalog")}, status=400)
+        self.assertIn("a2uiRendererCapabilities", body["detail"])
+        self.assertEqual(self.h.agent.inputs, [])
+
+    def test_empty_or_malformed_capabilities_are_refused(self):
+        for bad in (caps(), {}, {"1.0": {}}, {"1.0": {"supportedCatalogIds": "x"}}, {"0.9": {"supportedCatalogIds": ["a"]}}):
+            self.h.post({"message": "hi", "a2uiRendererCapabilities": bad}, status=400)
+        self.assertEqual(self.h.agent.inputs, [])
+
+    def test_a_malformed_inline_catalog_is_refused(self):
+        bad = caps(self.catalog.CATALOG_ID, inlineCatalogs=[{"oops": 1}])
+        self.h.post({"message": "hi", "a2uiRendererCapabilities": bad}, status=400)
+
+    def test_the_frontend_catalog_id_is_the_one_the_server_serves(self):
+        import re
+        from pathlib import Path
+
+        ts = (Path(__file__).parents[1] / "frontend/src/features/chat/a2ui/catalog/index.ts").read_text()
+        self.assertEqual(re.search(r"CATALOG_ID = '([^']+)'", ts).group(1), self.catalog.CATALOG_ID)
+
+    def test_a_refused_handshake_does_not_create_a_chat(self):
+        from app import db
+
+        before = len(db.list_chat_sessions(self.h.user["id"]))
+        self.h.post({"message": "hi", "a2uiRendererCapabilities": caps("nope")}, status=400)
+        self.assertEqual(len(db.list_chat_sessions(self.h.user["id"])), before)
+
+
 if __name__ == "__main__":
     unittest.main()

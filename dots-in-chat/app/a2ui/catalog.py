@@ -24,6 +24,8 @@ from a2ui.core.schema import ProtocolVersion
 from a2ui.inference_formats import ExpressFormatFactory
 from a2ui.processor import A2uiGenerator, A2uiRequestProcessor, CatalogConfig
 
+from app.a2ui import capabilities
+
 PROTOCOL_VERSION = "1.0"
 
 # Our own id: the catalog is a derived one, not the basic catalog.
@@ -103,7 +105,7 @@ def _chat_catalog() -> Catalog:
 
 CATALOG = _chat_catalog()
 
-# The chat frontend renders this catalog only, so every request has the same capabilities.
+# What a request without a capabilities handshake gets (see capabilities.py): the chat catalog.
 CAPABILITIES = {PROTOCOL_VERSION: {"supportedCatalogIds": [CATALOG_ID]}}
 
 GENERATOR = A2uiGenerator(
@@ -113,8 +115,9 @@ GENERATOR = A2uiGenerator(
 
 
 def new_processor() -> A2uiRequestProcessor:
-    """A processor for one request: compiles replies and makes renderer states."""
-    return GENERATOR.create_processor(CAPABILITIES)
+    """A processor for one request: compiles replies and makes renderer states. It is bound to
+    the capabilities the renderer sent (capabilities.use), else to CAPABILITIES."""
+    return GENERATOR.create_processor(capabilities.current() or CAPABILITIES)
 
 
 # The SDK writes the same `weight` note under every basic component (15 x 211 chars, ~800

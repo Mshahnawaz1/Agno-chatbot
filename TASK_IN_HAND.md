@@ -348,6 +348,61 @@ changes to `a2ui-poc/`.
   (blocks add ~7k); an in-place update redraws the card in the earlier message, so the new reply
   can be text only. A test user `blocks-e2e-…@example.com` was created in `data/app.db`.
 
+## Phase 8: Input token cost and "This interface was removed" (done 2026-11-16, not committed)
+- [x] 8.1 Root cause of input tokens, from `data/agno.db` runs + Gemini count_tokens:
+  - system prompt 11,012 tokens per model call, 10,475 of it A2UI (component signatures 4,573,
+    catalog instructions 2,643, functions 1,345, grammar 969, our guide 701); tools 546; history
+    0-3.5k. Resent on every model call: tool steps (1-7 per run), repair runs.
+  - agno's `<additional_information>` (current time, to the microsecond) sat at char ~500, before
+    the A2UI block (`additional_context`), so the prompt differed after ~130 tokens on every
+    request: no cross-turn cache hits in any stored run (only inside tool loops).
+  - `search_past_sessions` listed 20 sessions x 3 runs: 8k chars on average per call.
+- [x] 8.2 Fixes: A2UI block moved into `instructions` (before the time): the prefix shared by
+  two requests went from ~130 tokens to 9,897 of 10,225; the SDK's `weight` note said once instead of 15 times
+  (`catalog.py` `_compact`, ~790 tokens); `num_past_sessions_to_search=8`.
+  Raw test: 3 identical flash-lite requests got no implicit cache hit, so caching is best-effort
+  on this key; the prompt size is what reliably counts.
+- [x] 8.3 "This interface was removed": all 7 stored cases were model `deleteSurface`s of an
+  earlier card; 6 of 7 came while it showed a new card (the guide told it to delete on layout
+  changes), 1 was asked for. Fixes: guide says keep earlier surfaces, delete only on request;
+  server holds deletes to the end of the turn and drops those in a turn that creates a surface
+  (`store.keep_earlier_surfaces`, `A2uiTurn.finish`), also on read, so old chats get their cards
+  back. Edge: "remove X and show Y" in one turn keeps X.
+- Checks: 34 offline tests pass (3 new); live flash-lite: histogram then "make this into a pie
+  chart" → updated in place, no delete, nothing rejected. Test user `token-audit@example.com`
+  and `token-audit*` sessions were created in `data/`.
+- Open: function signatures (1,345 tokens): only `required` and `numeric` were used in 61
+  stored A2UI replies; dropping the rest would save ~1k tokens but removes features.
+
+## Phase 9: A2UI as a lazily loaded skill (done 2026-11-16, not committed)
+Rule from the user: nothing goes straight into the system prompt; it is a skill loaded when needed.
+- [x] 9.1 Research (three Sonnet subagents): Agent Skills spec + Anthropic docs (3 levels:
+  metadata always, SKILL.md < 5k tokens on trigger, references/scripts on demand; validator loop),
+  Hermes agent (`skill_view(name, file_path)`, repeat-load stubs, date-only timestamp, old tool
+  output cleared), agno 3.1.12 source (only references/ + scripts/ scanned; `allowed_tools` unused;
+  scripts run without cap; retry-with-errors only through a tool, not post_hooks/retries).
+- [x] 9.2 Built:
+  - `skills/a2ui/`: SKILL.md (judgement, workflow, rules, block index; `metadata.preload` =
+    grammar, components, form template), `references/` generated from the catalog
+    (`app/a2ui/skill_build.py`, `--check` in tests), `templates/` (form, block-card, update),
+    `scripts/check.py` (compiles a block against the chat's real surfaces, fix hints).
+  - `app/skills.py`: `get_skill_instructions(name, paths=[...])` returns SKILL.md + preload +
+    asked files in one call, repeats in a run are stubs; `get_skill_script` runs only (app Python,
+    session id, 30 s, 4k chars); `stub_skill_loads` replaces loaded skill text in stored runs
+    (`agno_runs` rows) after each turn; skill search falls back to every description.
+  - `app/a2ui/turn.py`: `surface("<existing id>")` is turned into `update=true` while streaming
+    (no repair run); hints for unknown components (lists them) and string children.
+  - System prompt: A2UI block and A2UI_RULE removed; 11,012 → 600 tokens.
+- Found live: agno silently drops a tool argument named `files` (framework-injected media
+  parameter); renamed to `paths`, with a test against agno's reserved names.
+- Live (flash-lite, one chat): capital of France 1,320 in; "plan a weekend trip" 16,069 (load,
+  check OK first try, form); SIP 10k/month 25,534 (load + block-growth, check OK, GrowthCalculator);
+  "make it 20 years" 4,446 (update in place). Before: ~11.6k+ for every turn, so plain turns are
+  ~9x cheaper and UI turns ~1.3-2x dearer (2-3 extra round trips).
+- Checks: 42 offline tests pass; references up to date; app imports.
+- Open: the check call costs one round trip per UI turn; listing skill file names in the index
+  (~80 tokens/turn) would let block turns load in one call instead of two.
+
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and
   the lost shadcn catalog are replaced.

@@ -49,7 +49,9 @@ export function ChartView({ spec, height }: { spec: unknown; height: number }) {
         const result = await embed(
           el,
           { width: 'container', height, autosize: { type: 'fit-x', contains: 'padding' }, ...base } as never,
-          { actions: false, renderer: 'svg', config: THEME as never, loader },
+          // Without a $schema vega-embed guesses the language and takes Vega-Lite for Vega when the
+          // spec has none of mark/encoding/layer/...; the chat's charts are Vega-Lite unless `marks`.
+          { actions: false, renderer: 'svg', config: THEME as never, loader, mode: base.$schema || 'marks' in base ? undefined : 'vega-lite' },
         )
         if (cancelled) result.finalize()
         else finalize = result.finalize

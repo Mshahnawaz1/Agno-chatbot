@@ -159,12 +159,18 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
             for attempt in range(REPAIR_ATTEMPTS + 1):
                 async for chunk in model_pass(model_input, user, session["id"], turn, run, repair):
                     yield chunk
+                if turn.rejected and not run["stopped"]:
+                    for name, data in turn.autofix():  # `name: value` arguments: no model call
+                        yield sse(name, data)
                 if run["stopped"] or not turn.rejected or attempt == REPAIR_ATTEMPTS:
                     break
                 yield sse("a2ui_repair", {"attempt": attempt + 1})
                 model_input, repair = turn.repair_prompt(), True
             if run["stopped"]:
                 return
+            if turn.rejected:  # still rejected after the repairs: say so instead of "here it is"
+                for name, data in turn.give_up():
+                    yield sse(name, data)
             for name, data in turn.finish():
                 yield sse(name, data)
             if run["metrics"]:

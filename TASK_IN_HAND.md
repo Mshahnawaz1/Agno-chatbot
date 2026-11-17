@@ -436,6 +436,39 @@ only named for ADK/CopilotKit with no schema, so a custom `show_block` tool was 
   pie, but the model's sentence still said "pie chart" (rule added to the guide, not re-measured).
 - Open: sample sizes are small; the benchmark and tests are kept local, not committed.
 
+## Phase 11: Why charts did not show, and a more robust A2UI pipeline (done 2026-11-17, not committed)
+Report: "monthly tracker" said "here is your tracker" and showed nothing; radar charts failed.
+- [x] 11.1 Causes, from the stored runs (`agno.db`) replayed through the compiler:
+  1. The model wrote `BudgetSplit(..., title: "x")`; call arguments use `=`, a colon is only for map keys. The
+     error text ("extraneous input ':'") gave no hint, so 3 repair runs repeated it.
+  2. Streaming compiled the `root = Column([budget, next])` line first, then failed on `budget`: the client
+     got a surface whose children were never defined (an empty card) and the id counted as existing, so the
+     repairs wrongly used `update=true`.
+  3. Radar: the model wrote an invalid Vega-Lite spec (`"coordinates": "polar"`, a `closed` mark option); the
+     browser drew nothing; the skill had no radar/gauge/heatmap/waterfall recipe.
+  4. After the repairs failed, the reply's own "here is your chart" stayed alone.
+- [x] 11.2 Fixes (`app/a2ui/turn.py`, `vegacheck.py`, `routers/chat.py`):
+  - a block is all-or-nothing: compiled messages wait until the block ends and a failing block drops its own;
+    the state is rebuilt without its half-built surface.
+  - `fix_named_args` / `A2uiTurn.autofix`: `name: value` call arguments are rewritten to `name=value` and the
+    block recompiled with no model call; a fix hint for the error otherwise.
+  - VegaChart specs are checked against the official Vega-Lite JSON schema (vendored
+    `catalogs/vega-lite-schema.json`, from the frontend's vega-lite 6.5.0) before they are shown; the error
+    names the path, and a chart repair prompt carries the working recipes.
+  - `give_up`: "I couldn't draw that card" is added when the repairs fail.
+  - `ChartView` tells vega-embed to use Vega-Lite unless the spec has `marks`.
+- [x] 11.3 Skill: `references/chart-choice.md` has verified recipes (bar, line, donut, stacked, scatter,
+  histogram, radar, gauge, heatmap, waterfall, area); SKILL.md states the `=` rule and sends radar/gauge/...
+  to VegaChart recipes.
+- [x] 11.4 Tests: dev pages `/dev/chart` and `/dev/surface`; `frontend/e2e/charts.mjs` (every recipe draws),
+  `frontend/e2e/pipeline.mjs` (every skill example: server compile -> real renderer, 26/26; `WIRE_JSON` renders a
+  model's actual output), `blocks.mjs` 15/15; 55 offline tests; tsc, eslint, build pass. Found while testing: a
+  gauge recipe that "drew" a full ring (checked by eye, screenshots), and `{...}` in a hint breaking `.format`.
+- Live (flash-lite): tracker 2/2 BudgetSplit; radar 6/6; heatmap 2/2; waterfall 5/5 (one 503); gauge: one run
+  ended with the honest "couldn't draw" note before recipes were added to the repair prompt, then 4/4 (1-2
+  repairs on two of them).
+- Open: a spec that is schema-valid but draws wrongly is not caught; samples are small.
+
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and
   the lost shadcn catalog are replaced.

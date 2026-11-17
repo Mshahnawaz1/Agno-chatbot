@@ -1,6 +1,6 @@
 """The hidden repair run's prompt: the A2UI docs' validate-and-retry loop (the retry prompt quotes the
 previous response and the validation error). Everything else the model knows about A2UI is the a2ui
-skill (skills/a2ui/: SKILL.md, references built from the catalog by skill_build.py, templates),
+skill (skills/a2ui/: SKILL.md, references built from the catalog by skill_build.py plus hand-written form and chart guides),
 loaded only for replies that show UI. None of it is in the system prompt.
 """
 

@@ -2,7 +2,8 @@
 
 The catalog is the single source of truth: the SDK generates the Express grammar and every
 component's signature from it, and this script cuts that text into small files the model loads
-only when it needs them (see skills/a2ui/SKILL.md). Nothing of it is in the system prompt.
+only when it needs them (see skills/a2ui/SKILL.md). The folder also holds hand-written files
+(form.md, chart-choice.md); this script only manages the generated ones. Nothing of it is in the system prompt.
 
     PYTHONPATH=. python -m app.a2ui.skill_build          # write the files
     PYTHONPATH=. python -m app.a2ui.skill_build --check  # exit 1 if they are out of date
@@ -78,10 +79,18 @@ def build() -> dict[str, str]:
     return {name: HEAD + text for name, text in files.items()}
 
 
+def _generated() -> set[str]:
+    """The reference files this script wrote (they start with HEAD). Hand-written ones
+    (form.md, chart-choice.md) live in the same folder and are never touched."""
+    if not REFERENCES.is_dir():
+        return set()
+    return {p.name for p in REFERENCES.glob("*.md") if p.read_text().startswith(HEAD)}
+
+
 def stale() -> list[str]:
     """Reference files that differ from what the catalog generates, or shouldn't exist."""
     want = build()
-    have = {p.name for p in REFERENCES.glob("*.md")} if REFERENCES.is_dir() else set()
+    have = _generated()
     out = [n for n, text in want.items() if not (REFERENCES / n).is_file() or (REFERENCES / n).read_text() != text]
     return out + sorted(have - set(want))
 
@@ -89,9 +98,8 @@ def stale() -> list[str]:
 def write() -> None:
     REFERENCES.mkdir(parents=True, exist_ok=True)
     want = build()
-    for p in REFERENCES.glob("*.md"):
-        if p.name not in want:
-            p.unlink()
+    for name in _generated() - set(want):
+        (REFERENCES / name).unlink()
     for name, text in want.items():
         (REFERENCES / name).write_text(text)
 
@@ -106,4 +114,4 @@ if __name__ == "__main__":
     else:
         write()
         for p in sorted(REFERENCES.glob("*.md")):
-            print(f"{p.name}: {len(p.read_text())} chars")
+            print(f"{p.name}: {len(p.read_text())} chars{'' if p.name in build() else ' (hand-written)'}")

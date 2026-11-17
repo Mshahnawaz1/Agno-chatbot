@@ -10,7 +10,7 @@ Compared with plain agno Skills:
 - search_skills(query) finds skills by keyword.
 - get_skill_instructions(name, paths=[...]) returns SKILL.md, the files its
   `metadata.preload` names (`default_paths` too when none are requested, `pairs` adds a
-  companion file to a requested one), and any requested files (references/, templates/) in
+  companion file to a requested one), and any requested files (references/) in
   ONE call: every extra call resends the whole context. A file already returned in
   this run comes back as a one-line stub.
   It also honours the SKILL.md `allowed-tools` list: those connector tools come
@@ -33,7 +33,7 @@ from app.connectors import tools as connector_tools
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIRS = [ROOT / "skills", ROOT / "connector_skills"]
 INLINE_MAX = 8
-FILE_DIRS = ("references", "templates")  # agno scans only references/ (and scripts/)
+FILE_DIRS = ("references",)  # agno scans only references/
 SKILL_TOOLS = ("get_skill_instructions",)
 STUB = (
     "[Skill text removed from history to save tokens; it is NOT in context any more. Before using"
@@ -42,7 +42,7 @@ STUB = (
 
 
 def _files_line(files: list[str]) -> str:
-    """ Files: references/{grammar,chart}.md, templates/{form}.md (compact; the index is in every request)."""
+    """ Files: references/{grammar,chart}.md (compact; the index is in every request)."""
     if not files:
         return ""
     groups: dict[str, list[str]] = {}

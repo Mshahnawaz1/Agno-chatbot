@@ -1,4 +1,4 @@
-# Template: a form that asks for details
+# Form template: ask for details
 
 Rename the surface id, fields and event; keep the shape. Every input is bound to `$/form/...`
 with a default, and the submit Event passes every field.

@@ -56,7 +56,7 @@ async def session_messages(session_id: str, user: CurrentUser):
     out = []
     for run in runs:
         text = run.input.input_content_string() if run.input else ""
-        if text:
+        if text and not (run.metadata or {}).get("a2ui_hidden_input"):  # those inputs are hidden
             action = parse_action_prompt(text)
             out.append(MessageOut(role="user", content="" if action else text, action=action))
         turn_parts = parts.get(run.run_id)

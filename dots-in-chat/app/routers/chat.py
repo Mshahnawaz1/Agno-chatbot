@@ -9,6 +9,14 @@ from fastapi.responses import StreamingResponse
 
 from app import db
 from app.a2ui.actions import InvalidAction, action_prompt, read_action
+from typing import Any
+
+from pydantic import BaseModel
+
+from app.a2ui import capabilities, rpc
+from app.a2ui.catalog import new_processor
+from app.a2ui.feedback import InvalidError, data_model_context, error_prompt, negotiate, read_data_model, read_errors
+from app.a2ui.store import load_state
 from app.a2ui.turn import A2uiTurn
 from app.agent import agent
 from app.agent.title import generate_title
@@ -94,18 +102,23 @@ async def chat(body: ChatRequest, user: CurrentUser):
 
 
 async def model_pass(
-    model_input: str, user: dict, session_id: str, turn: A2uiTurn, run: dict, repair: bool = False
+    model_input: str, user: dict, session_id: str, turn: A2uiTurn, run: dict, repair: bool = False,
+    hidden_input: bool = False, context: dict | None = None,
 ) -> AsyncIterator[str]:
     """One agent run streamed through the A2UI compiler. Fills `run` with its outcome."""
     turn.start_pass()
     # `query` lets the tool router pick connector tools for the message. A repair run only fixes
     # UI, so it gets none: routing its prompt ("create ... form") attached unrelated tools.
-    metadata = {"query": "" if repair else model_input}
+    metadata = {"query": "" if repair or hidden_input else model_input}
     if repair:
         metadata["a2ui_repair"] = True  # hidden from the history endpoint
+    if hidden_input:
+        metadata["a2ui_hidden_input"] = True  # the run shows, its input (errors, a function result) doesn't
+    # `context` is extra input for this turn only (agno `dependencies`); the stored input stays clean.
+    extra = {"dependencies": context, "add_dependencies_to_context": True} if context else {}
     async for event in agent.arun(
         model_input, user_id=user["id"], session_id=session_id,
-        stream=True, stream_events=True, metadata=metadata,
+        stream=True, stream_events=True, metadata=metadata, **extra,
     ):
         if event.event == RunEvent.run_error:
             # Guardrail failures (InputCheckError/OutputCheckError) and model/provider errors
@@ -139,30 +152,111 @@ async def model_pass(
         yield sse(name, data)
 
 
+_DONE = object()
+
+
+async def with_outbox(passes: AsyncIterator[str], outbox: asyncio.Queue) -> AsyncIterator[str]:
+    """The model pass's SSE chunks, plus whatever tools put in `outbox` while the pass waits
+    (a tool that calls the browser blocks the pass, so its message must not wait behind it)."""
+
+    async def pump() -> None:
+        try:
+            async for chunk in passes:
+                await outbox.put(chunk)
+        finally:
+            await outbox.put(_DONE)
+
+    task = asyncio.create_task(pump())
+    try:
+        while (item := await outbox.get()) is not _DONE:
+            yield item if isinstance(item, str) else sse(*item)
+    finally:
+        task.cancel()  # the client left: stop the model run
+        await asyncio.gather(task, return_exceptions=True)
+    if not task.cancelled() and task.exception():
+        raise task.exception()
+
+
+class RpcRequest(BaseModel):
+    session_id: str
+    message: dict[str, Any]
+
+
+@router.post("/rpc")
+async def chat_rpc(body: RpcRequest, user: CurrentUser):
+    """Renderer-to-agent function RPC: a `callAgentFunction` (answered here, in `replies`) or a
+    `rendererFunctionResponse` (settles the call a tool is waiting for). `handled` is false for a
+    response nobody was waiting for."""
+    if db.get_chat_session(body.session_id, user["id"]) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+    try:
+        return await rpc.handle(body.session_id, body.message)
+    except Exception as e:  # A2uiValidationError: not a v1.0 RPC message
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid RPC message: {e}")
+
+
 @router.post("/stream")
 async def chat_stream(body: ChatRequest, user: CurrentUser):
     is_new = not body.session_id
+    if (body.errors is not None or body.function_response is not None) and is_new:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Renderer messages belong to an existing chat")
+    caps = None
+    if body.renderer_capabilities is not None:  # the renderer's handshake; else the default catalog
+        try:
+            caps = negotiate(body.renderer_capabilities)
+        except InvalidError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
     session = resolve_session(body, user)      # 404 is raised here, before streaming
     # A new chat gets an LLM-written title, generated alongside the first reply.
     title_task = asyncio.create_task(generate_title(body.message)) if is_new and body.message else None
-    turn = A2uiTurn(session["id"])
+    with capabilities.use(caps):  # every processor this turn makes is bound to them
+        turn = A2uiTurn(session["id"])
     if body.action is not None:
         try:
             action = await read_action(body.action)  # a bad action is a plain 400
         except InvalidAction as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid action: {e}")
         prompt = action_prompt(action, turn.surface_ids)
+    elif body.errors is not None:
+        try:
+            errors = await read_errors(body.errors)
+        except InvalidError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid error: {e}")
+        logger.warning("renderer errors in session %s: %s", session["id"], errors)
+        prompt = error_prompt(errors, turn.surface_ids)
+    elif body.function_response is not None:
+        try:
+            prompt = rpc.result_prompt(rpc.read_result(body.function_response))
+        except InvalidError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid function response: {e}")
     else:
         prompt = body.message
+    hidden = body.errors is not None or body.function_response is not None  # the user typed nothing
+    outbox: asyncio.Queue = asyncio.Queue()
+
+    context = None
+    if body.renderer_data_model is not None:
+        try:
+            with capabilities.use(caps):
+                state = load_state(session["id"], new_processor())
+            context = data_model_context(read_data_model(body.renderer_data_model, state))
+        except InvalidError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
 
     async def event_stream() -> AsyncIterator[str]:
         # run_id is the reply's run: the repair run's parts are stored under it too.
         run: dict = {"run_id": None, "all_ids": [], "tools": [], "metrics": None, "stopped": False}
         yield sse("session", {"session_id": session["id"]})
+        # Tools that call the browser (call_renderer_function) put their messages here.
+        rpc.open_stream(session["id"], outbox)
         try:
             model_input, repair = prompt, False
             for attempt in range(REPAIR_ATTEMPTS + 1):
-                async for chunk in model_pass(model_input, user, session["id"], turn, run, repair):
+                pass_ = model_pass(
+                    model_input, user, session["id"], turn, run, repair,
+                    hidden_input=hidden and not repair, context=None if repair else context,
+                )
+                async for chunk in with_outbox(pass_, outbox):
                     yield chunk
                 if turn.rejected and not run["stopped"]:
                     for name, data in turn.autofix():  # `name: value` arguments: no model call
@@ -185,6 +279,7 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
             logger.exception("stream failed")
             yield sse("error", {"message": f"Generation failed. Error {e}"})
         finally:
+            rpc.close_stream(session["id"])
             turn.save(run["run_id"])
             if title_task:
                 try:

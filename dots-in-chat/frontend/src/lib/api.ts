@@ -132,14 +132,25 @@ export const getConnectorSkill = (id: string) => request<Skill>(`/connectors/${e
 // ---- chat ----
 
 /** Opens the SSE stream; pass the result to readSseEvents. Throws ApiError for non-2xx. */
+/** Renderer-to-agent function RPC: a callAgentFunction or a rendererFunctionResponse. */
+export async function postRpc(
+  sessionId: string,
+  message: unknown,
+): Promise<{ handled: boolean; replies: Record<string, unknown>[] }> {
+  const res = await rawRequest('/chat/rpc', { method: 'POST', body: JSON.stringify({ session_id: sessionId, message }) })
+  return res.json()
+}
+
 export function openChatStream(
-  input: { message: string } | { action: unknown },
+  input: { message: string } | { action: unknown } | { errors: unknown[] } | { function_response: unknown },
   sessionId: string | null,
   signal?: AbortSignal,
+  /** What the renderer tells the agent with every request (capabilities, data models). */
+  context: Record<string, unknown> = {},
 ): Promise<Response> {
   return rawRequest('/chat/stream', {
     method: 'POST',
-    body: JSON.stringify({ ...input, session_id: sessionId }),
+    body: JSON.stringify({ ...input, ...context, session_id: sessionId }),
     signal,
   })
 }

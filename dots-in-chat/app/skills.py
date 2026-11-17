@@ -9,23 +9,18 @@ Compared with plain agno Skills:
   search_skills finds them.
 - search_skills(query) finds skills by keyword.
 - get_skill_instructions(name, paths=[...]) returns SKILL.md, the files its
-  `metadata.preload` names, and any requested files (references/, templates/) in
+  `metadata.preload` names (`default_paths` too when none are requested, `pairs` adds a
+  companion file to a requested one), and any requested files (references/, templates/) in
   ONE call: every extra call resends the whole context. A file already returned in
   this run comes back as a one-line stub.
   It also honours the SKILL.md `allowed-tools` list: those connector tools come
   back with their schemas (callable now through call_tool) and are attached
   directly to the chat from the next message on.
-- get_skill_script runs a script (never returns its text: only output enters
-  context), with this app's Python, the chat's session id, a timeout and an
-  output cap. Offered only if some skill has scripts.
 - Loaded skill text is stubbed out of stored history after the run
   (stub_skill_loads), so it isn't replayed in the next turns' context.
 """
 
 import asyncio
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 from agno.run import RunContext
@@ -39,8 +34,6 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIRS = [ROOT / "skills", ROOT / "connector_skills"]
 INLINE_MAX = 8
 FILE_DIRS = ("references", "templates")  # agno scans only references/ (and scripts/)
-SCRIPT_TIMEOUT = 30
-SCRIPT_OUTPUT_MAX = 4000
 SKILL_TOOLS = ("get_skill_instructions",)
 STUB = (
     "[Skill text removed from history to save tokens; it is NOT in context any more. Before using"
@@ -85,24 +78,23 @@ class LazySkills(Skills):
         lines = [
             "<skills>",
             "Skills are playbooks for specific tasks. When a request matches one, call "
-            "get_skill_instructions(skill_name) before acting and follow it.",
+            "get_skill_instructions(skill_name, paths=[files you need]) once, before acting, "
+            "and follow it.",
         ]
         if len(skills) <= INLINE_MAX:
             for s in skills:
-                lines.append(f"- {s.name}: {s.description}")
+                # File names too: the model can then load what it needs in its first call.
+                lines.append(f"- {s.name}: {s.description}{_files_line(skill_files(s))}")
         else:
             lines.append(f"{len(skills)} skills exist; find them with search_skills(query).")
         lines.append("</skills>")
         return "\n".join(lines)
 
     def get_tools(self) -> list[Function]:
-        tools = [
-            Function.from_callable(self.search_skills),
-            Function.from_callable(self.get_skill_instructions),
-        ]
         skills = self.get_all_skills()
-        if any(s.scripts for s in skills):
-            tools.append(Function.from_callable(self.get_skill_script))
+        tools = [Function.from_callable(self.get_skill_instructions)]
+        if len(skills) > INLINE_MAX:  # with fewer, the index lists them all: no search round trip
+            tools.insert(0, Function.from_callable(self.search_skills))
         return tools
 
     def search_skills(self, query: str) -> str:
@@ -127,13 +119,14 @@ class LazySkills(Skills):
         return "\n".join(f"{s.name}: {s.description}" for _, s in scored[:5])
 
     async def get_skill_instructions(
-        self, skill_name: str, run_context: RunContext, paths: list[str] | None = None
+        self, skill_name: str, run_context: RunContext, paths: list[str]
     ) -> str:
         """Load a skill's instructions and, in the same call, any of its files.
 
         Args:
             skill_name: The skill's name.
-            paths: Skill files to load too, e.g. ["references/chart.md", "templates/update.md"].
+            paths: Skill files to load in this same call; the skill index lists them, e.g.
+                ["references/block-budget.md"]. Use [] when you need none beyond the defaults.
         """
         skill = self.get_skill(skill_name)
         if skill is None:
@@ -153,7 +146,17 @@ class LazySkills(Skills):
             # metadata.preload: files every use of the skill needs, sent with the instructions so
             # the model doesn't guess (seen live: it never asked for them and invented components).
             # (Not named `files`: agno drops tool arguments with that name, its media parameter.)
-            paths = (skill.metadata or {}).get("preload", "").split() + list(paths or [])
+            meta = skill.metadata or {}
+            # `default_paths` apply only when the model names no files: a block turn asks for its
+            # block file and skips the form components (the turn-type pruning of the catalog).
+            extra = list(paths) if paths else meta.get("default_paths", "").split()
+            # `pairs`: "<prefix>=<file>": asking for a file under <prefix> also brings <file>
+            # (seen live: a block turn that skipped the Suggestions template got one repair run).
+            for pair in meta.get("pairs", "").split():
+                prefix, _, extra_file = pair.partition("=")
+                if any(_resolve(f, available).startswith(prefix) for f in extra):
+                    extra.append(extra_file)
+            paths = meta.get("preload", "").split() + extra
         for f in dict.fromkeys(paths or []):
             f = _resolve(f, available)
             if f not in available:
@@ -163,8 +166,6 @@ class LazySkills(Skills):
             else:
                 seen.add((skill.name, f))
                 out.append(f"--- {f} ---\n" + (Path(skill.source_path) / f).read_text())
-        if skill.scripts:
-            out.append(f"Scripts (get_skill_script): {', '.join(skill.scripts)}")
 
         if skill.allowed_tools and run_context.user_id:
             specs = {s.name: s for s in await connector_tools.user_specs(run_context.user_id)}
@@ -184,34 +185,6 @@ class LazySkills(Skills):
                         )
                     )
         return "\n\n".join(out)
-
-
-    def get_skill_script(
-        self, skill_name: str, script_path: str, run_context: RunContext, args: list[str] | None = None
-    ) -> str:
-        """Run a script of a skill (e.g. a checker) and return its output.
-
-        Args:
-            skill_name: The skill's name.
-            script_path: The script's file name, e.g. "check.py".
-            args: Arguments for the script.
-        """
-        skill = self.get_skill(skill_name)
-        if skill is None or script_path not in skill.scripts:
-            have = ", ".join(skill.scripts) if skill else "no such skill"
-            return f"No script '{script_path}' in {skill_name}. Scripts: {have}"
-        path = Path(skill.source_path) / "scripts" / script_path
-        cmd = [sys.executable, str(path)] if path.suffix == ".py" else [str(path)]
-        env = {**os.environ, "A2UI_SESSION_ID": run_context.session_id or ""}
-        try:
-            r = subprocess.run(
-                [*cmd, *(args or [])], capture_output=True, text=True,
-                timeout=SCRIPT_TIMEOUT, cwd=skill.source_path, env=env, check=False,
-            )
-        except subprocess.TimeoutExpired:
-            return f"{script_path} timed out after {SCRIPT_TIMEOUT}s"
-        text = r.stdout.strip() or r.stderr.strip()[-1500:] or f"(no output, exit {r.returncode})"
-        return text[:SCRIPT_OUTPUT_MAX]
 
 
 def _seen(run_context: RunContext) -> set:

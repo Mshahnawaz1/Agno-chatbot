@@ -1,8 +1,10 @@
 ---
 name: a2ui
-description: Interactive UI in replies. Load it for EVERY reply that shows UI (also when earlier turns did) and before any reply that asks the user to choose, pick, confirm or fill in details, offers options, or shows a chart, card or calculation; never ask such questions as plain text. Has ready-made live blocks - investment/SIP growth, budget split, quadratic, chart switcher, rank list, reminder, and approval cards for messages, emails and orders - prefer them over computing results yourself.
+description: Interactive UI in replies. ALWAYS load it BEFORE replying when you would otherwise ask the user anything (a question, preferences, details, options, confirmation, a date or amount), e.g. "help me plan ...", "which one should I ...", or when you show a chart, card or calculation; plain-text questions are not allowed. Load it again for every reply that shows UI, also when earlier turns did. Has ready-made live blocks - investment/SIP growth, budget split, quadratic, chart switcher, rank list, reminder, and approval cards for messages, emails and orders - prefer them over computing results yourself.
 metadata:
-  preload: references/grammar.md references/components.md templates/form.md
+  preload: references/grammar.md
+  default_paths: references/components.md templates/form.md
+  pairs: references/block-=templates/block-card.md
 ---
 
 # Interactive UI (A2UI Express)
@@ -19,15 +21,16 @@ You MAY show results as a card (weather, schedule, comparison) or a chart. No UI
 answers, explanations or code.
 
 ## Workflow
-1. This skill came with grammar.md, components.md and templates/form.md. For anything else in
-   the table below (a block, a chart, more checks), load it in ONE more call:
-   `get_skill_instructions("a2ui", paths=["references/block-growth.md", ...])`.
-   Use only components named in these files; never guess a component.
-2. Write the block, starting from the template.
-3. Check it: `get_skill_script("a2ui", "check.py", args=["<the whole block, with <a2ui> tags>"])`.
-   It compiles the block against this chat's real surfaces. On errors, fix and check again
-   (at most twice). Send the block only once it prints OK, unchanged.
-4. Reply: one short sentence, then the block. Don't repeat in text what the UI shows.
+1. Load in ONE call, naming what the reply needs (the index lists the files). Grammar always
+   comes with it.
+   - A chat block below (budget, SIP, chart...): `get_skill_instructions("a2ui",
+     paths=["references/block-<name>.md"])` (the block template comes with it)
+   - A form or custom card: no paths (you get the basic components and the form template).
+   - A chart: add "references/chart.md". Input checks or number formats: "references/functions.md".
+   Use only components named in what you loaded; never guess a component.
+2. Write the block, starting from the template. The server checks it as it arrives; if it is
+   rejected you get the errors once to fix.
+3. Reply: one short sentence, then the block. Don't repeat in text what the UI shows.
 
 | File | Load when |
 |---|---|

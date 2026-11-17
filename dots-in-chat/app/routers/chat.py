@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 # A reply whose A2UI block the compiler rejects gets this many hidden runs to correct it.
-REPAIR_ATTEMPTS = 1
+REPAIR_ATTEMPTS = 2  # the A2UI docs' validate-and-retry loop uses 2 retries
 
 # agno's error types for guardrail checks; any other run error is a failure, not a block.
 GUARDRAIL_ERRORS = {"input_check_error", "output_check_error"}

@@ -403,6 +403,29 @@ Rule from the user: nothing goes straight into the system prompt; it is a skill 
 - Open: the check call costs one round trip per UI turn; listing skill file names in the index
   (~80 tokens/turn) would let block turns load in one call instead of two.
 
+## Phase 10: Fewer model calls per UI turn, following the A2UI docs (done 2026-11-17, not committed)
+Source: https://a2ui.org/guides/agent-integration/ (+ /concepts/inference-formats/, /concepts/sdks/).
+The docs' method is prompt-based Express through the SDK (what we run); tool-call emission is
+only named for ADK/CopilotKit with no schema, so a custom `show_block` tool was dropped.
+- [x] 10.1 Bench: `dots-in-chat/scripts/bench_a2ui.py` (real /chat/stream, fresh chat per rep).
+  Free tier is 15 requests/min on flash-lite, so it pauses between turns.
+- [x] 10.2 Changes: no `search_skills` tool when the index lists all skills (`app/skills.py`);
+  index lists file names; `paths` is a required argument, so the first call names the files;
+  `metadata.default_paths` (forms: components + form template) apply only when no paths are given,
+  a block turn skips the form components (turn-type pruning); `metadata.pairs` brings
+  block-card.md with any block file; the model no longer gets `get_skill_script` (check.py stays
+  as a dev tool): the server validates, and a rejected block gets the errors in a repair run
+  (`REPAIR_ATTEMPTS` 1 -> 2, the docs' maxRetries); stronger trigger text in the skill description.
+- [x] 10.3 Cleanup and the docs' retry prompt: removed `get_skill_script`, `skills/a2ui/scripts/check.py`
+  and `A2uiTurn.upgraded` (nothing in the app used them); the repair prompt now quotes the rejected
+  reply and the validation error, like the docs' `generate_validated_turn`.
+- Results, final code, reply-run input tokens / skill loads (baseline -> after; flash-lite free tier,
+  n = 3-6, repair runs not in the token column, none occurred):
+  budget 23.5k/4 -> 5.5k/1; SIP 22.8k/3.5 -> 5.7k/1; chart 25.0k/4 -> 8.5k/1.3; trip 16.3k/3 -> 8.3k/1.3;
+  plain 1.3k -> 1.3k. UI shown in every UI turn; one turn of 18 failed on a Gemini 429.
+  Seconds are noisy (provider latency 3-20 s): budget 12 -> 9.6, SIP 10 -> 9, chart 18 -> 14.
+- Open: sample sizes are small; the benchmark and tests are kept local, not committed.
+
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and
   the lost shadcn catalog are replaced.

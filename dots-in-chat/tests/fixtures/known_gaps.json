@@ -1,0 +1,24 @@
+{
+  "server": {
+    "login-form": {"match": "@checks", "why": "spec at main spells it @checks; a2ui-agent-sdk 0.11.0 only knows checks"},
+    "advanced-form-validator": {"match": "@checks", "why": "same"},
+    "modal": {"match": "Unrecognized component type 'Modal'", "why": "Modal is left out of the chat catalog on purpose"},
+    "movie-card": {"match": "Unrecognized component type", "why": "uses Modal and Video, not in the chat catalog"},
+    "podcast-episode": {"match": "Unrecognized component type 'AudioPlayer'", "why": "AudioPlayer is not in the chat catalog"}
+  },
+  "renderer": {
+    "login-form": {"why": "@checks: web_core 0.15.0 only knows checks"},
+    "advanced-form-validator": {"why": "@checks: web_core 0.15.0 only knows checks"},
+    "modal": {"why": "Modal not in the chat catalog; the renderer silently draws nothing for it"},
+    "movie-card": {"why": "Modal/Video not in the chat catalog (silent)"},
+    "podcast-episode": {"why": "AudioPlayer not in the chat catalog (silent)"},
+    "contact-card": {"why": "Image renders <img src=\"\"> until its data arrives: React console error (transient, final src is set)"},
+    "music-player": {"why": "same empty img src"},
+    "product-card": {"why": "same empty img src"},
+    "purchase-complete": {"why": "same empty img src"},
+    "recipe-card": {"why": "same empty img src"},
+    "restaurant-card": {"why": "same empty img src"},
+    "sports-player": {"why": "same empty img src"},
+    "user-profile": {"why": "same empty img src"}
+  }
+}

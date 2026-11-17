@@ -57,8 +57,11 @@ function sync(feed: SurfaceFeed) {
   const replaced = r.applied > messages.length || messages[r.applied - 1] !== r.last
   if (replaced) r.reset()
   if (!replaced && r.applied === messages.length) return
-  // A reply streaming now is live; stored history is replayed quietly.
-  r.apply(messages.slice(r.applied) as WireMessage[], feed.busy)
+  // Stored history is replayed quietly; what a reply streams now is live.
+  const from = r.applied
+  const quiet = Math.max(0, Math.min(messages.length, feed.historyCount) - from)
+  if (quiet > 0) r.apply(messages.slice(from, from + quiet) as WireMessage[], false)
+  if (from + quiet < messages.length) r.apply(messages.slice(from + quiet) as WireMessage[], true)
   r.applied = messages.length
   r.last = messages.at(-1)
   r.version++

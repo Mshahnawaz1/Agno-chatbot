@@ -86,6 +86,13 @@ class Harness:
         self.app = app
         self.client = TestClient(app)
 
+    def async_client(self):
+        """An httpx client on the same app, for scenarios with two requests at once (a stream
+        and the browser's RPC response). It returns a streamed body only when it has ended."""
+        import httpx
+
+        return httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url="http://test")
+
     def close(self):
         chat.agent, chat.stub_skill_loads, chat.generate_title = self._saved
 

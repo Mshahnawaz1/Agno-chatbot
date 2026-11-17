@@ -5,6 +5,8 @@ Use these exact positional signatures to instantiate check rules or logic functi
 • and(values)
   - Description: Performs a logical AND operation on a list of boolean values.
   - values: The list of boolean values to evaluate.
+• clientInfo()
+  - Description: The user's browser: {timezone, locale, localTime (ISO 8601 with offset), screenWidth, screenHeight}. Called by the agent with the call_renderer_function tool.
 • email(value)
   - Description: Checks that the value is a valid email address.
 • formatCurrency(value, currency, decimals?, grouping?)
@@ -72,3 +74,6 @@ Examples:
 • required(value)
   - Description: Checks that the value is not null, undefined, or empty.
   - value: The value to check.
+• serverTime(timezone?)
+  - Description: The server's current time as ISO 8601. Called by the renderer (callAgentFunction), not used in components.
+  - timezone: An IANA timezone, default UTC.

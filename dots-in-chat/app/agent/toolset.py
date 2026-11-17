@@ -5,6 +5,7 @@ from agno.tools.yfinance import YFinanceTools
 from app.config import settings
 from app.connectors.tools import user_connector_tools
 from app.agent.tools import get_weather, primes_below
+from app.a2ui.rpc import call_renderer_function
 
 settings.agent_workspace.mkdir(parents=True, exist_ok=True)
 
@@ -20,7 +21,7 @@ file_tools = FileTools(
     enable_search_content=False,
 )
 
-BASE_TOOLS = [primes_below, get_weather, YFinanceTools(), file_tools]
+BASE_TOOLS = [primes_below, get_weather, YFinanceTools(), file_tools, call_renderer_function]
 
 
 async def agent_tools(run_context) -> list:

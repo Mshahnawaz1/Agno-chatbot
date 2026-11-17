@@ -57,11 +57,15 @@ The host compiler will compile your A2UI Express output into the correct JSON en
 12. To delete a user interface surface, output the standalone `deleteSurface(surfaceId)` command (no variable assignment):
     deleteSurface("dashboard-surface-1")
 
-13. Static properties: Arguments annotated with '(static)' in the signatures below MUST be defined as literal values or arrays inline. You CANNOT use a dynamic data binding path (prefixed by $) for these arguments.
+13. To have the renderer run a function right away, output the call as a standalone command (no variable assignment):
+    clientInfo(...)
+    Only these functions can be called this way: `clientInfo`.
 
-14. Required actions: Parameters named 'action' (or annotated in component signatures) are strictly required. You must pass a valid Event (e.g. Event("click")) or function call. If no specific action is described in the user request, you must provide a dummy click event like Event("click") instead of passing null or omitting the parameter.
+14. Static properties: Arguments annotated with '(static)' in the signatures below MUST be defined as literal values or arrays inline. You CANNOT use a dynamic data binding path (prefixed by $) for these arguments.
 
-15. Surface targeting: Output `surface(surfaceId)` to specify or target a user interface surface:
+15. Required actions: Parameters named 'action' (or annotated in component signatures) are strictly required. You must pass a valid Event (e.g. Event("click")) or function call. If no specific action is described in the user request, you must provide a dummy click event like Event("click") instead of passing null or omitting the parameter.
+
+16. Surface targeting: Output `surface(surfaceId)` to specify or target a user interface surface:
     surface("dashboard-surface-1")
     root = Card(...)
 

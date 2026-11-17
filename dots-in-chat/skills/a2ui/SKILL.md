@@ -27,7 +27,9 @@ named in them (never guess a component).
 | needs to give you details or choose (trip, booking, preferences) | a form | no paths: you get components.md and form.md |
 | wants something changed on a card from an earlier turn | update it | see "Earlier surfaces" |
 
-Also available: references/functions.md (input checks beyond ?required, number/date formats).
+Also available: references/functions.md (input checks beyond ?required, number/date formats), and
+references/rpc.md (ask the user's browser for their timezone, locale or local time, with the
+call_renderer_function tool; load it only when the answer depends on where or when the user is).
 Any chart: the chart-choice guide comes with the chart files; follow it.
 
 ## When to show UI

@@ -25,6 +25,7 @@ from a2ui.inference_formats import ExpressFormatFactory
 from a2ui.processor import A2uiGenerator, A2uiRequestProcessor, CatalogConfig
 
 from app.a2ui import capabilities
+from app.a2ui.functions import with_rpc_functions
 
 PROTOCOL_VERSION = "1.0"
 
@@ -103,7 +104,7 @@ def _chat_catalog() -> Catalog:
     )
 
 
-CATALOG = _chat_catalog()
+CATALOG = with_rpc_functions(_chat_catalog())  # + the RPC functions (functions.py)
 
 # What a request without a capabilities handshake gets (see capabilities.py): the chat catalog.
 CAPABILITIES = {PROTOCOL_VERSION: {"supportedCatalogIds": [CATALOG_ID]}}

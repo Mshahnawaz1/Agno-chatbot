@@ -12,6 +12,7 @@ import { VegaChart } from './chart'
 import { Icon, Image, Text } from './content'
 import { Button, CheckBox, ChoicePicker, DateTimeInput, Slider, TextField } from './inputs'
 import { Card, Column, Divider, List, Row, Tabs } from './layout'
+import { CLIENT_INFO } from './functions'
 
 export const CATALOG_ID = 'dots-in-chat/chat/v1'
 
@@ -25,5 +26,5 @@ export const catalog = new Catalog<ReactCatalogComponent>(
     VegaChart,
     ...BLOCKS,
   ] as ReactCatalogComponent[],
-  BASIC_FUNCTIONS,
+  [...BASIC_FUNCTIONS, CLIENT_INFO],
 )

@@ -11,6 +11,8 @@ export type SurfaceFeed = {
   /** The chat this feed belongs to; a new key starts a new processor. */
   key: string
   messages: A2uiMessage[]
+  /** How many of `messages` come from stored history: replayed quietly, never reported to the agent. */
+  historyCount: number
   sendAction: (action: UiAction) => void
   /** A renderer `error` message for the agent. */
   reportError: (error: WireMessage) => void

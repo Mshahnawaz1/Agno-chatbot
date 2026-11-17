@@ -50,8 +50,12 @@ export type StreamAction =
   | { type: 'fail'; runId: number; assistantId: string; message: string; kind: ErrorKind }
   | { type: 'finish'; runId: number; assistantId: string; status: Exclude<TurnStatus, 'streaming'> }
 
-/** What a turn sends: typed text, a click on a surface, or renderer errors (no user turn is shown). */
-export type TurnInput = { text: string } | { action: ActionMessage } | { errors: WireMessage[] }
+/** What a turn sends: typed text, a click on a surface, or renderer messages (no user turn is shown). */
+export type TurnInput =
+  | { text: string }
+  | { action: ActionMessage }
+  | { errors: WireMessage[] }
+  | { functionResponse: WireMessage }
 
 export const initialStreamState = (sessionId: string | null): StreamState => ({
   sessionId,
@@ -80,7 +84,7 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       activeRun: action.runId,
       turns: [
         ...state.turns,
-        ...('errors' in action.input
+        ...('errors' in action.input || 'functionResponse' in action.input
           ? []
           : [{
               id: action.userId, role: 'user' as const, parts: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'done' as const,

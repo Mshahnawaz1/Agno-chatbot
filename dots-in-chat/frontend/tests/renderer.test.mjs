@@ -11,6 +11,10 @@ import { z } from 'zod'
 import { BASIC_FUNCTIONS, Catalog, createFunctionImplementation } from '@a2ui/web_core/v1_0'
 import { Renderer } from '../src/features/chat/a2ui/renderer.ts'
 
+// the app's real clientInfo needs a browser's window; give it a stand-in screen
+globalThis.window = { screen: { width: 1440, height: 900 } }
+const { CLIENT_INFO } = await import('../src/features/chat/a2ui/catalog/functions.ts')
+
 const ID = 'test/chat/v1'
 const Text = { name: 'Text', schema: z.object({ text: z.string() }) }
 const Column = { name: 'Column', schema: z.object({ children: z.array(z.string()) }) }
@@ -152,6 +156,28 @@ test('capabilities list the real catalog ids', () => {
 })
 
 // ---------------------------------------------------------------- 4. function RPC
+
+test("the app's real clientInfo answers the agent with the browser's facts", async () => {
+  const sent = []
+  const r = new Renderer(new Catalog(ID, '1.0', [Text], [...BASIC_FUNCTIONS, CLIENT_INFO]), {
+    sendAction: () => {},
+    reportError: () => {},
+    transport: async (m) => (sent.push(m), []),
+  })
+  await r.runCall({ version: '1.0', callRendererFunction: { functionCallId: 'c1', callFunction: { '@call': 'clientInfo', catalogId: ID, args: {} } } })
+  const value = sent[0].rendererFunctionResponse.value
+  assert.equal(typeof value.timezone, 'string')
+  assert.equal(typeof value.locale, 'string')
+  assert.match(value.localTime, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d$/)
+  assert.equal(value.screenWidth, 1440)
+})
+
+test('the real catalog declares clientInfo callable by the agent, and nothing else is', async () => {
+  assert.equal(CLIENT_INFO.allowedCallers, 'rendererOrAgent')
+  assert.ok(!CLIENT_INFO.requiresUserActivation)
+  const callable = [...BASIC_FUNCTIONS, CLIENT_INFO].filter((f) => f.allowedCallers && f.allowedCallers !== 'rendererOnly')
+  assert.deepEqual(callable.map((f) => f.name), ['clientInfo'])
+})
 
 const call = (name, id = 'c1', extra = {}) => ({
   version: '1.0',

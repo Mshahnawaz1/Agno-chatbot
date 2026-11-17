@@ -52,7 +52,7 @@ class RendererErrorTest(unittest.TestCase):
         self.assertIn("updateComponents", a2ui_kinds(events))
         self.assertEqual(events[-1][0], "done")
         meta = self.h.agent.kwargs[0]["metadata"]
-        self.assertTrue(meta["a2ui_renderer_error"])  # history hides this input
+        self.assertTrue(meta["a2ui_hidden_input"])  # history hides this input
         self.assertEqual(meta["query"], "")  # the tool router gets nothing to match
 
     def test_generic_expression_error_is_accepted(self):

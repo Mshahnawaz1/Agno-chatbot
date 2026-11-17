@@ -6,7 +6,7 @@ import { readSseEvents } from '@/lib/sse'
 import type { Message, Metrics } from '@/lib/types'
 import { ChatStreamContext, initialStreamState, streamReducer, type ChatStreamValue, type TurnInput } from './chatStore'
 import { actionMessage, type A2uiMessage, type UiAction } from './a2ui/protocol'
-import { rendererContext } from './a2ui/processor'
+import { rendererContext, rendererFor, setRendererTransport } from './a2ui/processor'
 import type { WireMessage } from './a2ui/renderer'
 
 /** Route -> session it shows: an id, null for "/" (new chat), or OTHER for non-chat pages. */
@@ -48,6 +48,8 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
   const idCounter = useRef(0)
   const hadTurnsRef = useRef(false)
   const errorQueueRef = useRef<WireMessage[]>([])
+  /** Function results for calls the model wrote itself; each becomes a hidden turn. */
+  const resultQueueRef = useRef<WireMessage[]>([])
   const errorBudgetRef = useRef(ERROR_REPORTS_PER_TURN)
   /** Writes the run's buffered tokens into the state now (tokens are batched per frame). */
   const flushRef = useRef<(() => void) | null>(null)
@@ -63,6 +65,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
     (sessionId: string | null) => {
       abortActive()
       errorQueueRef.current = []
+      resultQueueRef.current = []
       const prev = sessionIdRef.current
       // Local turns of the chat we leave are not in its cached history: drop the cache so a
       // later visit refetches from the server instead of showing the pre-stream snapshot.
@@ -143,7 +146,13 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       let failed = false
       try {
         const res = await api.openChatStream(
-          'text' in input ? { message: input.text } : 'action' in input ? { action: input.action } : { errors: input.errors },
+          'text' in input
+            ? { message: input.text }
+            : 'action' in input
+              ? { action: input.action }
+              : 'errors' in input
+                ? { errors: input.errors }
+                : { function_response: input.functionResponse },
           sessionId,
           controller.signal,
           rendererContext(sessionId),
@@ -187,6 +196,15 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
               flush()
               if (d.message && typeof d.message === 'object') {
                 dispatch({ type: 'a2ui', runId, assistantId, message: d.message as A2uiMessage })
+              }
+              break
+            case 'a2ui_rpc':
+              // The agent's tool calls a renderer function: run it here; the response goes back
+              // through the renderer's transport (POST /chat/rpc) and the tool resumes.
+              if (sessionId && d.message && typeof d.message === 'object') {
+                rendererFor(sessionId)
+                  .runCall(d.message as WireMessage)
+                  .catch((err) => console.warn('A2UI renderer function call failed:', err))
               }
               break
             case 'a2ui_error':
@@ -268,22 +286,45 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
     void send({ text })
   }, [send])
 
-  // Renderer errors wait for the reply to end, then go to the agent as one hidden turn.
-  const flushErrors = useCallback(() => {
+  // Renderer messages for the agent (errors, results of calls the model wrote) wait for the
+  // reply to end, then go as one hidden turn each.
+  const flushQueued = useCallback(() => {
+    if (activeRunRef.current !== null || sessionIdRef.current === null) return
+    const result = resultQueueRef.current.shift()
+    if (result) {
+      void send({ functionResponse: result })
+      return
+    }
     const queued = errorQueueRef.current
-    if (queued.length === 0 || activeRunRef.current !== null) return
+    if (queued.length === 0) return
     errorQueueRef.current = []
-    if (sessionIdRef.current === null || errorBudgetRef.current <= 0) return
+    if (errorBudgetRef.current <= 0) return
     errorBudgetRef.current--
     void send({ errors: queued.slice(0, 5) })
   }, [send])
   const reportError = useCallback((error: WireMessage) => {
     errorQueueRef.current.push(error)
-    flushErrors()
-  }, [flushErrors])
+    flushQueued()
+  }, [flushQueued])
   useEffect(() => {
-    if (state.activeRun === null) flushErrors()
-  }, [state.activeRun, flushErrors])
+    if (state.activeRun === null) flushQueued()
+  }, [state.activeRun, flushQueued])
+
+  // The renderer's function RPC goes to the server; a response nobody was waiting for (the call
+  // was written by the model in its reply) is handed back to the model as a turn.
+  useEffect(() => {
+    setRendererTransport(async (key, message) => {
+      const id = key === 'new' ? sessionIdRef.current : key
+      if (!id) return []
+      const out = await api.postRpc(id, message)
+      if (!out.handled && 'rendererFunctionResponse' in message) {
+        resultQueueRef.current.push(message)
+        flushQueued()
+      }
+      return out.replies as WireMessage[]
+    })
+    return () => setRendererTransport(undefined)
+  }, [flushQueued])
 
   const value = useMemo<ChatStreamValue>(
     () => ({

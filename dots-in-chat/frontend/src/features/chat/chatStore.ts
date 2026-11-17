@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { Metrics } from '@/lib/types'
 import type { A2uiMessage, ActionMessage, Part, UiAction } from './a2ui/protocol'
+import type { WireMessage } from './a2ui/renderer'
 
 export type TurnStatus = 'streaming' | 'done' | 'stopped' | 'error'
 export type ErrorKind = 'guardrail' | 'error'
@@ -49,8 +50,8 @@ export type StreamAction =
   | { type: 'fail'; runId: number; assistantId: string; message: string; kind: ErrorKind }
   | { type: 'finish'; runId: number; assistantId: string; status: Exclude<TurnStatus, 'streaming'> }
 
-/** What a turn sends: typed text, or a click on a surface. */
-export type TurnInput = { text: string } | { action: ActionMessage }
+/** What a turn sends: typed text, a click on a surface, or renderer errors (no user turn is shown). */
+export type TurnInput = { text: string } | { action: ActionMessage } | { errors: WireMessage[] }
 
 export const initialStreamState = (sessionId: string | null): StreamState => ({
   sessionId,
@@ -79,10 +80,12 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       activeRun: action.runId,
       turns: [
         ...state.turns,
-        {
-          id: action.userId, role: 'user', parts: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'done',
-          ...('text' in action.input ? { content: action.input.text } : { content: '', action: action.input.action.action }),
-        },
+        ...('errors' in action.input
+          ? []
+          : [{
+              id: action.userId, role: 'user' as const, parts: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'done' as const,
+              ...('text' in action.input ? { content: action.input.text } : { content: '', action: action.input.action.action }),
+            }]),
         { id: action.assistantId, role: 'assistant', content: '', parts: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'streaming' },
       ],
     }
@@ -129,6 +132,8 @@ export type ChatStreamValue = {
   send: (text: string) => void
   /** A click on an A2UI surface: sent to the agent as the next turn. */
   sendAction: (action: UiAction) => void
+  /** The renderer rejected part of a surface: tell the agent (queued until the reply ends). */
+  reportError: (error: WireMessage) => void
   stop: () => void
   newChat: () => void
 }

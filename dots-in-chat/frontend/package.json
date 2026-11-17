@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "e2e:blocks": "node e2e/blocks.mjs"
+    "e2e:blocks": "node e2e/blocks.mjs",
+    "test:a2ui": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@a2ui/react": "0.15.0",

@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from app import db
 from app.a2ui.actions import InvalidAction, action_prompt, read_action
+from app.a2ui.feedback import InvalidError, error_prompt, read_errors
 from app.a2ui.turn import A2uiTurn
 from app.agent import agent
 from app.agent.title import generate_title
@@ -94,15 +95,18 @@ async def chat(body: ChatRequest, user: CurrentUser):
 
 
 async def model_pass(
-    model_input: str, user: dict, session_id: str, turn: A2uiTurn, run: dict, repair: bool = False
+    model_input: str, user: dict, session_id: str, turn: A2uiTurn, run: dict, repair: bool = False,
+    renderer_error: bool = False,
 ) -> AsyncIterator[str]:
     """One agent run streamed through the A2UI compiler. Fills `run` with its outcome."""
     turn.start_pass()
     # `query` lets the tool router pick connector tools for the message. A repair run only fixes
     # UI, so it gets none: routing its prompt ("create ... form") attached unrelated tools.
-    metadata = {"query": "" if repair else model_input}
+    metadata = {"query": "" if repair or renderer_error else model_input}
     if repair:
         metadata["a2ui_repair"] = True  # hidden from the history endpoint
+    if renderer_error:
+        metadata["a2ui_renderer_error"] = True  # the run shows, its input (the errors) doesn't
     async for event in agent.arun(
         model_input, user_id=user["id"], session_id=session_id,
         stream=True, stream_events=True, metadata=metadata,
@@ -142,6 +146,8 @@ async def model_pass(
 @router.post("/stream")
 async def chat_stream(body: ChatRequest, user: CurrentUser):
     is_new = not body.session_id
+    if body.errors is not None and is_new:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Renderer errors belong to an existing chat")
     session = resolve_session(body, user)      # 404 is raised here, before streaming
     # A new chat gets an LLM-written title, generated alongside the first reply.
     title_task = asyncio.create_task(generate_title(body.message)) if is_new and body.message else None
@@ -152,6 +158,13 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
         except InvalidAction as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid action: {e}")
         prompt = action_prompt(action, turn.surface_ids)
+    elif body.errors is not None:
+        try:
+            errors = await read_errors(body.errors)
+        except InvalidError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid error: {e}")
+        logger.warning("renderer errors in session %s: %s", session["id"], errors)
+        prompt = error_prompt(errors, turn.surface_ids)
     else:
         prompt = body.message
 
@@ -162,7 +175,9 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
         try:
             model_input, repair = prompt, False
             for attempt in range(REPAIR_ATTEMPTS + 1):
-                async for chunk in model_pass(model_input, user, session["id"], turn, run, repair):
+                async for chunk in model_pass(
+                    model_input, user, session["id"], turn, run, repair, renderer_error=body.errors is not None and not repair
+                ):
                     yield chunk
                 if turn.rejected and not run["stopped"]:
                     for name, data in turn.autofix():  # `name: value` arguments: no model call

@@ -1,37 +1,46 @@
 import { useLayoutEffect, useSyncExternalStore } from 'react'
-import { MessageProcessor, type ActionPayload } from '@a2ui/web_core/v1_0'
+import { MessageProcessor } from '@a2ui/web_core/v1_0'
 import type { ReactCatalogComponent } from '@a2ui/react/v0_9'
 import { catalog } from './catalog'
 import type { SurfaceFeed } from './feed'
-import type { A2uiMessage, UiAction } from './protocol'
+import { Renderer, type WireMessage } from './renderer'
+import type { A2uiMessage } from './protocol'
 
-/** One chat's processor and how far through its feed it is. */
-type Entry = {
-  processor: MessageProcessor<ReactCatalogComponent>
-  /** How many of the feed's messages are applied, and the last one applied. */
-  applied: number
-  last: A2uiMessage | undefined
-  onAction: (action: UiAction) => void
-  /** Bumped whenever messages are applied, so surfaces re-render. */
-  version: number
-  listeners: Set<() => void>
+/** One renderer per chat. Chats are few, so entries are kept for the page's lifetime. */
+const entries = new Map<string, Renderer<ReactCatalogComponent>>()
+
+/** Where the renderer's RPC messages go (set once by the chat stream provider). */
+let transport: ((key: string, message: WireMessage) => Promise<WireMessage[]>) | undefined
+
+export function setRendererTransport(t: typeof transport) {
+  transport = t
 }
 
-/** One processor per chat. Chats are few, so entries are kept for the page's lifetime. */
-const entries = new Map<string, Entry>()
-
-function newProcessor(entry: Entry) {
-  return new MessageProcessor<ReactCatalogComponent>([catalog], (a: ActionPayload) => entry.onAction(a as UiAction))
-}
-
-function entryFor(key: string): Entry {
-  let entry = entries.get(key)
-  if (!entry) {
-    entry = { processor: undefined as never, applied: 0, last: undefined, onAction: () => {}, version: 0, listeners: new Set() }
-    entry.processor = newProcessor(entry)
-    entries.set(key, entry)
+/** The chat's renderer; made on first use. */
+export function rendererFor(key: string): Renderer<ReactCatalogComponent> {
+  let r = entries.get(key)
+  if (!r) {
+    r = new Renderer<ReactCatalogComponent>(catalog, {
+      sendAction: () => {},
+      reportError: () => {},
+      transport: (m) => (transport ? transport(key, m) : Promise.resolve([])),
+    })
+    entries.set(key, r)
   }
-  return entry
+  return r
+}
+
+/**
+ * What every request to the agent carries about this renderer: its capabilities (from the
+ * real catalog) and the data models of the surfaces that asked for them (`sendDataModel`).
+ */
+export function rendererContext(key: string | null) {
+  const r = rendererFor(key ?? 'new')
+  const dataModel = r.dataModel()
+  return {
+    a2uiRendererCapabilities: r.capabilities(),
+    ...(dataModel ? { a2uiRendererDataModel: dataModel } : {}),
+  }
 }
 
 /**
@@ -41,41 +50,37 @@ function entryFor(key: string): Entry {
  * renderer's signals, which must not happen while React renders.
  */
 function sync(feed: SurfaceFeed) {
-  const entry = entryFor(feed.key)
-  entry.onAction = feed.sendAction
+  const r = rendererFor(feed.key)
+  r.io.sendAction = feed.sendAction as never
+  r.io.reportError = feed.reportError
   const { messages } = feed
-  const replaced = entry.applied > messages.length || messages[entry.applied - 1] !== entry.last
-  if (replaced) {
-    entry.processor = newProcessor(entry)
-    entry.applied = 0
-    entry.last = undefined
-  }
-  if (!replaced && entry.applied === messages.length) return
-  const errors = entry.processor.processMessagesWithErrors(messages.slice(entry.applied))
-  // The server validated these against the same catalog, so an error here is a bug to look at.
-  if (errors.length) console.warn('A2UI renderer errors:', errors)
-  entry.applied = messages.length
-  entry.last = messages.at(-1)
-  entry.version++
-  entry.listeners.forEach((l) => l())
+  const replaced = r.applied > messages.length || messages[r.applied - 1] !== r.last
+  if (replaced) r.reset()
+  if (!replaced && r.applied === messages.length) return
+  // A reply streaming now is live; stored history is replayed quietly.
+  r.apply(messages.slice(r.applied) as WireMessage[], feed.busy)
+  r.applied = messages.length
+  r.last = messages.at(-1)
+  r.version++
+  r.listeners.forEach((l) => l())
 }
 
 /** The chat's processor, kept in step with the feed; re-renders when messages are applied. */
 export function useProcessor(feed: SurfaceFeed): MessageProcessor<ReactCatalogComponent> {
-  const entry = entryFor(feed.key)
+  const r = rendererFor(feed.key)
   useSyncExternalStore(
     (onChange) => {
-      entry.listeners.add(onChange)
-      return () => entry.listeners.delete(onChange)
+      r.listeners.add(onChange)
+      return () => r.listeners.delete(onChange)
     },
-    () => entry.version,
+    () => r.version,
   )
   useLayoutEffect(() => sync(feed), [feed])
-  return entry.processor
+  return r.processor
 }
 
 /** Whether the processor has caught up with the feed (a surface missing before that is pending). */
 export function isSynced(feed: SurfaceFeed): boolean {
-  const entry = entries.get(feed.key)
-  return !!entry && entry.applied === feed.messages.length && feed.messages.at(-1) === entry.last
+  const r = entries.get(feed.key)
+  return !!r && r.applied === feed.messages.length && (feed.messages.at(-1) as A2uiMessage | undefined) === r.last
 }

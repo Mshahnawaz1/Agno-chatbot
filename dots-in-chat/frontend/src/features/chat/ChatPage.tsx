@@ -51,6 +51,7 @@ function useSurfaceFeed(
   key: string,
   turns: Turn[],
   sendAction: SurfaceFeed['sendAction'],
+  reportError: SurfaceFeed['reportError'],
   busy: boolean,
 ): SurfaceFeed {
   const all = turns.flatMap((t) => t.parts.flatMap((p) => (p.kind === 'a2ui' ? [p.message] : [])))
@@ -58,7 +59,7 @@ function useSurfaceFeed(
   const count = all.length
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const messages = useMemo<A2uiMessage[]>(() => all, [key, count, last])
-  return useMemo(() => ({ key, messages, sendAction, busy }), [key, messages, sendAction, busy])
+  return useMemo(() => ({ key, messages, sendAction, reportError, busy }), [key, messages, sendAction, reportError, busy])
 }
 
 export function ChatPage() {
@@ -106,7 +107,7 @@ export function ChatPage() {
     () => (ownsTurns ? [...historyTurns, ...stream.turns] : historyTurns),
     [ownsTurns, historyTurns, stream.turns],
   )
-  const feed = useSurfaceFeed(routeId ?? 'new', turns, stream.sendAction, stream.streaming)
+  const feed = useSurfaceFeed(routeId ?? 'new', turns, stream.sendAction, stream.reportError, stream.streaming)
   const isEmpty = routeId === null && (!ownsTurns || stream.turns.length === 0)
   const loadingHistory = routeId !== null && history.isPending
 

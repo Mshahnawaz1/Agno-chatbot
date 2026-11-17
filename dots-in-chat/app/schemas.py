@@ -51,12 +51,14 @@ class ChatRequest(BaseModel):
     """A typed message, or a click on an A2UI surface (a v1.0 renderer-to-agent `action` message)."""
     message: str | None = Field(default=None, min_length=1, max_length=4000)  # rejects empty / huge input
     action: dict[str, Any] | None = None
+    # Renderer `error` messages: the browser rejected part of a surface (see app/a2ui/feedback.py).
+    errors: list[dict[str, Any]] | None = Field(default=None, max_length=5)
     session_id: str | None = None
 
     @model_validator(mode="after")
     def one_input(self):
-        if (self.message is None) == (self.action is None):
-            raise ValueError("Send either a message or an action.")
+        if sum(x is not None for x in (self.message, self.action, self.errors)) != 1:
+            raise ValueError("Send either a message, an action or errors.")
         return self
 
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Link, NavLink } from 'react-router'
-import { useQuery } from '@tanstack/react-query'
-import { ArrowUpRight, PanelLeftClose, Plug, Search } from 'lucide-react'
+import { Link, NavLink, matchPath, useLocation } from 'react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowUpRight, PanelLeftClose, Plug, Search, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import * as api from '@/lib/api'
 import { groupSessionsByDate } from '@/lib/format'
@@ -17,6 +17,17 @@ const rowBase =
 
 function SessionList({ query, onNavigate }: { query: string; onNavigate: () => void }) {
   const sessions = useQuery({ queryKey: ['sessions'], queryFn: api.listSessions })
+  const queryClient = useQueryClient()
+  const { newChat } = useChatStream()
+  const { pathname } = useLocation()
+  const remove = useMutation({
+    mutationFn: api.deleteSession,
+    onSuccess: (_, id) => {
+      // Deleting the chat on screen: go back to a blank new chat.
+      if (matchPath('/c/:sessionId', pathname)?.params.sessionId === id) newChat()
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+    },
+  })
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -65,7 +76,7 @@ function SessionList({ query, onNavigate }: { query: string; onNavigate: () => v
           <h2 className="px-2.5 pb-1 font-sans text-xs font-medium tracking-normal text-fg-subtle">{g.label}</h2>
           <ul className="flex flex-col gap-px">
             {g.sessions.map((s) => (
-              <li key={s.id}>
+              <li key={s.id} className="group relative">
                 <NavLink
                   to={`/c/${encodeURIComponent(s.id)}`}
                   onClick={onNavigate}
@@ -77,8 +88,19 @@ function SessionList({ query, onNavigate }: { query: string; onNavigate: () => v
                     )
                   }
                 >
-                  <span className="truncate">{s.title || 'Untitled'}</span>
+                  <span className="truncate pr-6">{s.title || 'Untitled'}</span>
                 </NavLink>
+                <button
+                  type="button"
+                  aria-label={`Delete chat: ${s.title || 'Untitled'}`}
+                  disabled={remove.isPending}
+                  onClick={() => {
+                    if (window.confirm('Delete this chat? This cannot be undone.')) remove.mutate(s.id)
+                  }}
+                  className="absolute right-1.5 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-fg-subtle opacity-0 transition hover:bg-surface-3 hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-100"
+                >
+                  <Trash2 className="size-3.5" aria-hidden />
+                </button>
               </li>
             ))}
           </ul>

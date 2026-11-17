@@ -178,6 +178,20 @@ def get_chat_session(session_id: str, user_id: str) -> dict | None:
         ).fetchone()
     return dict(row) if row else None
 
+def set_chat_session_title(session_id: str, title: str) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE chat_sessions SET title = ? WHERE id = ?", (title, session_id))
+
+
+def delete_chat_session(session_id: str, user_id: str) -> bool:
+    """chat_parts rows go with it (ON DELETE CASCADE). False if not found / not the owner's."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM chat_sessions WHERE id = ? AND user_id = ?", (session_id, user_id)
+        )
+    return cur.rowcount > 0
+
+
 def touch_chat_session(session_id: str) -> None:
     with get_conn() as conn:
         conn.execute(

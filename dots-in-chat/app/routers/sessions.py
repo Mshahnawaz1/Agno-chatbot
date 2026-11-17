@@ -29,6 +29,13 @@ def get_session(session_id: str, user: CurrentUser):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
     return session
 
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(session_id: str, user: CurrentUser):
+    if not db.delete_chat_session(session_id, user["id"]):  # ownership check is in the query
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+    await agent.adelete_session(session_id=session_id, user_id=user["id"])  # Agno's copy of the history
+
+
 @router.get("/{session_id}/messages", response_model=list[MessageOut])
 async def session_messages(session_id: str, user: CurrentUser):
     # Ownership check FIRST: Agno's history call takes only a session_id.

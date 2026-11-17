@@ -96,6 +96,9 @@ export const listSessions = () => request<Session[]>('/sessions')
 export const listMessages = (sessionId: string) =>
   request<Message[]>(`/sessions/${enc(sessionId)}/messages`)
 
+export const deleteSession = (sessionId: string) =>
+  request<void>(`/sessions/${enc(sessionId)}`, { method: 'DELETE' })
+
 // ---- connectors ----
 
 export const listConnectors = () => request<Connector[]>('/connectors')

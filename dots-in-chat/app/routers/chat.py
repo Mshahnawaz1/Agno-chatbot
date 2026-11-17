@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -10,6 +11,7 @@ from app import db
 from app.a2ui.actions import InvalidAction, action_prompt, read_action
 from app.a2ui.turn import A2uiTurn
 from app.agent import agent
+from app.agent.title import generate_title
 from app.deps import CurrentUser
 from app.schemas import ChatRequest, ChatResponse
 from app.skills import stub_skill_loads
@@ -139,7 +141,10 @@ async def model_pass(
 
 @router.post("/stream")
 async def chat_stream(body: ChatRequest, user: CurrentUser):
+    is_new = not body.session_id
     session = resolve_session(body, user)      # 404 is raised here, before streaming
+    # A new chat gets an LLM-written title, generated alongside the first reply.
+    title_task = asyncio.create_task(generate_title(body.message)) if is_new and body.message else None
     turn = A2uiTurn(session["id"])
     if body.action is not None:
         try:
@@ -181,6 +186,12 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
             yield sse("error", {"message": f"Generation failed. Error {e}"})
         finally:
             turn.save(run["run_id"])
+            if title_task:
+                try:
+                    if title := await title_task:
+                        db.set_chat_session_title(session["id"], title)
+                except Exception:
+                    logger.exception("could not set the chat title")
             try:
                 await stub_skill_loads(agent, session["id"], run["all_ids"])
             except Exception:

@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # Auth. No default for the secret: the app refuses to start without one.
     jwt_secret: str
     jwt_algorithm: str = "HS256"
-    access_token_minutes: int = 60
+    access_token_minutes: int = 600
 
     # Connectors
     app_name: str = "Dots-in Chat"  # shown on providers' consent screens

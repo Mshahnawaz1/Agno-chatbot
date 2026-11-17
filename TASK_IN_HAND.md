@@ -424,6 +424,16 @@ only named for ADK/CopilotKit with no schema, so a custom `show_block` tool was 
   budget 23.5k/4 -> 5.5k/1; SIP 22.8k/3.5 -> 5.7k/1; chart 25.0k/4 -> 8.5k/1.3; trip 16.3k/3 -> 8.3k/1.3;
   plain 1.3k -> 1.3k. UI shown in every UI turn; one turn of 18 failed on a Gemini 429.
   Seconds are noisy (provider latency 3-20 s): budget 12 -> 9.6, SIP 10 -> 9, chart 18 -> 14.
+- [x] 10.4 Skill content (2026-11-17): templates folded away (block-card example and update examples
+  into SKILL.md, form template -> `references/form.md`; no `templates/` dir, `pairs` now brings
+  `references/chart-choice.md` with any chart file). New `references/chart-choice.md`: data rules (no
+  invented numbers), request -> chart type table, ChartSwitcher flags (`ordered` defaults to true, so
+  categories got line/area unless `ordered=false` is passed), Vega-Lite examples (bar, line, donut,
+  stacked, scatter, histogram, all compiled with the frontend's vega-lite). SKILL.md opens with a
+  request -> block -> files table and "when NOT to ask" (details given: no form).
+  Live, flash-lite: category bar -> ChartSwitcher bar, ordered=false (2/2); time series -> line,
+  ordered=true (2/2); scatter -> VegaChart point (2/2); pie of temperatures -> the block greys the
+  pie, but the model's sentence still said "pie chart" (rule added to the guide, not re-measured).
 - Open: sample sizes are small; the benchmark and tests are kept local, not committed.
 
 ## Notes

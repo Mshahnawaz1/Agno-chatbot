@@ -48,3 +48,46 @@ On the frontend, any 401 clears the token and opens login. This covers expiry wi
 The token is stored in localStorage. It's simple and fine for learning. The trade-off is that any XSS bug could read it. Production apps often use an httpOnly cookie instead, which brings CSRF handling with it. Your messages already go through DOMPurify, which helps.
 
 Changing the server URL logs you out, because a token from one server isn't valid on another. The login dialog can't be dismissed with Escape, since nothing works logged out. It has a "⚙ Server" button so you can still change the URL.
+
+
+### Input token reduction
+
+These are the changes in commit ccde10e. They build on earlier phases that had already moved the A2UI text out of the system prompt and into a lazily loaded skill (11k down to about 600 tokens).
+
+Changes
+
+1. Removed the search_skills call.
+   - The model used to search for a skill the index already listed. That cost one full model call (~1.5k tokens).
+   - search_skills is now only offered when more than 8 skills exist.
+2. Made paths a required argument of get_skill_instructions, and listed file names in the skill index.
+   - Before, the model first loaded the skill with no files, then loaded the block file in a second call. That second call resent the whole skill text.
+   - Now the first call names what it needs, so a block turn takes one load.
+   - Making the argument required is what changed the model's behaviour, because optional paths were left out.
+3. Stopped loading form components on block turns.
+   - Before, every load pulled in components.md (~2k tokens) and form.md.
+   - Now only grammar is always loaded. The form files load only when no paths are given, and a block file brings its own card template.
+4. Dropped the model-run check script.
+   - The model used to run check.py before replying, which cost one more model call (~7.7k tokens) on every UI turn.
+   - The server now validates as the reply streams. A rejected block gets one retry, quoting the rejected reply and the error, and that only costs tokens when a block fails.
+5. Removed the dead code that went with this. That covers get_skill_script, check.py and A2uiTurn.upgraded. It saves no tokens, but it also removes the script tool schema from each request (~100 tokens).
+
+Costs added
+
+- File names in the index and a longer skill description add about 100–150 tokens to every request, including plain chat.
+- Plain chat measured 1.3k before and 1.3k after, so this is small in practice.
+
+Result
+
+┌───────────┬─────────────────────────────┐
+│ Scenario  │ Input tokens before → after │
+├───────────┼─────────────────────────────┤
+│ Budget    │ 23.5k → 5.5k                │
+├───────────┼─────────────────────────────┤
+│ SIP       │ 22.8k → 5.7k                │
+├───────────┼─────────────────────────────┤
+│ Chart     │ 25.0k → 8.5k                │
+├───────────┼─────────────────────────────┤
+│ Trip form │ 16.3k → 8.3k                │
+└───────────┴─────────────────────────────┘
+
+I haven't measured how much each change contributed separately, only the combined result. The numbers come from 3–6 live runs per scenario on flash-lite, so treat them as indicative.

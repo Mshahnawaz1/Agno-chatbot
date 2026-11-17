@@ -138,13 +138,9 @@ agent = Agent(
     # pre_hooks=[input_length_guardrail, piiGuardrails],
     tool_hooks=[tool_logger_hook], #applied to each tool call
     # post_hooks=[output_hook_validate], # No need for streaming response
-    search_knowledge=True,
-    # agno's default says "search before answering questions", which costs an extra
-    # model round trip on unrelated questions; scope it in `instructions` instead.
+    # search_knowledge=True,
     add_search_knowledge_instructions=False,
     search_past_sessions=True,
-    # Its listing defaults to 20 sessions x 3 runs (8k chars on average, resent on every later
-    # model call of the run); read_past_session still reads a whole session when needed.
     num_past_sessions_to_search=8,
     enable_agentic_memory=True,
     add_memories_to_context=True,

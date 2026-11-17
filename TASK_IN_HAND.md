@@ -477,11 +477,12 @@ Unknown = inline createSurface components/data, progressive render, @checks Vali
 Not in scope: A2A / AG-UI / MCP transports (Agno SSE does this job), CopilotKit.
 Tracks (parallel, one worktree each):
 - [ ] 12.A Audit of the Unknown rows by running them + replay all 43 official examples through the app's renderer and server compiler (tests + results table).
-- [ ] 12.B Feedback channel: renderer `error` -> agent (+ repair), `sendDataModel`, capabilities handshake, then function RPC (both directions, allowedCallers, requiresUserActivation).
+- [x] 12.B Feedback channel (done 2026-11-17, branch worktree-agent-a771b1e3e24798e6a): renderer `error` -> agent (+ repair), `sendDataModel`, capabilities handshake, then function RPC (both directions, allowedCallers, requiresUserActivation).
 - [ ] 12.C Catalogs: mixed catalogs (per-component catalogId), register upstream catalogs, macros, blueprints; skills + check scripts.
 - [ ] 12.D Progressive rendering while the model streams (turn.py / feed).
 - [ ] 12.E Merge, full scenario suite, tsc/eslint/build, update a2ui-kb.
-Results: (fill in per track)
+Results:
+- 12.B: renderer errors -> hidden repair turn (cap 2 per user turn, history replays never report); sendDataModel -> turn-only context; capabilities handshake via SDK negotiation (constant CAPABILITIES is only the default); function RPC both ways (call_renderer_function tool, /chat/rpc, clientInfo + serverTime). Tests: `unittest tests.test_a2ui_feedback tests.test_a2ui_rpc` (scripted model, real route), `npm run test:a2ui` (22 node tests on frontend/src/features/chat/a2ui/renderer.ts). Not covered: a real browser + live model run. web_core does not flag unknown components as errors (the server compiler does).
 
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and

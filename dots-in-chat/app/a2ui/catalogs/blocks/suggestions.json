@@ -1,0 +1,15 @@
+{
+  "guide": "Suggestions(prompt?, options) — a follow-up question and 2–4 short replies the user can tap, placed under a block in the same Column. A tap sends Event `say` with {text, onScreen}: `text` is the reply, `onScreen` the live values of every block on the surface (what the user dragged, unticked or reordered); answer from onScreen, not from what you first sent. Put the follow-up question here, not in your prose. Example: next = Suggestions(\"Want me to compare 20 years, or add inflation?\", [\"Make it 20 years\", \"Add inflation\", \"Save this plan\"])",
+  "components": {
+    "Suggestions": {
+      "type": "object",
+      "description": "A follow-up question with replies the user can tap; a tap sends the `say` event.",
+      "properties": {
+        "component": {"const": "Suggestions"},
+        "prompt": {"type": "string", "description": "The follow-up question shown above the replies."},
+        "options": {"type": "array", "items": {"type": "string"}, "description": "Two to four short replies the user can tap."}
+      },
+      "required": ["component", "options"]
+    }
+  }
+}

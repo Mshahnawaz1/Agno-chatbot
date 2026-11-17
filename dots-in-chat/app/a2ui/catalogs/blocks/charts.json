@@ -1,0 +1,33 @@
+{
+  "guide": "ChartSwitcher(title, data, styles?, style?, partsOfWhole?, ordered?, currency?, unit?, note?) — a small chart the user can restyle (bar, line, area, pie, donut) with a toggle and 'same data, other styles' thumbnails; the block itself greys out styles the data cannot honestly show and says why. data is [{label, value}]. Set partsOfWhole=true only when values add up to a whole (enables pie/donut, max 6 items); ordered defaults to true (line/area need ordered data, set false for categories). styles defaults to bar, line, area, pie; style is the one shown first. Amounts are money (INR) unless unit is given. Sends no events; the style the user picks is visible to you in onScreen. Prefer it over VegaChart for one series of up to ~12 points. Example: card = ChartSwitcher(\"Spending by category\", [{label: \"Food\", value: 8200}, {label: \"Bills\", value: 6400}], styles=[\"donut\", \"bar\"], style=\"donut\", partsOfWhole=true, ordered=false)",
+  "components": {
+    "ChartSwitcher": {
+      "type": "object",
+      "description": "A chart the user can switch between bar, line, area, pie and donut; styles that misrepresent the data are greyed out.",
+      "properties": {
+        "component": {"const": "ChartSwitcher"},
+        "title": {"type": "string", "description": "Card title, e.g. \"Spending this week\"."},
+        "data": {
+          "type": "array",
+          "description": "The points, in order.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {"type": "string", "description": "Category or x label."},
+              "value": {"type": "number", "description": "The number."}
+            },
+            "required": ["label", "value"]
+          }
+        },
+        "styles": {"type": "array", "items": {"enum": ["bar", "line", "area", "pie", "donut"]}, "description": "Styles offered in the toggle. Defaults to bar, line, area, pie."},
+        "style": {"enum": ["bar", "line", "area", "pie", "donut"], "description": "The style shown first. Defaults to the first enabled one in styles."},
+        "partsOfWhole": {"type": "boolean", "description": "True when the values add up to a meaningful total (enables pie/donut). Defaults to false."},
+        "ordered": {"type": "boolean", "description": "True when the points have a natural order such as time (enables line/area). Defaults to true."},
+        "currency": {"type": "string", "description": "ISO currency code. Defaults to INR."},
+        "unit": {"type": "string", "description": "A unit shown instead of money, e.g. \"steps\" or \"hours\"."},
+        "note": {"type": "string", "description": "Footnote text that replaces the automatic explanation of greyed styles."}
+      },
+      "required": ["component", "title", "data"]
+    }
+  }
+}

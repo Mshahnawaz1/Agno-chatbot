@@ -1,0 +1,17 @@
+{
+  "guide": "MessageApproval(to, message, channel?, detail?) — a message the agent drafted for one person, shown for the user to approve; nothing is sent until they tap Send and the 8-second undo runs out. Use it for any request to message, follow up with or text someone, instead of sending anything yourself. Events: send_message {to, channel, text} once the undo window closes; dismiss_message {} on Not now. Example: msg = MessageApproval(\"Priya Sharma\", \"Hey Priya! It's been a while.\", \"WhatsApp\", \"Product Manager at Zepto\")",
+  "components": {
+    "MessageApproval": {
+      "type": "object",
+      "description": "A drafted message to one person that the user approves, edits or dismisses before it is sent.",
+      "properties": {
+        "component": {"const": "MessageApproval"},
+        "to": {"type": "string", "description": "Name of the person the message goes to, e.g. \"Priya Sharma\"."},
+        "message": {"type": "string", "description": "The drafted message, exactly as it would be sent."},
+        "channel": {"type": "string", "description": "Where it is sent, e.g. \"WhatsApp\", \"SMS\", \"Email\". Defaults to \"WhatsApp\"."},
+        "detail": {"type": "string", "description": "The person's role line under their name, e.g. \"Product Manager at Zepto\"."}
+      },
+      "required": ["component", "to", "message"]
+    }
+  }
+}

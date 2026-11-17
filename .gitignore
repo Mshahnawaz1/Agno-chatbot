@@ -13,3 +13,7 @@ wheels/
 learn_agno/data
 .env
 data/
+
+.claude/
+a2ui-poc/
+a2ui-kb/

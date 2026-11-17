@@ -1,0 +1,41 @@
+{
+  "guide": "OrderReview(items, fees?, payment, title?, currency?) — a basket the user must approve before paying; items = [{name, qty, price}] (price is the LINE total), fees = [{label, amount}], payment = how it is charged (\"UPI ending 4821\"). Shows total and a hold-to-pay button (1.5 s hold, never a single tap). Use it before any purchase or payment. Events: place_order {items, fees, total, payment} (the user held to pay; only now place the order), edit_order {items}, cancel_order {}. Example: card = OrderReview([{name: \"Amul Milk 500 ml\", qty: 1, price: 59}], [{label: \"Delivery + taxes\", amount: 61}], \"UPI ending 4821\")",
+  "components": {
+    "OrderReview": {
+      "type": "object",
+      "description": "An order review with a hold-to-place-order button.",
+      "properties": {
+        "component": {"const": "OrderReview"},
+        "items": {
+          "type": "array",
+          "description": "The basket lines.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string", "description": "Item name with size, e.g. \"Amul Milk 500 ml\"."},
+              "qty": {"type": "number", "description": "Quantity."},
+              "price": {"type": "number", "description": "Line total for this item (not per unit)."}
+            },
+            "required": ["name", "qty", "price"]
+          }
+        },
+        "fees": {
+          "type": "array",
+          "description": "Extra charges shown muted under the items.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {"type": "string", "description": "e.g. \"Delivery + taxes\"."},
+              "amount": {"type": "number", "description": "Fee amount."}
+            },
+            "required": ["label", "amount"]
+          }
+        },
+        "payment": {"type": "string", "description": "How it is paid, e.g. \"UPI ending 4821\"."},
+        "title": {"type": "string", "description": "Optional card title."},
+        "currency": {"type": "string", "description": "ISO currency code. Defaults to INR."}
+      },
+      "required": ["component", "items", "payment"]
+    }
+  }
+}

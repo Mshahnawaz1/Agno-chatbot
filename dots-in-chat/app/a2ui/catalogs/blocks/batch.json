@@ -1,0 +1,27 @@
+{
+  "guide": "BatchSend(people, action?) — follow-up messages for several people at once, one row each, that the user can drop or edit before anything is sent; nothing goes out until they tap the send button. Use it for requests like 'follow up with everyone I have not spoken to'. people is a list of {name, detail?, message} where detail is how long ago, e.g. \"45 days ago\". Events: send_batch {people: [{name, message}]} with only the people still included and their edited text; dismiss_batch {} on Not now. Example: batch = BatchSend([{name: \"Priya Sharma\", detail: \"45 days ago\", message: \"Hey Priya! It's been a while.\"}, {name: \"Rahul Mehta\", detail: \"30 days ago\", message: \"Hi Rahul, how are you?\"}])",
+  "components": {
+    "BatchSend": {
+      "type": "object",
+      "description": "Follow-up messages for several people; the user removes people or edits messages, then sends the batch.",
+      "properties": {
+        "component": {"const": "BatchSend"},
+        "people": {
+          "type": "array",
+          "description": "One entry per person due a follow-up.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string", "description": "The person's name, e.g. \"Priya Sharma\"."},
+              "detail": {"type": "string", "description": "When they were last messaged, e.g. \"45 days ago\"."},
+              "message": {"type": "string", "description": "The follow-up drafted for them."}
+            },
+            "required": ["name", "message"]
+          }
+        },
+        "action": {"type": "string", "description": "The verb on the send button. Defaults to \"Send\"."}
+      },
+      "required": ["component", "people"]
+    }
+  }
+}

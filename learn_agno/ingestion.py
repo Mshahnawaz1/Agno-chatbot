@@ -12,9 +12,7 @@ from agno.knowledge.reader.pdf_reader import PDFReader
 from agno.vectordb.chroma import ChromaDb
 from agno.vectordb.search import SearchType
 from rich.pretty import pprint
-from agno.knowledge.embedder.fastembed import FastEmbedEmbedder
 
-embedder = FastEmbedEmbedder()
 
 
 import httpx
@@ -29,25 +27,27 @@ EMBEDDING_MODEL = "liquid/lfm-2.5-embedding-350m:free"
 PDF1 = "learn_agno/data/mp.pdf"
 CHROMA_DB = "learn_agno/data/chroma"
 
-# 2. Vector DB: Persistent ChromaDB instance
-vector_db = ChromaDb(
-    collection="groq_knowledge_vectors",
-    path=CHROMA_DB,
-    persistent_client=True,
-    embedder=embedder,
-    search_type=SearchType.hybrid,
-    hybrid_rrf_k=60,  # default
+def ingestion_pipeline():
+    from agno.knowledge.embedder.fastembed import FastEmbedEmbedder
+    embedder = FastEmbedEmbedder()
 
-)
+    vector_db = ChromaDb(
+        collection="groq_knowledge_vectors",
+        path=CHROMA_DB,
+        persistent_client=True,
+        embedder=embedder,
+        search_type=SearchType.hybrid,
+        hybrid_rrf_k=60,  # default
+    )
 
-# 3. Knowledge Base: Load and index your content
-knowledge = Knowledge(
-    name="System Docs Knowledge Base",
-    vector_db=vector_db,            
-)
+    # 3. Knowledge Base: Load and index your content
+    knowledge = Knowledge(
+        name="System Docs Knowledge Base",
+        vector_db=vector_db,            
+    )
+    return knowledge
 
-def ingestion():
-    # Insert documents or raw text
+def ingest_knowledge(knowledge):
     knowledge.insert(
         text_content="""
     The name of my client is Gobta pvt. ltd.
@@ -67,6 +67,9 @@ def ingestion():
         reader=pdf_reader,
         skip_if_exists=True
     )
+def ingestion():
+    knowledge = ingestion_pipeline()
+    ingest_knowledge(knowledge=knowledge)
 
     # # Check how many chunks exist in your collection
     # print("Total vectors stored:", vector_db.client.get_collection("groq_knowledge_vectors").count())

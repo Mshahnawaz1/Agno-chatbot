@@ -1,0 +1,28 @@
+{
+  "guide": "BudgetSplit(income, parts, title?, currency?) — a monthly income as a donut ring with a draggable handle on each boundary; dragging (or arrow keys) moves percent between the two neighbours, amounts recompute live in the browser. parts = [{label, percent}], 2 to 5 parts summing to 100. Use it for 'split my salary / 50-30-20 budget' questions. Sends no events; put Suggestions under it so the user's tap carries the dragged split. Example: card = BudgetSplit(80000, [{label: \"Needs\", percent: 50}, {label: \"Wants\", percent: 30}, {label: \"Savings\", percent: 20}])",
+  "components": {
+    "BudgetSplit": {
+      "type": "object",
+      "description": "An income split into parts as a donut ring with draggable boundaries.",
+      "properties": {
+        "component": {"const": "BudgetSplit"},
+        "income": {"type": "number", "description": "Monthly income to split."},
+        "parts": {
+          "type": "array",
+          "description": "2 to 5 parts whose percents sum to 100.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {"type": "string", "description": "Name of the part, e.g. Needs."},
+              "percent": {"type": "number", "description": "Share of income in percent."}
+            },
+            "required": ["label", "percent"]
+          }
+        },
+        "title": {"type": "string", "description": "Card title. Defaults to \"Monthly budget\"."},
+        "currency": {"type": "string", "description": "ISO currency code. Defaults to INR."}
+      },
+      "required": ["component", "income", "parts"]
+    }
+  }
+}

@@ -6,8 +6,8 @@
  */
 import { z } from 'zod'
 import { DynamicNumberSchema, DynamicValueSchema, WeightSchema } from '@a2ui/web_core/v1_0'
-import { createComponentImplementation } from '@a2ui/react/v0_9'
 import { ChartView } from './ChartView'
+import { implement } from './aria'
 import { weightStyle } from './props'
 
 const VegaChartApi = {
@@ -21,7 +21,7 @@ const VegaChartApi = {
     .describe('Displays a Vega or Vega-Lite chart.'),
 }
 
-export const VegaChart = createComponentImplementation(VegaChartApi, ({ props }) => (
+export const VegaChart = implement(VegaChartApi, ({ props }) => (
   <div style={weightStyle(props.weight)} className="min-w-0">
     <ChartView spec={props.spec} height={typeof props.height === 'number' ? props.height : 290} />
   </div>

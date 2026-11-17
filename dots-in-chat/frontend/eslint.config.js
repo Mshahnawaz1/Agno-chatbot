@@ -21,7 +21,7 @@ export default defineConfig([
     // A2UI catalog components are made with createComponentImplementation.
     files: ['src/features/chat/a2ui/**/*.{ts,tsx}'],
     rules: {
-      'react-refresh/only-export-components': ['error', { extraHOCs: ['createComponentImplementation'] }],
+      'react-refresh/only-export-components': ['error', { extraHOCs: ['createComponentImplementation', 'implement'] }],
     },
   },
 ])

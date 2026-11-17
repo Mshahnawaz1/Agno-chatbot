@@ -9,7 +9,7 @@ The chat catalog is the official basic catalog (v1) plus the official VegaChart 
 (catalogs/vegachart_v1.json, from a2ui-project/a2ui `catalogs/vegachart/v1/catalog.json` at
 57f961f), plus the chat blocks (catalogs/blocks/*.json): interactive templates such as a SIP
 calculator or an approval card, each of which keeps its own live state in the browser and sends
-its own events. Media and Modal are left out: the chat doesn't need them.
+its own events. Modal, Video and AudioPlayer are included (drawn with shadcn Dialog and native media elements).
 
 A block file is {"guide": "<how the model uses it>", "components": {"<Name>": <JSON schema>}};
 its guide goes into the a2ui skill (skill_build.py).
@@ -31,7 +31,8 @@ CATALOG_ID = "dots-in-chat/chat/v1"
 
 BASIC_COMPONENTS = [
     "Text", "Image", "Icon",
-    "Row", "Column", "List", "Card", "Tabs", "Divider",
+    "Row", "Column", "List", "Card", "Tabs", "Modal", "Divider",
+    "Video", "AudioPlayer",
     "Button", "TextField", "CheckBox", "ChoicePicker", "Slider", "DateTimeInput",
 ]
 

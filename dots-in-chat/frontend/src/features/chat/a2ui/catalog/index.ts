@@ -1,6 +1,6 @@
 /**
  * The catalog the chat renders: the A2UI v1.0 basic catalog's components drawn with shadcn/ui,
- * plus the official VegaChart component and the chat blocks (../blocks).
+ * plus Modal, Video and AudioPlayer (./media), the official VegaChart component and the chat blocks (../blocks).
  *
  * The id, component names and props match the server's catalog (app/a2ui/catalog.py), which
  * the agent's prompt and the server's validator are generated from: keep the two in step.
@@ -12,6 +12,7 @@ import { VegaChart } from './chart'
 import { Icon, Image, Text } from './content'
 import { Button, CheckBox, ChoicePicker, DateTimeInput, Slider, TextField } from './inputs'
 import { Card, Column, Divider, List, Row, Tabs } from './layout'
+import { AudioPlayer, Modal, Video } from './media'
 
 export const CATALOG_ID = 'dots-in-chat/chat/v1'
 
@@ -20,7 +21,7 @@ export const catalog = new Catalog<ReactCatalogComponent>(
   '1.0',
   [
     Text, Image, Icon,
-    Row, Column, List, Card, Tabs, Divider,
+    Row, Column, List, Card, Tabs, Modal, Divider, Video, AudioPlayer,
     Button, TextField, CheckBox, ChoicePicker, Slider, DateTimeInput,
     VegaChart,
     ...BLOCKS,

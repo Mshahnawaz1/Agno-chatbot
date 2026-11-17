@@ -148,6 +148,44 @@ const scenarios = {
     return { ok: !r.errors.length, notes: [`errors=${JSON.stringify(r.errors).slice(0, 200)}`] }
   },
 
+  async 'accessibility becomes aria-* on every kind of component'() {
+    await reset()
+    const a = (n) => ({ label: 'L-' + n, description: 'D-' + n })
+    const r = await apply(create(), comps([
+      { id: 'root', component: 'Column', children: ['t', 'c', 'i', 'f', 'v'], accessibility: a('col') },
+      { id: 't', component: 'Text', text: 'hi', accessibility: a('text') },
+      { id: 'c', component: 'Card', child: 't2', accessibility: a('card') },
+      { id: 't2', component: 'Text', text: 'in card' },
+      { id: 'i', component: 'Image', url: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', accessibility: a('img') },
+      { id: 'f', component: 'TextField', label: 'Name', value: { '@path': '/n' }, accessibility: a('field') },
+      { id: 'v', component: 'Video', url: 'https://example.com/v.mp4', accessibility: a('video') },
+    ]))
+    const miss = []
+    for (const n of ['col', 'text', 'card', 'img', 'field', 'video']) {
+      const ok = await page.evaluate((n) => !!document.querySelector(`[aria-label="L-${n}"][aria-description="D-${n}"]`), n)
+      if (!ok) miss.push(n)
+    }
+    return { ok: !r.errors.length && !miss.length, notes: [`errors=${JSON.stringify(r.errors)} missing aria on: ${JSON.stringify(miss)}`] }
+  },
+
+  async 'Modal opens its content; Video and AudioPlayer draw media elements'() {
+    await reset()
+    const r = await apply(create(), comps([
+      { id: 'root', component: 'Column', children: ['m', 'v', 'au'] },
+      { id: 'm', component: 'Modal', trigger: 'b', content: 'body' },
+      { id: 'b', component: 'Button', child: 'bt', action: { event: { name: 'x' } } },
+      { id: 'bt', component: 'Text', text: 'Open it' },
+      { id: 'body', component: 'Text', text: 'Inside the modal' },
+      { id: 'v', component: 'Video', url: 'https://example.com/v.mp4', posterUrl: 'https://example.com/p.jpg' },
+      { id: 'au', component: 'AudioPlayer', url: 'https://example.com/a.mp3', description: 'Episode 1' },
+    ]))
+    const before = (await text()).includes('Inside the modal')
+    await page.getByText('Open it').click()
+    const after = (await text()).includes('Inside the modal')
+    const media = await page.evaluate(() => [document.querySelectorAll('video[controls]').length, document.querySelectorAll('audio[controls]').length])
+    return { ok: !r.errors.length && !before && after && media[0] === 1 && media[1] === 1, notes: [`errors=${JSON.stringify(r.errors)} content before click=${before} after=${after} video,audio=${media}`] }
+  },
+
   async 'template list from a data array'() {
     await reset()
     const r = await apply(create({ dataModel: { people: [{ n: 'Ann' }, { n: 'Bob' }, { n: 'Cy' }] } }), comps([
@@ -174,8 +212,9 @@ const scenarios = {
 
   async '@index with offset (formatString and direct call forms)'() {
     const forms = {
-      'formatString ${@index(offset: 1)}': { '@call': 'formatString', args: { value: '${@index(offset: 1)}. ${n}' } },
-      'formatString ${@index(1)}': { '@call': 'formatString', args: { value: '${@index(1)}. ${n}' } },
+      'formatString ${@index(offset: 1)}': { '@call': 'formatString', args: { value: 'No. ${@index(offset: 1)} ${n}' } },
+      // Not valid upstream: the expression parser takes named arguments only; renders empty (documented, not fixable here).
+      'formatString ${@index(1)}': { '@call': 'formatString', args: { value: 'No. ${@index(1)} ${n}' } },
       'direct call args.offset': { '@call': '@index', args: { offset: 1 } },
       'direct call, no offset': { '@call': '@index' },
     }
@@ -188,10 +227,10 @@ const scenarios = {
         { id: 'row', component: 'Text', text: textValue },
       ]))
       const t = (await text()).trim().replace(/\n+/g, ' | ')
-      const want = label.includes('no offset') ? /0[\s\S]*1/ : /1\. Ann[\s\S]*2\. Bob|^1[\s\S]*2/
+      const want = label.includes('no offset') ? /0[\s\S]*1/ : label.includes('offset: 1') ? /No\. 1 Ann[\s\S]*No\. 2 Bob/ : /1[\s\S]*2/
       const good = !r.errors.length && want.test(t)
       notes.push(`${good ? 'ok  ' : 'FAIL'} ${label}: text=${JSON.stringify(t)} errors=${JSON.stringify(r.errors).slice(0, 120)}`)
-      if (!good && label.startsWith('direct')) ok = false  // string interpolation forms are reported, not required
+      if (!good && !label.includes('${@index(1)}')) ok = false  // the positional form is invalid upstream: reported, not required
     }
     return { ok, notes }
   },

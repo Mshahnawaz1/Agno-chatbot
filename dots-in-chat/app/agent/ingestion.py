@@ -1,7 +1,7 @@
 
 """
 Run:
-python3 app/ingestion.py
+python3 -m app.agent.ingestion
 """
 from agno.knowledge.knowledge import Knowledge
 from agno.knowledge.embedder.openai import OpenAIEmbedder

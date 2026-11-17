@@ -152,6 +152,19 @@ class LazyLoadTest(unittest.TestCase):
         fresh = asyncio.run(skills.get_skill_instructions("a2ui", ctx("next-run"), paths=[]))
         self.assertIn("## Match the request", fresh)  # a new run loads it again
 
+    def test_explain_visually_is_routed(self):
+        """Live run 2026-11-17: "explain CNN visually" got ASCII art until the table had this row."""
+        skill = (SKILL_DIR / "SKILL.md").read_text()
+        self.assertIn("references/explain-visually.md", skill)
+        self.assertTrue((SKILL_DIR / "references" / "explain-visually.md").is_file())
+        self.assertIn("Mermaid", skill)
+
+    def test_failure_message_never_leaks_a_repr(self):
+        from app.routers.chat import failure_message
+        raw = "<bound method ClientResponse.text of <ClientResponse(https://x) [503]>\n<CIMultiDictProxy('Vary': 'Origin')>>"
+        self.assertNotIn("<", failure_message(raw))
+        self.assertEqual(failure_message("boom"), "Generation failed. Error boom")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -34,6 +34,15 @@ REPAIR_ATTEMPTS = 2  # the A2UI docs' validate-and-retry loop uses 2 retries
 GUARDRAIL_ERRORS = {"input_check_error", "output_check_error"}
 
 
+def failure_message(error: object) -> str:
+    """What the user sees when a run fails: a short sentence, never a provider's repr (it can hold
+    response headers); the full error is in the log."""
+    text = " ".join(str(error).split())
+    if "<" in text or len(text) > 160:  # an object repr or a raw provider payload
+        return "Generation failed: the model is overloaded or out of quota. Please try again in a moment."
+    return f"Generation failed. Error {text}"
+
+
 def make_title(text: str, limit: int = 40) -> str:
     text = " ".join(text.split())
     if len(text) <= limit:
@@ -129,7 +138,7 @@ async def model_pass(
             if error_type in GUARDRAIL_ERRORS:
                 yield sse("guardrail_error", {"message": str(event.content), "type": error_type})
             else:
-                yield sse("error", {"message": f"Generation failed. Error {event.content}"})
+                yield sse("error", {"message": failure_message(event.content)})
             return
         if event.event == RunEvent.run_content:
             run["run_id"] = run.get("run_id") or event.run_id
@@ -277,7 +286,7 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
             yield sse("done", {"run_id": run["run_id"]})
         except Exception as e:
             logger.exception("stream failed")
-            yield sse("error", {"message": f"Generation failed. Error {e}"})
+            yield sse("error", {"message": failure_message(e)})
         finally:
             rpc.close_stream(session["id"])
             turn.save(run["run_id"])

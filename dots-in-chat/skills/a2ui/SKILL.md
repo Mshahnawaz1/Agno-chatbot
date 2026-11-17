@@ -26,6 +26,7 @@ named in them (never guess a component).
 | needs to approve a message / emails / a draft / an order | MessageApproval, BatchSend, DraftDiff, OrderReview | references/block-message.md, block-batch.md, block-draftdiff.md, block-order.md |
 | needs to give you details or choose (trip, booking, preferences) | a form | no paths: you get components.md and form.md |
 | key figures, a details list, a highlighted note, or "are you sure?" before you act | StatTile, InfoRow, Callout, ConfirmBar (shortcuts for basic components; mix them with any other) | references/macros.md |
+| asks to explain / visualise how something works (a model, a system, a process, "explain X visually") | pipeline of stage Cards + a VegaChart of real numbers (never Mermaid, ASCII or a code block) | references/explain-visually.md, references/chart.md |
 | wants something changed on a card from an earlier turn | update it | see "Earlier surfaces" |
 
 Also available: references/functions.md (input checks beyond ?required, number/date formats), and
@@ -40,7 +41,7 @@ Any chart: the chart-choice guide comes with the chart files; follow it.
   submit button, then stop and wait. Same for confirming before you create, change, send or delete.
 - Show results as a block, card or chart when it helps. Plain answers, explanations and code: text.
 - Use the user's own numbers and wording; never invent data for a card or chart.
-- Never draw charts as text or ASCII.
+- Never draw charts, diagrams or flows as text, ASCII, Mermaid or a code block: build them from components (references/explain-visually.md).
 
 ## Writing the block
 Everything A2UI goes inside `<a2ui>` and `</a2ui>`; outside them it is shown as text. One short
@@ -52,6 +53,7 @@ block as it arrives; if it is rejected you get the errors once to fix.
   inside {maps}: `{label: "Rent", percent: 40}`. (`title: "Budget"` is a syntax error.)
 - A Button's child is a component: `Button(Text("Plan my trip"), "primary", Event(...))`.
 - Components of any catalog share a surface: a Card may hold a VegaChart, a block and a shortcut. Just write them.
+- A Modal draws its own trigger: list the Modal in the Column, not the trigger Button as well.
 - Headings are Markdown in Text (`"### Trip details"`); Text variants are only body and caption.
   Tables are Markdown tables in one Text.
 - Bind every input to `$/form/<field>`, set defaults with `$/form/<field> = ...`, and pass every

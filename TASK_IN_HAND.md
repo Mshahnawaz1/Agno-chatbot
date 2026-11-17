@@ -509,6 +509,22 @@ Results:
   legacy catalog) for the component-name hint; switch it to `CATALOGS` when the streaming track lands.
 - (other tracks: fill in)
 
+### Phase 12 Results: live scenarios with the real model (2026-11-17, branch feat/a2ui-full)
+Setup: uvicorn + vite, throwaway DBs (APP_DB_PATH/AGNO_DB_PATH in scratchpad), throwaway user, SSE driver + Playwright (chromium-1248). ~17 chats; Gemini answered 503/504 several times (overload, not quota) and Groq hit its 8k TPM, never a 429 daily quota on Gemini.
+| # | Scenario | Result | What the model emitted |
+|---|---|---|---|
+| 1 | explain CNN visually | PASS after fix | Before: text + ASCII box diagram + invented ChartSwitcher data. After routing row + `references/explain-visually.md`: surface `cnn_visual` = Card, Row of 5 stage Cards (Icon/Text), VegaChart with real layer sizes, Suggestions; rendered in browser, no console errors |
+| 2 | form + sendDataModel + follow-up | PASS | form surface (no submit button) with sendDataModel; after typing "Goa" + 3 days in the browser, the next typed question carried `a2uiRendererDataModel {"trip_plan":{"form":{"destination":"Goa","days":["3"]}}}` and the agent answered "Goa ... 3 days" |
+| 3 | macros | PASS | StatTile x2, Callout(warning), ConfirmBar (Move Money / Cancel) + Suggestions, all rendered |
+| 4 | mixed catalogs | PASS | Card+Column with VegaChart (scatter) + GrowthCalculator (blocks) + Text: 3 catalogIds on one surface; also basic + ChartSwitcher + BudgetSplit |
+| 5 | clientInfo RPC | PASS | tool call_renderer_function, browser (Pacific/Auckland, en-NZ) answered via /chat/rpc, agent said "Pacific/Auckland ... 2:30:45 AM NZDT" |
+| 6 | invalid block -> repair | PASS | (a) `Gauge(70,"CPU")`: server a2ui_error "Unknown function Gauge", a2ui_repair attempt 1, corrected VegaChart gauge. (b) simulated renderer `error` (VALIDATION_FAILED) via errors body: hidden turn re-sent corrected cpu_gauge components. Not covered: an error produced by a real browser validation failure |
+| 7 | Modal / Video / AudioPlayer | PASS | Video (mp4 loaded, 5 s), AudioPlayer, Modal opened as a dialog on click. Model quirk: it listed the Button trigger and the Modal in the Column, so two "Terms" buttons; skill line added |
+| 8 | progressive render | PASS (weak evidence) | SSE: a2ui messages for cnn_visual arrive 3.17 s ... 4.43 s, the VegaChart 0.6 s after the cards, run done at 4.46 s; i.e. components arrive before the stream ends. Deterministic proof stays in test_a2ui_progressive |
+| 9 | delete chat + LLM title | PASS | deleted the top chat in the sidebar (10 -> 9); new chat "Why is the sky blue..." got the title "Rayleigh scattering and sunset" |
+Bugs found/fixed: (1) no routing for "explain visually": added SKILL.md row + `references/explain-visually.md` (verified recipe, compiled by skill_check) + test; (2) run failure message leaked a provider repr with response headers to the user: `failure_message()` in routers/chat.py now sends a short sentence (logged in full) + test; (3) Modal trigger listed twice by the model: skill line; (4) first CNN recipe with arrows wrapped badly in the Row: removed arrows, numbered "Step n:".
+Unverified: a renderer error raised by a real browser validation failure; Groq fallback path (Groq 8k TPM too small for the 14k-token prompt, so fallback cannot answer; not changed).
+
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and
   the lost shadcn catalog are replaced.

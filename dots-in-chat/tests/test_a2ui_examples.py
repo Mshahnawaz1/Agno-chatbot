@@ -6,7 +6,8 @@ Run from dots-in-chat/:
 Server side = the chat catalog (app/a2ui/catalog.py) validating the messages: a fresh
 renderer state per example, `state.apply(messages)`. Fixtures are copies of the upstream examples
 (a2ui-project/a2ui `catalogs/basic/v1/examples`, commit 57f961f), in tests/fixtures/a2ui_examples/.
-The chat registers one catalog, so each createSurface's catalogId is rewritten to CATALOG_ID.
+Each createSurface's catalogId is rewritten to the pre-mixed-catalog merged id and upgraded (upgrade_message),
+the way stored surfaces are: components then carry their own catalogId.
 
 Known gaps (tests/fixtures/known_gaps.json, "server") are asserted to STILL fail: when one is fixed,
 the test fails and the entry must be deleted. The renderer side of the same replay is
@@ -22,7 +23,7 @@ from pathlib import Path
 os.environ.setdefault("JWT_SECRET", "test-only")  # app.config needs these to import
 os.environ.setdefault("CONNECTOR_SECRET", "test-only")
 
-from app.a2ui.catalog import CATALOG_ID, new_processor  # noqa: E402
+from app.a2ui.catalog import BASIC_ID, CATALOG_ID, new_processor, upgrade_message  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures"
 EXAMPLES = sorted((FIXTURES / "a2ui_examples").glob("*.json"))
@@ -34,7 +35,7 @@ def load(path: Path) -> list[dict]:
     for m in messages:
         if "createSurface" in m:
             m["createSurface"]["catalogId"] = CATALOG_ID
-    return messages
+    return [upgrade_message(m) for m in messages]
 
 
 def normalize_checks(node):

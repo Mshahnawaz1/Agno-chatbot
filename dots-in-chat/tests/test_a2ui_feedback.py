@@ -184,6 +184,13 @@ class SendDataModelTest(unittest.TestCase):
         self.assertIn("larger", body["detail"])
 
 
+FRONTEND_IDS = [
+    'https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json',
+    'https://a2ui.org/specification/v1_0/catalogs/vegachart/catalog.json',
+    'dots-in-chat/blocks/v1',
+]  # the real frontend catalogs (catalog/index.ts); checked below
+
+
 def caps(*ids, **extra):
     return {"1.0": {"supportedCatalogIds": list(ids), **extra}}
 
@@ -210,7 +217,7 @@ class CapabilitiesTest(unittest.TestCase):
         self.h.close()
 
     def test_the_processor_is_negotiated_with_what_the_client_sent(self):
-        sent = caps("some/other/catalog", self.catalog.CATALOG_ID)
+        sent = caps("some/other/catalog", *FRONTEND_IDS)
         self.h.agent.replies = ["Hi."]
         events = self.h.post({"message": "hi", "a2uiRendererCapabilities": sent})
         self.assertEqual(events[-1][0], "done")
@@ -233,15 +240,16 @@ class CapabilitiesTest(unittest.TestCase):
         self.assertEqual(self.h.agent.inputs, [])
 
     def test_a_malformed_inline_catalog_is_refused(self):
-        bad = caps(self.catalog.CATALOG_ID, inlineCatalogs=[{"oops": 1}])
+        bad = caps(*FRONTEND_IDS, inlineCatalogs=[{"oops": 1}])
         self.h.post({"message": "hi", "a2uiRendererCapabilities": bad}, status=400)
 
-    def test_the_frontend_catalog_id_is_the_one_the_server_serves(self):
+    def test_the_frontend_catalog_ids_are_the_ones_the_server_serves(self):
         import re
         from pathlib import Path
 
         ts = (Path(__file__).parents[1] / "frontend/src/features/chat/a2ui/catalog/index.ts").read_text()
-        self.assertEqual(re.search(r"CATALOG_ID = '([^']+)'", ts).group(1), self.catalog.CATALOG_ID)
+        ids = [re.search(rf"export const {n} = '([^']+)'", ts).group(1) for n in ("BASIC_ID", "VEGA_ID", "BLOCKS_ID")]
+        self.assertEqual(ids, self.catalog.CATALOG_IDS)
 
     def test_a_refused_handshake_does_not_create_a_chat(self):
         from app import db

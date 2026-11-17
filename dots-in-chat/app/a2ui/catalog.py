@@ -128,7 +128,21 @@ CATALOG = _merged_catalog()
 COMPONENT_CATALOG = {name: cat.catalog_id for cat in RENDERER_CATALOGS for name in cat.components}
 
 
+def _tag_calls(node):
+    """Every function call (`{"call": ...}` / `{"@call": ...}`) names its catalog; the functions are the basic catalog's."""
+    if isinstance(node, dict):
+        out = {k: _tag_calls(v) for k, v in node.items()}
+        name = str(out.get("@call") or out.get("call") or "")
+        if name and not name.startswith("@") and "catalogId" not in out:  # system functions (@index) name no catalog
+            out["catalogId"] = BASIC_ID
+        return out
+    if isinstance(node, list):
+        return [_tag_calls(v) for v in node]
+    return node
+
+
 def _tag(component: dict) -> dict:
+    component = _tag_calls(component)
     cid = COMPONENT_CATALOG.get(component.get("component"))
     return {**component, "catalogId": cid} if cid and "catalogId" not in component else component
 
@@ -143,7 +157,8 @@ def upgrade_message(message: dict) -> dict:
     body = message.get("createSurface")
     if isinstance(body, dict) and body.get("catalogId") == CATALOG_ID:
         body = {k: v for k, v in body.items() if k != "catalogId"}
-        body["components"] = [_tag(c) for c in body.get("components", [])]
+        if "components" in body:  # an empty list is invalid; the official examples send them in updateComponents
+            body["components"] = [_tag(c) for c in body["components"]]
         return {**message, "createSurface": body}
     body = message.get("updateComponents")
     if isinstance(body, dict):

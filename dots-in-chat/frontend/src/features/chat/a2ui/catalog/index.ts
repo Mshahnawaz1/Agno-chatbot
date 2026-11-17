@@ -45,8 +45,21 @@ type Wire = Record<string, unknown>
 
 /** The component with the catalog it is from, unless it already names one. */
 export function tagComponent(c: Wire): Wire {
-  const id = catalogOf.get(String(c.component))
-  return id && !('catalogId' in c) ? { ...c, catalogId: id } : c
+  const tagged = tagCalls(c) as Wire
+  const id = catalogOf.get(String(tagged.component))
+  return id && !('catalogId' in tagged) ? { ...tagged, catalogId: id } : tagged
+}
+
+/** Every function call (`call` / `@call`) names its catalog, except system functions; the functions are the basic catalog's. */
+function tagCalls(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(tagCalls)
+  if (node && typeof node === 'object') {
+    const out = Object.fromEntries(Object.entries(node).map(([k, v]) => [k, tagCalls(v)])) as Wire
+    const name = String(out['@call'] ?? out.call ?? '')
+    // system functions (@index, ...) belong to no catalog and must not name one
+    return name && !name.startsWith('@') && !('catalogId' in out) ? { ...out, catalogId: BASIC_ID } : out
+  }
+  return node
 }
 
 /**
@@ -59,7 +72,9 @@ export function upgradeMessage<T extends Wire>(message: T): T {
   const create = message.createSurface as Wire | undefined
   if (create && create.catalogId === LEGACY_ID) {
     const rest = Object.fromEntries(Object.entries(create).filter(([k]) => k !== 'catalogId'))
-    return { ...message, createSurface: { ...rest, components: ((create.components as Wire[]) ?? []).map(tagComponent) } }
+    // an empty components list is invalid: the official examples send theirs in updateComponents
+    const components = create.components as Wire[] | undefined
+    return { ...message, createSurface: components ? { ...rest, components: components.map(tagComponent) } : rest }
   }
   const update = message.updateComponents as Wire | undefined
   if (update) return { ...message, updateComponents: { ...update, components: ((update.components as Wire[]) ?? []).map(tagComponent) } }

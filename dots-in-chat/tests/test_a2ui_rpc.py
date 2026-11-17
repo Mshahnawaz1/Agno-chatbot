@@ -12,7 +12,7 @@ import unittest
 from agno.run import RunContext
 
 from app.a2ui import rpc
-from app.a2ui.catalog import CATALOG_ID
+from app.a2ui.catalog import BASIC_ID
 from tests.a2ui_http import Harness, a2ui_kinds, sse_events
 
 
@@ -23,7 +23,7 @@ def response(call_id, **kw):
 def agent_call(name, args=None, call_id="f1", surface="s1"):
     return {"version": "1.0", "callAgentFunction": {
         "surfaceId": surface, "functionCallId": call_id,
-        "callFunction": {"@call": name, "catalogId": CATALOG_ID, "args": args or {}},
+        "callFunction": {"@call": name, "catalogId": BASIC_ID, "args": args or {}},
     }}
 
 
@@ -92,7 +92,7 @@ class AgentCallsRendererTest(unittest.TestCase):
         calls = [d["message"] for n, d in events if n == "a2ui_rpc"]
         self.assertEqual(len(calls), 1)
         fn = calls[0]["callRendererFunction"]
-        self.assertEqual(fn["callFunction"], {"@call": "clientInfo", "catalogId": CATALOG_ID, "args": {}})
+        self.assertEqual(fn["callFunction"], {"@call": "clientInfo", "catalogId": BASIC_ID, "args": {}})
         self.assertTrue(fn["functionCallId"])
         self.assertNotIn("callRendererFunction", a2ui_kinds(events), "the call is not a surface message: it is never stored")
         self.assertEqual(events[-1][0], "done")

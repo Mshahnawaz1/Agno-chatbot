@@ -23,7 +23,7 @@ import unittest
 os.environ.setdefault("JWT_SECRET", "test-only")
 os.environ.setdefault("CONNECTOR_SECRET", "test-only")
 
-from app.a2ui.catalog import CATALOG_ID, new_processor  # noqa: E402
+from app.a2ui.catalog import BASIC_ID, new_processor  # noqa: E402
 from app.a2ui.turn import A2uiTurn  # noqa: E402
 from tests.test_a2ui import new_session, run_reply  # noqa: E402
 
@@ -52,8 +52,8 @@ class InlineSurfaceTest(unittest.TestCase):
         state.apply([{
             "version": "1.0",
             "createSurface": {
-                "surfaceId": "s", "catalogId": CATALOG_ID,
-                "components": [{"id": "root", "component": "Text", "text": {"@path": "/x"}}],
+                "surfaceId": "s",
+                "components": [{"id": "root", "component": "Text", "catalogId": BASIC_ID, "text": {"@path": "/x"}}],
                 "dataModel": {"x": "hi"},
             },
         }])
@@ -73,9 +73,8 @@ class ProgressiveTest(unittest.TestCase):
         'a = Text("first")\nb = Text("second")\nc = Text("third")\n</a2ui>\ntail text'
     )
 
-    def test_events_arrive_only_when_the_block_ends(self):
-        """A2uiTurn holds a block's messages until `</a2ui>` (Phase 11: a block is all-or-nothing).
-        So the user sees the surface at once, not component by component: PARTIAL (track 12.D)."""
+    def test_events_arrive_before_the_block_ends(self):
+        """Progressive streaming (12.D): the first a2ui event leaves while the block is still being written."""
         turn = A2uiTurn(new_session())
         turn.start_pass()
         first_a2ui_at = None
@@ -85,9 +84,8 @@ class ProgressiveTest(unittest.TestCase):
                 first_a2ui_at = i
         turn.close()
         self.assertIsNotNone(first_a2ui_at)
-        self.assertGreaterEqual(first_a2ui_at, self.REPLY.index("</a2ui>"))
+        self.assertLess(first_a2ui_at, self.REPLY.index("</a2ui>"))
 
-    @unittest.expectedFailure
     def test_first_components_are_sent_before_the_block_ends(self):
         turn = A2uiTurn(new_session())
         turn.start_pass()
@@ -141,9 +139,9 @@ class ChecksTest(unittest.TestCase):
     def test_spec_spelling_at_checks_is_accepted(self):
         state = new_processor().create_state()
         state.apply([
-            {"version": "1.0", "createSurface": {"surfaceId": "s", "catalogId": CATALOG_ID}},
+            {"version": "1.0", "createSurface": {"surfaceId": "s"}},
             {"version": "1.0", "updateComponents": {"surfaceId": "s", "components": [
-                {"id": "root", "component": "TextField", "label": "E", "value": {"@path": "/e"},
+                {"id": "root", "component": "TextField", "catalogId": BASIC_ID, "label": "E", "value": {"@path": "/e"},
                  "@checks": [{"condition": {"@call": "required", "args": {"value": {"@path": "/e"}}}, "message": "m"}]},
             ]}},
         ])
@@ -159,9 +157,9 @@ class AccessibilityTest(unittest.TestCase):
         """The wire format takes `accessibility`; only the Express compiler's Button signature omits it."""
         state = new_processor().create_state()
         state.apply([
-            {"version": "1.0", "createSurface": {"surfaceId": "s", "catalogId": CATALOG_ID, "components": [
-                {"id": "t", "component": "Text", "text": "Go"},
-                {"id": "root", "component": "Button", "child": "t", "action": {"event": {"name": "go"}},
+            {"version": "1.0", "createSurface": {"surfaceId": "s", "components": [
+                {"id": "t", "component": "Text", "catalogId": BASIC_ID, "text": "Go"},
+                {"id": "root", "component": "Button", "catalogId": BASIC_ID, "child": "t", "action": {"event": {"name": "go"}},
                  "accessibility": {"label": "Go now"}},
             ]}},
         ])

@@ -26,7 +26,7 @@ from agno.run import RunContext
 from agno.tools import tool
 from pydantic import ValidationError
 
-from app.a2ui.catalog import CATALOG, CATALOG_ID
+from app.a2ui.catalog import BASIC_ID, RENDERER_CATALOGS
 from app.a2ui.feedback import InvalidError
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ RESULT_PREFIX = "Renderer function result: "
 
 class _Chat:
     def __init__(self) -> None:
-        self.calls = RendererFunctionCalls(default_timeout=CALL_TIMEOUT, max_pending=4, catalogs=[CATALOG])
+        self.calls = RendererFunctionCalls(default_timeout=CALL_TIMEOUT, max_pending=4, catalogs=RENDERER_CATALOGS)
         self.outbox: asyncio.Queue | None = None  # the open stream's queue of (event, data)
 
 
@@ -68,7 +68,7 @@ async def call_renderer(session_id: str, name: str, args: dict[str, Any] | None 
     chat = _chat(session_id)
     if chat.outbox is None:
         raise A2uiRpcError("No browser is connected to this chat.", code="NO_RENDERER")
-    message, result = chat.calls.call(catalog_id=CATALOG_ID, name=name, args=args, surface_id=surface_id)
+    message, result = chat.calls.call(catalog_id=BASIC_ID, name=name, args=args, surface_id=surface_id)
     chat.outbox.put_nowait(("a2ui_rpc", {"message": message.model_dump(by_alias=True, exclude_unset=True)}))
     return await result
 
@@ -81,7 +81,7 @@ async def handle(session_id: str, message: dict[str, Any]) -> dict[str, Any]:
     """
     chat = _chat(session_id)
     processor = RendererToAgentMessageProcessor(
-        [CATALOG],
+        RENDERER_CATALOGS,
         agent_function_timeout=AGENT_FUNCTION_TIMEOUT,
         on_renderer_function_response=chat.calls.resolve,
     )

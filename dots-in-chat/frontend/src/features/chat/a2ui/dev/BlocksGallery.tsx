@@ -11,7 +11,7 @@ import type { ReactCatalogComponent } from '@a2ui/react/v0_9'
 import '@fontsource/poppins/400.css'
 import '@fontsource/poppins/500.css'
 import '@fontsource/poppins/600.css'
-import { catalog, CATALOG_ID } from '../catalog'
+import { catalogs, LEGACY_ID, tagComponent, upgradeMessage } from '../catalog'
 import '../a2ui.css'
 import type { Sample } from './sample'
 import { blockSchemas } from './schemas'
@@ -22,9 +22,11 @@ const SAMPLES = Object.values(files).flatMap((f) => f.samples)
 function SampleView({ sample }: { sample: Sample }) {
   const [log, setLog] = useState<ActionPayload[]>([])
   const processor = useMemo(() => {
-    const p = new MessageProcessor<ReactCatalogComponent>([catalog], (a) => setLog((l) => [...l, a]))
+    const p = new MessageProcessor<ReactCatalogComponent>(catalogs, (a) => setLog((l) => [...l, a]))
     const errors = p.processMessagesWithErrors([
-      { version: '1.0', createSurface: { surfaceId: sample.id, catalogId: CATALOG_ID, components: sample.components } },
+      sample.legacy
+        ? upgradeMessage({ version: '1.0', createSurface: { surfaceId: sample.id, catalogId: LEGACY_ID, components: sample.components } })
+        : { version: '1.0', createSurface: { surfaceId: sample.id, components: sample.components.map(tagComponent) } },
       ...(sample.data ? [{ version: '1.0', updateDataModel: { surfaceId: sample.id, path: '/', value: sample.data } }] : []),
     ] as never)
     if (errors.length) console.warn(sample.id, errors)
@@ -34,7 +36,7 @@ function SampleView({ sample }: { sample: Sample }) {
   const surface = processor.getSurface(sample.id)
   const applyUpdate = () => {
     processor.processMessages([
-      { version: '1.0', updateComponents: { surfaceId: sample.id, components: sample.update } },
+      { version: '1.0', updateComponents: { surfaceId: sample.id, components: sample.update?.map(tagComponent) } },
     ] as never)
     setUpdated(true)
   }

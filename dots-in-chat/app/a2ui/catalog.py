@@ -22,22 +22,18 @@ from a2ui.core.basic_catalog import BasicCatalog
 from a2ui.core.catalog.catalog import Catalog
 from a2ui.core.schema import ProtocolVersion
 from a2ui.inference_formats import ExpressFormatFactory
+from a2ui.parser import A2uiPart
 from a2ui.processor import A2uiGenerator, A2uiRequestProcessor, CatalogConfig
 
 from app.a2ui import capabilities
 from app.a2ui.functions import with_rpc_functions
+from app.a2ui import macros
 
 PROTOCOL_VERSION = "1.0"
 
 # Our own id: the catalog is a derived one, not the basic catalog.
 CATALOG_ID = "dots-in-chat/chat/v1"
 
-BASIC_COMPONENTS = [
-    "Text", "Image", "Icon",
-    "Row", "Column", "List", "Card", "Tabs", "Modal", "Divider",
-    "Video", "AudioPlayer",
-    "Button", "TextField", "CheckBox", "ChoicePicker", "Slider", "DateTimeInput",
-]
 
 # Catalog-level instructions go into the generated prompt under "Catalog Instructions".
 INSTRUCTIONS = """VegaChart draws a Vega-Lite v5 chart from `spec` (a JSON object). Use it for any chart,
@@ -90,36 +86,126 @@ def _catalog_doc(catalog_id: str, components: dict) -> dict:
     }
 
 
-def _chat_catalog() -> Catalog:
-    basic = BasicCatalog(ProtocolVersion.V1_0)
-    vega = Catalog.from_json(json.loads((CATALOGS_DIR / "vegachart_v1.json").read_text()))
-    blocks = Catalog.from_json(_catalog_doc("dots-in-chat/blocks/v1", BLOCK_COMPONENTS))
-    return basic.derive(
+BASIC = with_rpc_functions(BasicCatalog(ProtocolVersion.V1_0))  # + clientInfo / serverTime (functions.py)
+BASIC_ID = BASIC.catalog_id
+BASIC_COMPONENTS = list(BASIC.components)
+# The official VegaChart catalog, with this app's usage notes as its instructions.
+VEGA = Catalog.from_json(json.loads((CATALOGS_DIR / "vegachart_v1.json").read_text()))
+VEGA = VEGA.derive(catalog_id=VEGA.catalog_id, instructions=INSTRUCTIONS)
+VEGA_ID = VEGA.catalog_id
+BLOCKS_ID = "dots-in-chat/blocks/v1"
+BLOCKS = Catalog.from_json(_catalog_doc(BLOCKS_ID, BLOCK_COMPONENTS))
+
+# Every catalog the chat renders, each under its own id. A surface has no catalog of its own:
+# each component names the catalog it is from (`catalogId` on the wire), so one card can mix
+# a basic Column, a VegaChart and a chat block.
+RENDERER_CATALOGS = [BASIC, VEGA, BLOCKS]
+CATALOG_IDS = [c.catalog_id for c in RENDERER_CATALOGS]
+
+# The catalogs the model writes in: the renderer's, plus the macros (macros.py), which exist only
+# on the server. `lower` expands macro calls into basic components before the client sees them.
+EXPANDER = macros.new_expander()
+CATALOGS = EXPANDER.transform_catalogs(RENDERER_CATALOGS)
+CATALOGS[-1] = CATALOGS[-1].derive(catalog_id=macros.MACROS_ID, instructions=macros.INSTRUCTIONS)
+MACRO_CATALOG = CATALOGS[-1]
+MODEL_CATALOG_IDS = [c.catalog_id for c in CATALOGS]
+
+
+def _merged_catalog() -> Catalog:
+    """All components under CATALOG_ID, the one catalog the chat had before mixed catalogs.
+
+    Surfaces stored back then name this id in createSurface; the client still renders it and
+    `upgrade_message` rewrites them for the server. It also lists the component names
+    (turn.py) and validates renderer messages (actions.py).
+    """
+    return BASIC.derive(
         catalog_id=CATALOG_ID,
-        components=[
-            *BASIC_COMPONENTS,
-            vega.components["VegaChart"],
-            *(blocks.components[name] for name in BLOCK_COMPONENTS),
-        ],
-        instructions=INSTRUCTIONS,
+        components=[*BASIC.components.values(), *VEGA.components.values(), *BLOCKS.components.values()],
     )
 
 
-CATALOG = with_rpc_functions(_chat_catalog())  # + the RPC functions (functions.py)
+CATALOG = _merged_catalog()
+COMPONENT_CATALOG = {name: cat.catalog_id for cat in RENDERER_CATALOGS for name in cat.components}
 
-# What a request without a capabilities handshake gets (see capabilities.py): the chat catalog.
-CAPABILITIES = {PROTOCOL_VERSION: {"supportedCatalogIds": [CATALOG_ID]}}
+
+def _tag(component: dict) -> dict:
+    cid = COMPONENT_CATALOG.get(component.get("component"))
+    return {**component, "catalogId": cid} if cid and "catalogId" not in component else component
+
+
+def upgrade_message(message: dict) -> dict:
+    """A stored surface message from before mixed catalogs, in today's shape.
+
+    `createSurface` named the one merged catalog; now it names none and each component names
+    its own. `updateComponents` of those turns named none at all. Anything else passes
+    through unchanged.
+    """
+    body = message.get("createSurface")
+    if isinstance(body, dict) and body.get("catalogId") == CATALOG_ID:
+        body = {k: v for k, v in body.items() if k != "catalogId"}
+        body["components"] = [_tag(c) for c in body.get("components", [])]
+        return {**message, "createSurface": body}
+    body = message.get("updateComponents")
+    if isinstance(body, dict):
+        return {**message, "updateComponents": {**body, "components": [_tag(c) for c in body.get("components", [])]}}
+    return message
+
 
 GENERATOR = A2uiGenerator(
-    catalogs=[CatalogConfig(catalog=CATALOG)],
+    catalogs=[CatalogConfig(catalog=c) for c in CATALOGS],
     inference_format_factory=ExpressFormatFactory(),
 )
 
+# Every request has the same capabilities: the renderer's catalogs and the macros.
+CAPABILITIES = {PROTOCOL_VERSION: {"supportedCatalogIds": MODEL_CATALOG_IDS}}
 
-def new_processor() -> A2uiRequestProcessor:
+
+class _LoweringStream:
+    """A response stream whose compiled messages have their macro calls expanded.
+
+    The SDK stream applies each message to the renderer state as the model wrote it (macro
+    calls in it), which is what the model reads back on update; what leaves it, and so what
+    the client shows and the store keeps, is the lowered form.
+    """
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def _lowered(self, parts):
+        return [A2uiPart(macros.lower_with_source(EXPANDER, p.a2ui)) if isinstance(p, A2uiPart) else p for p in parts]
+
+    def feed(self, chunk):
+        return self._lowered(self._stream.feed(chunk))
+
+    def close(self):
+        return self._lowered(self._stream.close())
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+class _LoweringProcessor:
+    """The SDK request processor, with `open_stream` lowering macros. Everything else is the SDK's."""
+
+    def __init__(self, processor: A2uiRequestProcessor):
+        self._processor = processor
+
+    def open_stream(self, *args, **kwargs):
+        return _LoweringStream(self._processor.open_stream(*args, **kwargs))
+
+    def __getattr__(self, name):
+        return getattr(self._processor, name)
+
+
+def new_processor() -> _LoweringProcessor:
     """A processor for one request: compiles replies and makes renderer states. It is bound to
-    the capabilities the renderer sent (capabilities.use), else to CAPABILITIES."""
-    return GENERATOR.create_processor(capabilities.current() or CAPABILITIES)
+    the capabilities the renderer sent (capabilities.use), else to CAPABILITIES. The macros exist
+    only on the server, so their catalog is always added to what the renderer reports."""
+    sent = capabilities.current()
+    if sent:
+        ids = sent.get(PROTOCOL_VERSION, {}).get("supportedCatalogIds", [])
+        sent = {**sent, PROTOCOL_VERSION: {**sent.get(PROTOCOL_VERSION, {}), "supportedCatalogIds": [*ids, macros.MACROS_ID]}}
+    return _LoweringProcessor(GENERATOR.create_processor(sent or CAPABILITIES))
 
 
 # The SDK writes the same `weight` note under every basic component (15 x 211 chars, ~800

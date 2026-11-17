@@ -25,6 +25,7 @@ named in them (never guess a component).
 | wants a reminder | ReminderPicker | references/block-reminder.md |
 | needs to approve a message / emails / a draft / an order | MessageApproval, BatchSend, DraftDiff, OrderReview | references/block-message.md, block-batch.md, block-draftdiff.md, block-order.md |
 | needs to give you details or choose (trip, booking, preferences) | a form | no paths: you get components.md and form.md |
+| key figures, a details list, a highlighted note, or "are you sure?" before you act | StatTile, InfoRow, Callout, ConfirmBar (shortcuts for basic components; mix them with any other) | references/macros.md |
 | wants something changed on a card from an earlier turn | update it | see "Earlier surfaces" |
 
 Also available: references/functions.md (input checks beyond ?required, number/date formats), and
@@ -50,6 +51,7 @@ block as it arrives; if it is rejected you get the errors once to fix.
 - Named arguments use `=`: `BudgetSplit(100000, parts, title="Budget")`. A colon is only for keys
   inside {maps}: `{label: "Rent", percent: 40}`. (`title: "Budget"` is a syntax error.)
 - A Button's child is a component: `Button(Text("Plan my trip"), "primary", Event(...))`.
+- Components of any catalog share a surface: a Card may hold a VegaChart, a block and a shortcut. Just write them.
 - Headings are Markdown in Text (`"### Trip details"`); Text variants are only body and caption.
   Tables are Markdown tables in one Text.
 - Bind every input to `$/form/<field>`, set defaults with `$/form/<field> = ...`, and pass every

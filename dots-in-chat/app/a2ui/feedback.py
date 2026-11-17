@@ -18,7 +18,7 @@ from a2ui.rpc import RendererToAgentMessageProcessor
 from a2ui.utils import RendererState
 from pydantic import ValidationError
 
-from app.a2ui.catalog import CATALOG, GENERATOR
+from app.a2ui.catalog import GENERATOR, RENDERER_CATALOGS
 
 # A turn started by renderer errors is stored with this input; history hides it.
 ERROR_PREFIX = "Renderer error: "
@@ -40,7 +40,7 @@ async def read_errors(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         body = msg.model_dump(by_alias=True, exclude_unset=True).get("error") or {}
         errors.append({k: (v[:ERROR_TEXT_MAX] if isinstance(v, str) else v) for k, v in body.items()})
 
-    rpc = RendererToAgentMessageProcessor([CATALOG], on_error=on_error)
+    rpc = RendererToAgentMessageProcessor(RENDERER_CATALOGS, on_error=on_error)
     for message in messages:
         try:
             result = await rpc.process_message(message)

@@ -489,6 +489,25 @@ Tracks (parallel, one worktree each):
 Results: (fill in per track)
 - 12.F (media + accessibility): Modal, Video, AudioPlayer added (shadcn Dialog / native media) on client + server catalog + skill references; `accessibility` (label/description/live) now becomes aria-label/aria-description/aria-live for every chat-catalog component (Button/Image directly, others via a display:contents group wrapper; blocks excluded); Image draws nothing until its url arrives (no empty-src console error). known_gaps.json renderer entries shrank from 13 to 2, server from 5 to 2 (only the `@checks` examples). `@checks`/`@accessibility`: pinned SDK 0.11.0 / web_core 0.15.0 reject the prefixed spelling, Express cannot set accessibility; documented, not normalized. `@index`: works in formatString as `${@index(offset: 1)}` (named arg); `${@index(1)}` is invalid upstream (parser takes named args only); the earlier "1. Ann" failure was Markdown list syntax in Text, not a bug.
 - 12.B: renderer errors -> hidden repair turn (cap 2 per user turn, history replays never report); sendDataModel -> turn-only context; capabilities handshake via SDK negotiation (constant CAPABILITIES is only the default); function RPC both ways (call_renderer_function tool, /chat/rpc, clientInfo + serverTime). Tests: `unittest tests.test_a2ui_feedback tests.test_a2ui_rpc` (scripted model, real route), `npm run test:a2ui` (22 node tests on frontend/src/features/chat/a2ui/renderer.ts). Not covered: a real browser + live model run. web_core does not flag unknown components as errors (the server compiler does).
+- [ ] 12.B Feedback channel: renderer `error` -> agent (+ repair), `sendDataModel`, capabilities handshake, then function RPC (both directions, allowedCallers, requiresUserActivation).
+- [x] 12.C (branch worktree-agent-ae7dc3cb43428508d, see Results) Catalogs: mixed catalogs (per-component catalogId), register upstream catalogs, macros, blueprints; skills + check scripts.
+- [ ] 12.D Progressive rendering while the model streams (turn.py / feed).
+- [ ] 12.E Merge, full scenario suite, tsc/eslint/build, update a2ui-kb.
+Results:
+- 12.C catalogs (2026-11-17): three renderer catalogs with their own ids (official basic, official VegaChart,
+  `dots-in-chat/blocks/v1`), a surface has no catalog and each component carries `catalogId` (server `app/a2ui/catalog.py`,
+  client `catalog/index.ts`, MessageProcessor with 3 catalogs). The whole basic catalog is registered (Modal, Video,
+  AudioPlayer added; client `catalog/media.tsx`). Stored surfaces with the old merged id `dots-in-chat/chat/v1` are upgraded
+  (`upgrade_message` server, `upgradeMessage` client). Macros `StatTile, InfoRow, Callout, ConfirmBar` (`app/a2ui/macros.py`):
+  a 4th model-only catalog, lowered to basic components in the response stream; the expansion root keeps the call in
+  `metadata.extensions.dotsMacro` and the store raises it back when a state is rebuilt (so updates work). Skill:
+  `references/macros.md`, `scripts/check.py` -> `app/a2ui/skill_check.py` (stale refs, undocumented components, example compile).
+  Tests: `tests/test_a2ui_catalogs.py` (15 scenarios), `frontend/e2e/catalogs.mjs` (4 browser scenarios); 76 python tests, blocks e2e 15/15.
+  Not done: the MCP v1 catalog (`catalogs/mcp/v1`) is not in a2ui-kb/reference/upstream and could not be fetched here;
+  the travel sample's catalog is domain-specific, not registered. Upstream blueprint `skill_generator.blueprint.md` describes what
+  `skill_build.py` already does (one reference per catalog + `--check`), so it was not adopted. turn.py still reads `CATALOG` (merged
+  legacy catalog) for the component-name hint; switch it to `CATALOGS` when the streaming track lands.
+- (other tracks: fill in)
 
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and

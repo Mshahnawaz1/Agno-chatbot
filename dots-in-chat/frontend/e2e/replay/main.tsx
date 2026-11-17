@@ -9,7 +9,7 @@ import { A2uiSurface } from '@a2ui/react/v0_9'
 import { MessageProcessor, type ActionPayload } from '@a2ui/web_core/v1_0'
 import type { ReactCatalogComponent } from '@a2ui/react/v0_9'
 import '@fontsource/poppins/400.css'
-import { catalog } from '@/features/chat/a2ui/catalog'
+import { catalogs, upgradeMessage } from '@/features/chat/a2ui/catalog'
 import '@/features/chat/a2ui/a2ui.css'
 
 type Msg = Record<string, unknown>
@@ -50,16 +50,16 @@ const api = {
     actions.length = 0
     errors.length = 0
     flushSync(() => root.render(null))
-    processor = new MessageProcessor<ReactCatalogComponent>([catalog], (a) => actions.push(a))
+    processor = new MessageProcessor<ReactCatalogComponent>(catalogs, (a) => actions.push(a))
   },
   /** Applies messages one call at a time, as a stream delivers them; returns processor errors. */
   apply(messages: Msg[]) {
-    const errs = processor.processMessagesWithErrors(messages as never).map(show)
+    const errs = processor.processMessagesWithErrors(messages.map(upgradeMessage) as never).map(show)
     errors.push(...errs)
     return { errors: errs, surfaces: draw() }
   },
   actions: () => actions,
-  catalogHas: (name: string) => catalog.components.has(name),
+  catalogHas: (name: string) => catalogs.some((c) => c.components.has(name)),
   allErrors: () => errors,
   dataModel(surfaceId: string, path = '/') {
     return processor.getSurface(surfaceId)?.dataModel.get(path)

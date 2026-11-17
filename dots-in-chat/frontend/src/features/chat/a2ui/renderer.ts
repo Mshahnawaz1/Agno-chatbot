@@ -53,20 +53,20 @@ export class Renderer<T extends ComponentApi = ComponentApi> {
   version = 0
   readonly listeners = new Set<() => void>()
   io: RendererIo
-  private readonly catalog: Catalog<T>
+  private readonly catalogs: Catalog<T>[]
   /** Surfaces created by a live reply: only their errors go to the agent. */
   private liveSurfaces = new Set<string>()
   private live = false
   private reported = new Set<string>()
 
-  constructor(catalog: Catalog<T>, io: RendererIo) {
-    this.catalog = catalog
+  constructor(catalog: Catalog<T> | Catalog<T>[], io: RendererIo) {
+    this.catalogs = Array.isArray(catalog) ? catalog : [catalog]
     this.io = io
     this.processor = this.build()
   }
 
   private build(): MessageProcessor<T> {
-    const p = new MessageProcessor<T>([this.catalog], (a) => this.io.sendAction(a as Action), {
+    const p = new MessageProcessor<T>(this.catalogs, (a) => this.io.sendAction(a as Action), {
       outboundListener: (m) => this.send(m as WireMessage),
     })
     // Runtime errors (an expression that fails) arrive on the surface; apply-time ones too.
@@ -136,7 +136,7 @@ export class Renderer<T extends ComponentApi = ComponentApi> {
   callAgent<R = unknown>(surfaceId: string, name: string, args: Record<string, unknown> = {}, timeoutMs?: number) {
     return this.processor.callAgentFunction<R>(
       surfaceId,
-      { '@call': name, catalogId: this.catalog.id, args } as never,
+      { '@call': name, catalogId: this.catalogs[0].id, args } as never,
       timeoutMs ? { timeoutMs } : undefined,
     )
   }

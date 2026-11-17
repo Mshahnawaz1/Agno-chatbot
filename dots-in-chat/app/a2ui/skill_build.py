@@ -16,8 +16,12 @@ import re
 import sys
 from pathlib import Path
 
+from app.a2ui import macros
 from app.a2ui.catalog import (
-    BASIC_COMPONENTS,
+    BASIC_ID,
+    CATALOGS,
+    BLOCKS_ID,
+    VEGA_ID,
     CATALOGS_DIR,
     INSTRUCTIONS,
     PROMPT_SNIPPET,
@@ -33,15 +37,55 @@ FUNCTIONS = "## Positional Function Signatures"
 CATALOG_INSTRUCTIONS = "## Catalog Instructions"
 
 
-def _section(start: str, end: str | None) -> str:
-    i = PROMPT_SNIPPET.index(start)
-    j = PROMPT_SNIPPET.index(end, i) if end else len(PROMPT_SNIPPET)
-    return PROMPT_SNIPPET[i:j].strip()
+_CATALOG_HEAD = re.compile(r"^# Catalog `([^`]+)`\n", re.MULTILINE)
 
 
-def _signatures() -> tuple[str, dict[str, str]]:
-    """The signatures section's intro, and each component's signature block by name."""
-    body = _section(SIGNATURES, FUNCTIONS)
+def _by_catalog() -> tuple[str, dict[str, str]]:
+    """The prompt snippet cut into its shared head (output contract, grammar, multi-catalog
+    rules) and one section per catalog, keyed by catalog id."""
+    parts = _CATALOG_HEAD.split(PROMPT_SNIPPET)
+    return parts[0].strip(), dict(zip(parts[1::2], (p.strip() for p in parts[2::2])))
+
+
+HEAD_TEXT, SECTIONS = _by_catalog()
+
+_MULTI = "## Multiple Catalogs"
+_MULTI_END = "## System Functions"
+
+
+def _single_names(head: str) -> str:
+    """The SDK's multi-catalog rules tell the model to write `catalogId=` where several
+    catalogs share a name. Ours never do (a test checks), so the rules shrink to one note:
+    the compiler finds each component's catalog from its name."""
+    if _MULTI not in head or _MULTI_END not in head:
+        raise RuntimeError("a2ui-agent-sdk prompt wording changed: update _single_names in skill_build.py")
+    names = [n for c in CATALOGS for n in c.components]
+    if len(names) != len(set(names)):
+        raise RuntimeError("two catalogs define the same component name: the model must write catalogId")
+    i, j = head.index(_MULTI), head.index(_MULTI_END)
+    note = (
+        f"{_MULTI}\n\nThe components come from several catalogs (see the files in references/), but "
+        "every name is unique: write `Name(...)` and the compiler picks the catalog. Never write "
+        "`catalogId`, and never name a catalog on a `surface` line. A basic Column, a VegaChart "
+        "and a chat block may share one surface.\n\n"
+    )
+    return head[:i] + note + head[j:]
+
+
+HEAD_TEXT = _single_names(HEAD_TEXT)
+
+
+def _section(text: str, start: str, end: str | None) -> str:
+    i = text.index(start)
+    j = text.index(end, i) if end else len(text)
+    return text[i:j].strip()
+
+
+def _signatures(catalog_id: str) -> tuple[str, dict[str, str]]:
+    """A catalog's signatures section intro, and each component's signature block by name."""
+    text = SECTIONS[catalog_id]
+    end = FUNCTIONS if FUNCTIONS in text else (CATALOG_INSTRUCTIONS if CATALOG_INSTRUCTIONS in text else None)
+    body = _section(text, SIGNATURES, end)
     intro, *items = re.split(r"\n(?=• )", body)
     by_name = {re.match(r"• (\w+)\(", item).group(1): item.strip() for item in items}
     return intro.removeprefix(SIGNATURES).strip(), by_name
@@ -49,31 +93,37 @@ def _signatures() -> tuple[str, dict[str, str]]:
 
 def build() -> dict[str, str]:
     """{file name: content} for references/."""
-    intro, sigs = _signatures()
+    intro, basic_sigs = _signatures(BASIC_ID)
+    _, vega_sigs = _signatures(VEGA_ID)
+    _, block_sigs = _signatures(BLOCKS_ID)
     files: dict[str, str] = {}
 
-    grammar = PROMPT_SNIPPET[: PROMPT_SNIPPET.index(SIGNATURES)].strip()
-    files["grammar.md"] = f"# A2UI Express: output contract and grammar\n\n{grammar}\n"
+    files["grammar.md"] = f"# A2UI Express: output contract and grammar\n\n{HEAD_TEXT}\n"
 
-    basic = "\n\n".join(sigs[name] for name in sorted(BASIC_COMPONENTS))
+    basic = "\n\n".join(basic_sigs[name] for name in sorted(basic_sigs))
     files["components.md"] = (
-        "# Basic components\n\n"
-        "Text, Image, Icon, Row, Column, List, Card, Tabs, Modal, Divider, Video, AudioPlayer, Button,"
-        f" TextField, CheckBox, ChoicePicker, Slider, DateTimeInput.\n\n{intro}\n\n{basic}\n"
+        f"# Basic components\n\n{', '.join(sorted(basic_sigs))}.\n\n{intro}\n\n{basic}\n"
     )
 
-    functions = _section(FUNCTIONS, CATALOG_INSTRUCTIONS).removeprefix(FUNCTIONS).strip()
+    functions = _section(SECTIONS[BASIC_ID], FUNCTIONS, CATALOG_INSTRUCTIONS).removeprefix(FUNCTIONS).strip()
     files["functions.md"] = (
         "# Functions: input checks (?required, ?email, ?regex, ...) and formatting\n\n"
         f"{functions}\n"
     )
 
-    files["chart.md"] = f"# VegaChart: charts, graphs and live formulas\n\n{sigs['VegaChart']}\n\n{INSTRUCTIONS}\n"
+    files["chart.md"] = f"# VegaChart: charts, graphs and live formulas\n\n{vega_sigs['VegaChart']}\n\n{INSTRUCTIONS}\n"
+
+    _, macro_sigs = _signatures(macros.MACROS_ID)
+    files["macros.md"] = (
+        f"# Macros: {', '.join(macro_sigs)} (shortcuts made of basic components)\n\n"
+        + "\n\n".join(macro_sigs.values())
+        + f"\n\n{macros.INSTRUCTIONS}\n"
+    )
 
     for path in sorted((CATALOGS_DIR / "blocks").glob("*.json")):
         doc = json.loads(path.read_text())
         names = list(doc["components"])
-        body = "\n\n".join(sigs[n] for n in names)
+        body = "\n\n".join(block_sigs[n] for n in names)
         files[f"block-{path.stem}.md"] = f"# {', '.join(names)} (chat block)\n\n{body}\n\n{doc['guide']}\n"
 
     return {name: HEAD + text for name, text in files.items()}

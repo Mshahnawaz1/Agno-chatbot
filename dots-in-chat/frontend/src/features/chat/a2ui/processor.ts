@@ -1,7 +1,7 @@
 import { useLayoutEffect, useSyncExternalStore } from 'react'
 import { MessageProcessor } from '@a2ui/web_core/v1_0'
 import type { ReactCatalogComponent } from '@a2ui/react/v0_9'
-import { catalog } from './catalog'
+import { catalogs, upgradeMessage } from './catalog'
 import type { SurfaceFeed } from './feed'
 import { Renderer, type WireMessage } from './renderer'
 import type { A2uiMessage } from './protocol'
@@ -20,7 +20,7 @@ export function setRendererTransport(t: typeof transport) {
 export function rendererFor(key: string): Renderer<ReactCatalogComponent> {
   let r = entries.get(key)
   if (!r) {
-    r = new Renderer<ReactCatalogComponent>(catalog, {
+    r = new Renderer<ReactCatalogComponent>(catalogs, {
       sendAction: () => {},
       reportError: () => {},
       transport: (m) => (transport ? transport(key, m) : Promise.resolve([])),
@@ -60,8 +60,8 @@ function sync(feed: SurfaceFeed) {
   // Stored history is replayed quietly; what a reply streams now is live.
   const from = r.applied
   const quiet = Math.max(0, Math.min(messages.length, feed.historyCount) - from)
-  if (quiet > 0) r.apply(messages.slice(from, from + quiet) as WireMessage[], false)
-  if (from + quiet < messages.length) r.apply(messages.slice(from + quiet) as WireMessage[], true)
+  if (quiet > 0) r.apply(messages.slice(from, from + quiet).map(upgradeMessage) as WireMessage[], false)
+  if (from + quiet < messages.length) r.apply(messages.slice(from + quiet).map(upgradeMessage) as WireMessage[], true)
   r.applied = messages.length
   r.last = messages.at(-1)
   r.version++

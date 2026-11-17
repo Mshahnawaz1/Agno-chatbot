@@ -69,6 +69,10 @@ The host compiler will compile your A2UI Express output into the correct JSON en
     surface("dashboard-surface-1")
     root = Card(...)
 
+## Multiple Catalogs
+
+The components come from several catalogs (see the files in references/), but every name is unique: write `Name(...)` and the compiler picks the catalog. Never write `catalogId`, and never name a catalog on a `surface` line. A basic Column, a VegaChart and a chat block may share one surface.
+
 ## System Functions
 
 These functions are defined by the A2UI protocol, not by a catalog. Call them by their `@` name, like any function, and never add a `catalogId` to them:

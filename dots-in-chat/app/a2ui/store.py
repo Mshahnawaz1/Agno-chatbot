@@ -16,6 +16,8 @@ from a2ui.processor import A2uiRequestProcessor
 from a2ui.utils import RendererState
 
 from app import db
+from app.a2ui.catalog import upgrade_message
+from app.a2ui.macros import raise_message
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +74,7 @@ def load_state(session_id: str, processor: A2uiRequestProcessor) -> RendererStat
     """The session's renderer state, rebuilt from every A2UI message it has shown."""
     state = processor.create_state()
     messages = [
-        p["message"] for parts in parts_by_run(session_id).values() for p in parts if p["type"] == "a2ui"
+        raise_message(upgrade_message(p["message"])) for parts in parts_by_run(session_id).values() for p in parts if p["type"] == "a2ui"
     ]
     if messages:
         try:

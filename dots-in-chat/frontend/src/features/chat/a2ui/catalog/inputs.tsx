@@ -8,7 +8,6 @@ import { useId, useState, type ChangeEvent, type ReactNode } from 'react'
 import {
   ButtonApi, CheckBoxApi, ChoicePickerApi, DateTimeInputApi, SliderApi, TextFieldApi,
 } from '@a2ui/web_core/v1_0'
-import { createComponentImplementation } from '@a2ui/react/v0_9'
 import { Button as ShadcnButton } from '@/components/shadcn/button'
 import { Checkbox } from '@/components/shadcn/checkbox'
 import { Input } from '@/components/shadcn/input'
@@ -17,6 +16,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/shadcn/radio-group'
 import { Slider as ShadcnSlider } from '@/components/shadcn/slider'
 import { Textarea } from '@/components/shadcn/textarea'
 import { Toggle } from '@/components/shadcn/toggle'
+import { createComponentImplementation } from '@a2ui/react/v0_9'
+import { ariaAttrs, implement } from './aria'
 import { Field, Option } from './parts'
 import { invalidProps, weightStyle } from './props'
 
@@ -32,6 +33,7 @@ export const Button = createComponentImplementation(ButtonApi, ({ props, buildCh
       style={weightStyle(props.weight)}
       className="a2ui-button self-start rounded-full px-5"
       disabled={disabled}
+      {...ariaAttrs(props.accessibility)}
       onClick={() => {
         if (!disabled) void props.action?.()
       }}
@@ -43,7 +45,7 @@ export const Button = createComponentImplementation(ButtonApi, ({ props, buildCh
 
 const inputType = { shortText: 'text', number: 'number', obscured: 'password' } as const
 
-export const TextField = createComponentImplementation(TextFieldApi, ({ props }) => {
+export const TextField = implement(TextFieldApi, ({ props }) => {
   const id = useId()
   const common = {
     id,
@@ -63,7 +65,7 @@ export const TextField = createComponentImplementation(TextFieldApi, ({ props })
   )
 })
 
-export const CheckBox = createComponentImplementation(CheckBoxApi, ({ props }) => {
+export const CheckBox = implement(CheckBoxApi, ({ props }) => {
   const id = useId()
   return (
     <Field props={{ ...props, label: undefined }} id={id}>
@@ -86,7 +88,7 @@ function selectedValues(value: unknown): string[] {
   return typeof value === 'string' && value ? [value] : []
 }
 
-export const ChoicePicker = createComponentImplementation(ChoicePickerApi, ({ props }) => {
+export const ChoicePicker = implement(ChoicePickerApi, ({ props }) => {
   const id = useId()
   const [filter, setFilter] = useState('')
   const selected = selectedValues(props.value)
@@ -165,7 +167,7 @@ export const ChoicePicker = createComponentImplementation(ChoicePickerApi, ({ pr
   )
 })
 
-export const Slider = createComponentImplementation(SliderApi, ({ props }) => {
+export const Slider = implement(SliderApi, ({ props }) => {
   const id = useId()
   const min = props.min ?? 0
   const max = props.max ?? 100
@@ -205,7 +207,7 @@ function today(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-export const DateTimeInput = createComponentImplementation(DateTimeInputApi, ({ props }) => {
+export const DateTimeInput = implement(DateTimeInputApi, ({ props }) => {
   const id = useId()
   const enableTime = props.enableTime ?? false
   // Neither flag set: a date, as the basic DateTimeInput does.

@@ -58,8 +58,8 @@ def build() -> dict[str, str]:
     basic = "\n\n".join(sigs[name] for name in sorted(BASIC_COMPONENTS))
     files["components.md"] = (
         "# Basic components\n\n"
-        "Text, Image, Icon, Row, Column, List, Card, Tabs, Divider, Button, TextField, CheckBox,"
-        f" ChoicePicker, Slider, DateTimeInput.\n\n{intro}\n\n{basic}\n"
+        "Text, Image, Icon, Row, Column, List, Card, Tabs, Modal, Divider, Video, AudioPlayer, Button,"
+        f" TextField, CheckBox, ChoicePicker, Slider, DateTimeInput.\n\n{intro}\n\n{basic}\n"
     )
 
     functions = _section(FUNCTIONS, CATALOG_INSTRUCTIONS).removeprefix(FUNCTIONS).strip()

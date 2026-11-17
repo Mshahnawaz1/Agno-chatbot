@@ -482,6 +482,7 @@ Tracks (parallel, one worktree each):
 - [ ] 12.D Progressive rendering while the model streams (turn.py / feed).
 - [ ] 12.E Merge, full scenario suite, tsc/eslint/build, update a2ui-kb.
 Results: (fill in per track)
+- 12.F (media + accessibility): Modal, Video, AudioPlayer added (shadcn Dialog / native media) on client + server catalog + skill references; `accessibility` (label/description/live) now becomes aria-label/aria-description/aria-live for every chat-catalog component (Button/Image directly, others via a display:contents group wrapper; blocks excluded); Image draws nothing until its url arrives (no empty-src console error). known_gaps.json renderer entries shrank from 13 to 2, server from 5 to 2 (only the `@checks` examples). `@checks`/`@accessibility`: pinned SDK 0.11.0 / web_core 0.15.0 reject the prefixed spelling, Express cannot set accessibility; documented, not normalized. `@index`: works in formatString as `${@index(offset: 1)}` (named arg); `${@index(1)}` is invalid upstream (parser takes named args only); the earlier "1. Ann" failure was Markdown list syntax in Text, not a bug.
 
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and

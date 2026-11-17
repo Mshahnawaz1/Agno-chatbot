@@ -1,0 +1,20 @@
+{
+  "server": {
+    "login-form": {
+      "match": "@checks",
+      "why": "spec at main spells it @checks; a2ui-agent-sdk 0.11.0 only knows checks"
+    },
+    "advanced-form-validator": {
+      "match": "@checks",
+      "why": "same"
+    }
+  },
+  "renderer": {
+    "login-form": {
+      "why": "@checks: web_core 0.15.0 only knows checks"
+    },
+    "advanced-form-validator": {
+      "why": "@checks: web_core 0.15.0 only knows checks"
+    }
+  }
+}

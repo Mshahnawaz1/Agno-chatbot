@@ -156,7 +156,8 @@ class PromptTest(unittest.TestCase):
         refs = build()
         self.assertIn("A2UI Express", refs["grammar.md"])
         self.assertIn("ChoicePicker(", refs["components.md"])
-        self.assertNotIn("AudioPlayer(", "".join(refs.values()))
+        for name in ("Modal(", "Video(", "AudioPlayer("):
+            self.assertIn(name, refs["components.md"])
         self.assertIn("DateTimeInput", BASIC_COMPONENTS)
         self.assertIn("VegaChart(spec, height?)", refs["chart.md"])
         self.assertIn("When to show UI", (SKILL_DIR / "SKILL.md").read_text())

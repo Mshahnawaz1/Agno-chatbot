@@ -8,13 +8,14 @@ import {
   Volume1, Volume2, VolumeOff, X, type LucideIcon,
 } from 'lucide-react'
 import { IconApi, ImageApi, TextApi } from '@a2ui/web_core/v1_0'
-import { createComponentImplementation } from '@a2ui/react/v0_9'
 import { Markdown } from '@/components/Markdown'
 import { cn } from '@/lib/utils'
+import { createComponentImplementation } from '@a2ui/react/v0_9'
+import { ariaAttrs, implement } from './aria'
 import { weightStyle } from './props'
 
 /** Text is Markdown: v1.0 has no heading variants, so headings and tables are written in it. */
-export const Text = createComponentImplementation(TextApi, ({ props }) => (
+export const Text = implement(TextApi, ({ props }) => (
   <div style={weightStyle(props.weight)} className={cn('a2ui-text', props.variant === 'caption' && 'a2ui-caption')}>
     <Markdown className="a2ui-markdown">{String(props.text ?? '')}</Markdown>
   </div>
@@ -37,15 +38,20 @@ const imageFit = {
   scaleDown: 'object-scale-down',
 } as const
 
-export const Image = createComponentImplementation(ImageApi, ({ props }) => (
+/** Nothing is drawn until the url has arrived: an <img src=""> is a React console error. */
+export const Image = createComponentImplementation(ImageApi, ({ props }) => {
+  if (!props.url) return null
+  return (
   <img
-    src={props.url ?? ''}
+    {...ariaAttrs(props.accessibility)}
+    src={props.url}
     alt={props.description ?? ''}
     loading="lazy"
     style={weightStyle(props.weight)}
     className={cn('rounded-xl', imageSize[props.variant ?? 'mediumFeature'], imageFit[props.fit ?? 'cover'])}
   />
-))
+  )
+})
 
 /** The basic catalog's icon names (Material names), drawn with the app's lucide set. */
 const icons: Record<string, LucideIcon> = {
@@ -63,7 +69,7 @@ const icons: Record<string, LucideIcon> = {
   volumeUp: Volume2, warning: TriangleAlert,
 }
 
-export const Icon = createComponentImplementation(IconApi, ({ props }) => {
+export const Icon = implement(IconApi, ({ props }) => {
   const name = props.name as unknown
   const className = 'size-5 shrink-0 text-fg-muted'
   if (name && typeof name === 'object' && 'svgPath' in name) {

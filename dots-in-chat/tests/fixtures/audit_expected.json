@@ -1,0 +1,16 @@
+{
+  "renderer": {
+    "inline createSurface components + data": "works",
+    "progressive render: orphan child, then fill in": "works",
+    "@checks (spelling in the official examples)": "fails",
+    "checks: field error + button disabled until valid": "works",
+    "checks: ValidationResult object ({valid,message}) as a condition": "works",
+    "accessibility prop (unprefixed) reaches the DOM": "works",
+    "@accessibility (spelling in the spec at main)": "fails",
+    "template list from a data array": "works",
+    "@index in a template (no offset)": "works",
+    "@index with offset (formatString and direct call forms)": "works",
+    "accessibility becomes aria-* on every kind of component": "works",
+    "Modal opens its content; Video and AudioPlayer draw media elements": "works"
+  }
+}

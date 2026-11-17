@@ -53,7 +53,12 @@ class ChatRequest(BaseModel):
     action: dict[str, Any] | None = None
     # Renderer `error` messages: the browser rejected part of a surface (see app/a2ui/feedback.py).
     errors: list[dict[str, Any]] | None = Field(default=None, max_length=5)
+    # What the renderer reports with a request (A2UI v1.0): the data models of surfaces that set
+    # `sendDataModel` (app/a2ui/feedback.py) and its capabilities (app/a2ui/catalog.py).
+    renderer_data_model: dict[str, Any] | None = Field(default=None, alias="a2uiRendererDataModel")
     session_id: str | None = None
+
+    model_config = {"populate_by_name": True}
 
     @model_validator(mode="after")
     def one_input(self):

@@ -53,6 +53,10 @@ block as it arrives; if it is rejected you get the errors once to fix.
 - Bind every input to `$/form/<field>`, set defaults with `$/form/<field> = ...`, and pass every
   field in the submit button's Event context.
 
+- Want the user's current inputs on later turns, without a submit button? Create the surface with
+  `surface("<id>", sendDataModel=true)`: its data model then comes with each following message
+  (`a2ui_surface_data_models` in your context; newer than anything you wrote). Only for forms.
+
 ## Chat blocks: live cards
 Each recalculates in the browser and sends its own events. Put the block first in
 `root = Column([...])` with a Suggestions under it (2-4 tap-to-reply follow-ups, references/block-suggestions.md;

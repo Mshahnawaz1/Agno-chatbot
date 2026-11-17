@@ -95,5 +95,94 @@ class RendererErrorTest(unittest.TestCase):
         self.assertTrue(self.h.agent.kwargs[1]["metadata"]["a2ui_repair"])
 
 
+FORM_SENDING = """Fill this in.
+<a2ui>
+surface("form", sendDataModel=true)
+$/name = ""
+root = Card(Column([title, nameField]))
+title = Text("### Details")
+nameField = TextField("Your name", $/name)
+</a2ui>"""
+
+FORM_PLAIN = FORM_SENDING.replace('surface("form", sendDataModel=true)', 'surface("plain")')
+
+
+def data_model(**surfaces):
+    return {"version": "1.0", "surfaces": surfaces}
+
+
+class SendDataModelTest(unittest.TestCase):
+    def setUp(self):
+        self.h = Harness()
+        self.session = self.h.new_session()
+
+    def tearDown(self):
+        self.h.close()
+
+    def show(self, reply):
+        self.h.agent.replies = [reply]
+        events = self.h.post({"message": "start", "session_id": self.session})
+        self.h.agent.inputs.clear(), self.h.agent.kwargs.clear()
+        return events
+
+    def test_the_surface_opts_in_with_senddatamodel_in_create_surface(self):
+        events = self.show(FORM_SENDING)
+        create = next(d["message"]["createSurface"] for n, d in events if n == "a2ui" and "createSurface" in d["message"])
+        self.assertIs(create["sendDataModel"], True)
+
+    def test_the_users_values_reach_the_model_for_that_turn_only(self):
+        self.show(FORM_SENDING)
+        self.h.agent.replies = ["Hello Asha."]
+        self.h.post({
+            "message": "what is my name?", "session_id": self.session,
+            "a2uiRendererDataModel": data_model(form={"name": "Asha"}),
+        })
+        kw = self.h.agent.kwargs[0]
+        self.assertTrue(kw["add_dependencies_to_context"])
+        self.assertEqual(kw["dependencies"]["a2ui_surface_data_models"]["surfaces"], {"form": {"name": "Asha"}})
+        self.assertEqual(self.h.agent.inputs[0], "what is my name?", "the stored input is not polluted")
+        self.h.agent.replies = ["ok"]
+        self.h.post({"message": "and now?", "session_id": self.session})
+        self.assertNotIn("dependencies", self.h.agent.kwargs[1])
+
+    def test_a_click_carries_the_data_model_too(self):
+        self.show(FORM_SENDING)
+        action = {"version": "1.0", "action": {
+            "name": "go", "surfaceId": "form", "sourceComponentId": "nameField",
+            "timestamp": "2026-11-17T10:00:00Z", "context": {},
+        }}
+        self.h.agent.replies = ["done"]
+        self.h.post({"action": action, "session_id": self.session, "a2uiRendererDataModel": data_model(form={"name": "Ravi"})})
+        self.assertIn("Ravi", str(self.h.agent.kwargs[0]["dependencies"]))
+
+    def test_a_surface_that_did_not_opt_in_is_dropped(self):
+        self.show(FORM_PLAIN)
+        self.h.agent.replies = ["ok"]
+        self.h.post({"message": "hi", "session_id": self.session, "a2uiRendererDataModel": data_model(plain={"name": "secret"})})
+        self.assertNotIn("dependencies", self.h.agent.kwargs[0])
+
+    def test_a_surface_the_chat_never_had_is_dropped(self):
+        self.show(FORM_SENDING)
+        self.h.agent.replies = ["ok"]
+        self.h.post({
+            "message": "hi", "session_id": self.session,
+            "a2uiRendererDataModel": data_model(form={"name": "A"}, ghost={"leak": 1}),
+        })
+        shown = self.h.agent.kwargs[0]["dependencies"]["a2ui_surface_data_models"]["surfaces"]
+        self.assertEqual(list(shown), ["form"])
+
+    def test_a_malformed_data_model_is_a_400_and_the_model_is_not_called(self):
+        for bad in ({"version": "1.0"}, {"version": "0.9", "surfaces": {}}, {"version": "1.0", "surfaces": {"a": 5}}):
+            body = self.h.post({"message": "hi", "session_id": self.session, "a2uiRendererDataModel": bad}, status=400)
+            self.assertIn("a2uiRendererDataModel", body["detail"])
+        self.assertEqual(self.h.agent.inputs, [])
+
+    def test_an_oversized_data_model_is_refused(self):
+        self.show(FORM_SENDING)
+        big = data_model(form={"name": "x" * 70_000})
+        body = self.h.post({"message": "hi", "session_id": self.session, "a2uiRendererDataModel": big}, status=400)
+        self.assertIn("larger", body["detail"])
+
+
 if __name__ == "__main__":
     unittest.main()

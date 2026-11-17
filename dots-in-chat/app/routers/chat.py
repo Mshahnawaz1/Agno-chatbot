@@ -9,7 +9,9 @@ from fastapi.responses import StreamingResponse
 
 from app import db
 from app.a2ui.actions import InvalidAction, action_prompt, read_action
-from app.a2ui.feedback import InvalidError, error_prompt, read_errors
+from app.a2ui.catalog import new_processor
+from app.a2ui.feedback import InvalidError, data_model_context, error_prompt, read_data_model, read_errors
+from app.a2ui.store import load_state
 from app.a2ui.turn import A2uiTurn
 from app.agent import agent
 from app.agent.title import generate_title
@@ -96,7 +98,7 @@ async def chat(body: ChatRequest, user: CurrentUser):
 
 async def model_pass(
     model_input: str, user: dict, session_id: str, turn: A2uiTurn, run: dict, repair: bool = False,
-    renderer_error: bool = False,
+    renderer_error: bool = False, context: dict | None = None,
 ) -> AsyncIterator[str]:
     """One agent run streamed through the A2UI compiler. Fills `run` with its outcome."""
     turn.start_pass()
@@ -107,9 +109,11 @@ async def model_pass(
         metadata["a2ui_repair"] = True  # hidden from the history endpoint
     if renderer_error:
         metadata["a2ui_renderer_error"] = True  # the run shows, its input (the errors) doesn't
+    # `context` is extra input for this turn only (agno `dependencies`); the stored input stays clean.
+    extra = {"dependencies": context, "add_dependencies_to_context": True} if context else {}
     async for event in agent.arun(
         model_input, user_id=user["id"], session_id=session_id,
-        stream=True, stream_events=True, metadata=metadata,
+        stream=True, stream_events=True, metadata=metadata, **extra,
     ):
         if event.event == RunEvent.run_error:
             # Guardrail failures (InputCheckError/OutputCheckError) and model/provider errors
@@ -168,6 +172,14 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
     else:
         prompt = body.message
 
+    context = None
+    if body.renderer_data_model is not None:
+        try:
+            state = load_state(session["id"], new_processor())
+            context = data_model_context(read_data_model(body.renderer_data_model, state))
+        except InvalidError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+
     async def event_stream() -> AsyncIterator[str]:
         # run_id is the reply's run: the repair run's parts are stored under it too.
         run: dict = {"run_id": None, "all_ids": [], "tools": [], "metrics": None, "stopped": False}
@@ -176,7 +188,8 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
             model_input, repair = prompt, False
             for attempt in range(REPAIR_ATTEMPTS + 1):
                 async for chunk in model_pass(
-                    model_input, user, session["id"], turn, run, repair, renderer_error=body.errors is not None and not repair
+                    model_input, user, session["id"], turn, run, repair,
+                    renderer_error=body.errors is not None and not repair, context=None if repair else context,
                 ):
                     yield chunk
                 if turn.rejected and not run["stopped"]:

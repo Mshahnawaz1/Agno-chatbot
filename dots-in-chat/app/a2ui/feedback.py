@@ -1,4 +1,7 @@
-"""What the renderer tells the agent besides clicks: `error` messages (A2UI v1.0 renderer-to-agent).
+"""What the renderer tells the agent besides clicks (A2UI v1.0 renderer-to-agent).
+
+- `error` messages (`read_errors`);
+- the data model of surfaces that set `sendDataModel` (`read_data_model`).
 
 The browser validates every message it applies. When one fails (VALIDATION_FAILED,
 UNALLOWED_PARENT, EXPRESSION_ERROR, ...) it sends an `error` message back. Here the server
@@ -9,7 +12,10 @@ repair turn: the model sees what the renderer rejected and sends a corrected blo
 import json
 from typing import Any
 
+from a2ui.core.schema.v1_0 import A2uiRendererDataModel
 from a2ui.rpc import RendererToAgentMessageProcessor
+from a2ui.utils import RendererState
+from pydantic import ValidationError
 
 from app.a2ui.catalog import CATALOG
 
@@ -55,6 +61,42 @@ def error_prompt(errors: list[dict[str, Any]], surface_ids: list[str]) -> str:
         '`surface("<id>", update=true)` if it exists, else create it). If the error has no '
         "surface or you cannot fix it, say so in one sentence. Don't apologise."
     )
+
+
+DATA_MODEL_MAX = 64_000  # chars of JSON: a form's values, not a document
+
+
+def read_data_model(raw: dict[str, Any], state: RendererState) -> dict[str, Any]:
+    """Validates an `a2uiRendererDataModel` and returns {surface id: data model}.
+
+    Only surfaces that exist in this chat and opted in (`sendDataModel`) are kept: the client
+    can't make the model read data of a surface the agent never asked about.
+    """
+    try:
+        model = A2uiRendererDataModel.model_validate(raw)
+    except ValidationError as e:
+        raise InvalidError(f"Malformed a2uiRendererDataModel: {e.errors()[0]['msg']}") from e
+    if len(json.dumps(model.surfaces)) > DATA_MODEL_MAX:
+        raise InvalidError(f"a2uiRendererDataModel is larger than {DATA_MODEL_MAX} characters.")
+    out: dict[str, Any] = {}
+    for surface_id, data in model.surfaces.items():
+        surface = state.get_surface(surface_id)
+        if surface is not None and surface.send_data_model:
+            out[surface_id] = data
+    return out
+
+
+def data_model_context(surfaces: dict[str, Any]) -> dict[str, Any] | None:
+    """The model's extra context for one turn (agno `dependencies`), or None when empty."""
+    if not surfaces:
+        return None
+    return {
+        "a2ui_surface_data_models": {
+            "note": "Current values on the user's screen for surfaces you created with sendDataModel=true "
+            "(keyed by surface id). They are newer than anything you wrote earlier.",
+            "surfaces": surfaces,
+        }
+    }
 
 
 def parse_error_prompt(text: str) -> bool:

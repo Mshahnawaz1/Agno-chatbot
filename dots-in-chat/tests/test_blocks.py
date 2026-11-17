@@ -20,7 +20,7 @@ os.environ["APP_DB_PATH"] = os.path.join(_tmp, "app.db")  # before app.config is
 from app import db  # noqa: E402
 from app.a2ui.actions import action_prompt, read_action  # noqa: E402
 from app.a2ui.catalog import BLOCK_COMPONENTS, CATALOGS_DIR  # noqa: E402
-from app.a2ui.prompt import A2UI_INSTRUCTIONS  # noqa: E402
+from app.a2ui.skill_build import build  # noqa: E402
 from app.a2ui.turn import A2uiTurn  # noqa: E402
 
 db.init_db()
@@ -64,10 +64,10 @@ class BlockFilesTest(unittest.TestCase):
                     self.assertTrue(set(schema["required"]) <= set(schema["properties"]))
                     self.assertIn(name + "(", doc["guide"], "guide must show the signature")
 
-    def test_prompt_lists_every_block(self):
-        self.assertIn("Chat blocks:", A2UI_INSTRUCTIONS)
+    def test_skill_has_a_reference_for_every_block(self):
+        refs = "".join(text for name, text in build().items() if name.startswith("block-"))
         for name in BLOCK_COMPONENTS:
-            self.assertIn(f"• {name}(", A2UI_INSTRUCTIONS)
+            self.assertIn(f"• {name}(", refs)
 
 
 class BlockExamplesTest(unittest.TestCase):

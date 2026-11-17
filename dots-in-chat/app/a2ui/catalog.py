@@ -12,7 +12,7 @@ calculator or an approval card, each of which keeps its own live state in the br
 its own events. Media and Modal are left out: the chat doesn't need them.
 
 A block file is {"guide": "<how the model uses it>", "components": {"<Name>": <JSON schema>}};
-its guide goes into the prompt under Catalog Instructions.
+its guide goes into the a2ui skill (skill_build.py).
 """
 
 import json
@@ -58,25 +58,15 @@ chart = VegaChart({"params": [{"name": "monthly", "value": 5000, "bind": {"input
 
 CATALOGS_DIR = Path(__file__).parent / "catalogs"
 
-BLOCKS_GUIDE_HEAD = """Chat blocks: ready-made interactive cards. Prefer a block over building the same thing
-from basic components or a VegaChart: a block recalculates live, keeps the design's look and
-sends well-defined events. A block is usually the first child of root = Column([...]), with a
-Suggestions under it. Update a block in place (surface(id, update=true) and the same component
-name) to change its values; it then shows a "changed" badge."""
-
-
-def _blocks() -> tuple[dict, list[str]]:
-    """Every chat block's schema, and its guide line for the prompt."""
+def _blocks() -> dict:
+    """Every chat block's schema (each file's guide goes into the a2ui skill, skill_build.py)."""
     components: dict = {}
-    guides: list[str] = []
     for path in sorted((CATALOGS_DIR / "blocks").glob("*.json")):
-        doc = json.loads(path.read_text())
-        components.update(doc["components"])
-        guides.append("- " + doc["guide"])
-    return components, guides
+        components.update(json.loads(path.read_text())["components"])
+    return components
 
 
-BLOCK_COMPONENTS, _BLOCK_GUIDES = _blocks()
+BLOCK_COMPONENTS = _blocks()
 
 
 def _catalog_doc(catalog_id: str, components: dict) -> dict:
@@ -107,7 +97,7 @@ def _chat_catalog() -> Catalog:
             vega.components["VegaChart"],
             *(blocks.components[name] for name in BLOCK_COMPONENTS),
         ],
-        instructions=INSTRUCTIONS + "\n\n" + BLOCKS_GUIDE_HEAD + "\n" + "\n".join(_BLOCK_GUIDES),
+        instructions=INSTRUCTIONS,
     )
 
 
@@ -127,5 +117,28 @@ def new_processor() -> A2uiRequestProcessor:
     return GENERATOR.create_processor(CAPABILITIES)
 
 
-# The catalog is fixed, so one snippet serves every request.
-PROMPT_SNIPPET = new_processor().prompt_snippet
+# The SDK writes the same `weight` note under every basic component (15 x 211 chars, ~800
+# tokens on every model call). Said once instead; the signatures still list `weight?`.
+_WEIGHT_LINE = (
+    "\n  - weight: The relative weight of this component within a Row or Column. This is similar"
+    " to the CSS 'flex-grow' property. Note: this may ONLY be set when the component is a direct"
+    " descendant of a Row or Column."
+)
+_SIGNATURES_HEAD = "Use these exact positional signatures to instantiate components. Do not output property keys:"
+_WEIGHT_ONCE = (
+    "\n`weight` (on every component that lists it): its flex-grow share, only on a direct child"
+    " of a Row or Column."
+)
+
+
+def _compact(snippet: str) -> str:
+    """The generated snippet without repeated text. Fails loudly if the SDK's wording changes."""
+    if snippet.count(_WEIGHT_LINE) < 10 or _SIGNATURES_HEAD not in snippet:
+        raise RuntimeError("a2ui-agent-sdk prompt wording changed: update _compact in catalog.py")
+    snippet = snippet.replace(_WEIGHT_LINE, "")
+    return snippet.replace(_SIGNATURES_HEAD, _SIGNATURES_HEAD + _WEIGHT_ONCE, 1)
+
+
+# The catalog is fixed, so one snippet serves every request. It is not sent as a whole:
+# skill_build.py cuts it into the a2ui skill's reference files.
+PROMPT_SNIPPET = _compact(new_processor().prompt_snippet)

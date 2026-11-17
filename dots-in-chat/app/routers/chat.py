@@ -12,6 +12,7 @@ from app.a2ui.turn import A2uiTurn
 from app.agent import agent
 from app.deps import CurrentUser
 from app.schemas import ChatRequest, ChatResponse
+from app.skills import stub_skill_loads
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -128,6 +129,7 @@ async def model_pass(
             run["tools"].append(event.tool)
         elif event.event == RunEvent.run_completed:
             run["run_id"] = run.get("run_id") or event.run_id
+            run["all_ids"].append(event.run_id)
             if not repair:
                 run["metrics"] = run_metrics(event.metrics, run["tools"])
             log_run(event.run_id, event.metrics, run["tools"])
@@ -150,7 +152,7 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
 
     async def event_stream() -> AsyncIterator[str]:
         # run_id is the reply's run: the repair run's parts are stored under it too.
-        run: dict = {"run_id": None, "tools": [], "metrics": None, "stopped": False}
+        run: dict = {"run_id": None, "all_ids": [], "tools": [], "metrics": None, "stopped": False}
         yield sse("session", {"session_id": session["id"]})
         try:
             model_input, repair = prompt, False
@@ -173,6 +175,10 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
             yield sse("error", {"message": f"Generation failed. Error {e}"})
         finally:
             turn.save(run["run_id"])
+            try:
+                await stub_skill_loads(agent, session["id"], run["all_ids"])
+            except Exception:
+                logger.exception("could not stub skill loads in history")
             db.touch_chat_session(session["id"])
 
     return StreamingResponse(

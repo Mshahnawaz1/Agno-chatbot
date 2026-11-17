@@ -17,7 +17,7 @@ os.environ["APP_DB_PATH"] = os.path.join(_tmp, "app.db")  # before app.config is
 from app import db  # noqa: E402
 from app.a2ui.actions import InvalidAction, action_prompt, parse_action_prompt, read_action  # noqa: E402
 from app.a2ui.catalog import BASIC_COMPONENTS, CATALOG_ID  # noqa: E402
-from app.a2ui.prompt import A2UI_INSTRUCTIONS  # noqa: E402
+from app.a2ui.skill_build import SKILL_DIR, build  # noqa: E402
 from app.a2ui.store import parts_by_run  # noqa: E402
 from app.a2ui.turn import A2uiTurn  # noqa: E402
 
@@ -64,13 +64,14 @@ def run_reply(turn: A2uiTurn, reply: str, chunk: int = 7) -> list[tuple[str, dic
 
 
 class PromptTest(unittest.TestCase):
-    def test_prompt_is_generated_from_the_pruned_catalog(self):
-        self.assertIn("A2UI Express", A2UI_INSTRUCTIONS)
-        self.assertIn("When to show UI", A2UI_INSTRUCTIONS)
-        self.assertIn("ChoicePicker", A2UI_INSTRUCTIONS)
-        self.assertNotIn("AudioPlayer(", A2UI_INSTRUCTIONS)
+    def test_skill_references_come_from_the_pruned_catalog(self):
+        refs = build()
+        self.assertIn("A2UI Express", refs["grammar.md"])
+        self.assertIn("ChoicePicker(", refs["components.md"])
+        self.assertNotIn("AudioPlayer(", "".join(refs.values()))
         self.assertIn("DateTimeInput", BASIC_COMPONENTS)
-        self.assertIn("VegaChart(spec, height?)", A2UI_INSTRUCTIONS)
+        self.assertIn("VegaChart(spec, height?)", refs["chart.md"])
+        self.assertIn("When to show UI", (SKILL_DIR / "SKILL.md").read_text())
 
 
 class TurnTest(unittest.TestCase):
@@ -120,14 +121,25 @@ class TurnTest(unittest.TestCase):
         self.assertEqual(stored["run-1"][0], {"type": "text", "text": "Tell me a bit about the trip."})
         self.assertEqual(stored["run-2"][-1]["type"], "a2ui")
 
-    def test_recreating_an_existing_surface_is_rejected(self):
+    def test_redrawing_an_existing_surface_becomes_an_update(self):
+        # Seen live ("make it 20 years"): `surface("<existing id>")` again was rejected and cost
+        # a repair run. It now becomes surface(id, update=true), with no model call.
         session = new_session()
         first = A2uiTurn(session)
         run_reply(first, FORM_REPLY)
         first.save("run-1")
         again = A2uiTurn(session)
-        run_reply(again, FORM_REPLY)
-        self.assertEqual(len(again.rejected), 1)
+        events = run_reply(again, FORM_REPLY.replace('"2"]', '"1"]'), chunk=3)  # split mid-line
+        self.assertEqual(again.rejected, [])
+        self.assertEqual(again.upgraded, ["trip_prefs"])
+        kinds = {k for n, d in events if n == "a2ui" for k in d["message"] if k != "version"}
+        self.assertNotIn("createSurface", kinds)
+
+    def test_prose_streams_without_waiting_for_a_newline(self):
+        turn = A2uiTurn(new_session())
+        turn.start_pass()
+        events = turn.feed("Paris is the capital")
+        self.assertEqual(events, [("token", {"content": "Paris is the capital"})])
 
 
 CHART_REPLY = """A live growth curve.
@@ -154,18 +166,49 @@ class ChartTest(unittest.TestCase):
         self.assertEqual(chart["spec"]["params"][0]["bind"]["input"], "range")
         self.assertEqual(chart["height"], 300)
 
-    def test_layout_change_is_delete_and_new_surface_in_one_block(self):
+    def test_new_surface_does_not_delete_the_earlier_one(self):
+        # Seen live: the model deleted the form/histogram whenever it showed a new card, so the
+        # earlier message showed "This interface was removed".
         session = new_session()
         first = A2uiTurn(session)
         run_reply(first, FORM_REPLY)
         first.save("run-1")
         second = A2uiTurn(session)
         reply = CHART_REPLY.replace("<a2ui>\n", '<a2ui>\ndeleteSurface("trip_prefs")\n')
-        events = run_reply(second, reply)
+        events = run_reply(second, reply) + second.finish()
         self.assertEqual(second.rejected, [])
         kinds = [next(k for k in d["message"] if k != "version") for n, d in events if n == "a2ui"]
-        self.assertEqual(kinds[0], "deleteSurface")
-        self.assertEqual(second.surface_ids, ["growth"])
+        self.assertNotIn("deleteSurface", kinds)
+        second.save("run-2")
+        self.assertEqual(sorted(A2uiTurn(session).surface_ids), ["growth", "trip_prefs"])
+
+    def test_delete_only_turn_removes_the_surface(self):
+        session = new_session()
+        first = A2uiTurn(session)
+        run_reply(first, FORM_REPLY)
+        first.save("run-1")
+        second = A2uiTurn(session)
+        events = run_reply(second, '<a2ui>\ndeleteSurface("trip_prefs")\n</a2ui>\nRemoved it.')
+        events += second.finish()
+        kinds = [next(k for k in d["message"] if k != "version") for n, d in events if n == "a2ui"]
+        self.assertEqual(kinds, ["deleteSurface"])
+        second.save("run-2")
+        self.assertEqual(A2uiTurn(session).surface_ids, [])
+
+    def test_stored_replacing_delete_is_ignored_on_read(self):
+        # Chats saved before the rule: the delete is in the database, but history and the
+        # next turn's state skip it.
+        session = new_session()
+        first = A2uiTurn(session)
+        run_reply(first, FORM_REPLY)
+        first.save("run-1")
+        delete = {"version": "v1.0", "deleteSurface": {"surfaceId": "trip_prefs"}}
+        second = A2uiTurn(session)
+        run_reply(second, CHART_REPLY)
+        second.parts.insert(0, {"type": "a2ui", "message": delete})  # as stored before
+        second.save("run-2")
+        self.assertNotIn(delete, [p.get("message") for p in parts_by_run(session)["run-2"]])
+        self.assertEqual(sorted(A2uiTurn(session).surface_ids), ["growth", "trip_prefs"])
 
 
 class RootAliasTest(unittest.TestCase):
@@ -174,7 +217,7 @@ class RootAliasTest(unittest.TestCase):
         turn = A2uiTurn(new_session())
         run_reply(turn, '<a2ui>\nsurface("s")\ncard = Card(Text("Hi"))\nroot = card\n</a2ui>')
         self.assertEqual(len(turn.rejected), 1)
-        self.assertIn("root = card", A2UI_INSTRUCTIONS)
+        self.assertIn("root = card", (SKILL_DIR / "SKILL.md").read_text())
 
 
 class ActionTest(unittest.TestCase):

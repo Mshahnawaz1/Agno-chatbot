@@ -195,8 +195,10 @@ class SkillsTest(unittest.IsolatedAsyncioTestCase):
     async def test_snippet_tools_search_and_allowed_tools(self):
         from app.skills import skills
 
-        self.assertLess(len(skills.get_system_prompt_snippet()) // 4, 200)  # ~tokens
-        self.assertEqual([f.name for f in skills.get_tools()], ["search_skills", "get_skill_instructions"])
+        # ~tokens; the a2ui description names its blocks so the model loads it for them.
+        self.assertLess(len(skills.get_system_prompt_snippet()) // 4, 260)
+        # get_skill_script: the a2ui skill has scripts/check.py; no reference tool (files= batches them).
+        self.assertEqual([f.name for f in skills.get_tools()], ["search_skills", "get_skill_instructions", "get_skill_script"])
         self.assertTrue(skills.search_skills("schedule focus time on my calendar").startswith("reclaim"))
 
         async def fake_specs(user_id):

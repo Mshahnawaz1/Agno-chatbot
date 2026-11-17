@@ -23,7 +23,6 @@ from app.guardrails import piiGuardrails, input_length_guardrail, tool_logger_ho
 from app.tools import primes_below, get_weather
 from app.connectors.tools import user_connector_tools
 from app.skills import skills
-from app.a2ui import A2UI_INSTRUCTIONS, A2UI_RULE
 from app.reasoning_groq import ReasoningGroq
 
 Path(settings.agno_db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -144,6 +143,9 @@ agent = Agent(
     # model round trip on unrelated questions; scope it in `instructions` instead.
     add_search_knowledge_instructions=False,
     search_past_sessions=True,
+    # Its listing defaults to 20 sessions x 3 runs (8k chars on average, resent on every later
+    # model call of the run); read_past_session still reads a whole session when needed.
+    num_past_sessions_to_search=8,
     enable_agentic_memory=True,
     add_memories_to_context=True,
     add_datetime_to_context=True,
@@ -160,8 +162,6 @@ agent = Agent(
         "Connected-app tools are named <app>_<tool>, e.g. todoist_find-tasks. If one in "
         "your tool list fits, call it directly. Only when none fits: search_tools, "
         "then get_tool, then call_tool.",
-        A2UI_RULE,
     ],
-    additional_context=A2UI_INSTRUCTIONS,  # interactive UI in replies (app/a2ui.py)
 )
 # agent.print_response("What is the name of my client?")

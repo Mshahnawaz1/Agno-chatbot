@@ -469,6 +469,20 @@ Report: "monthly tracker" said "here is your tracker" and showed nothing; radar 
   repairs on two of them).
 - Open: a spec that is schema-valid but draws wrongly is not caught; samples are small.
 
+## Phase 12: full public A2UI (branch feat/a2ui-full)
+Goal: every public A2UI v1.0 capability in dots-in-chat, with scenario-based iterative tests (write a scenario, run it, fix, rerun; record results here).
+Audit (2026-11-17, partial): done = the 4 surface messages, basic catalog, VegaChart, 12 blocks, `action`.
+Missing = renderer `error` -> agent, `sendDataModel`, capabilities handshake, function RPC, mixed catalogs.
+Unknown = inline createSurface components/data, progressive render, @checks ValidationResult, @accessibility, templates/@index.
+Not in scope: A2A / AG-UI / MCP transports (Agno SSE does this job), CopilotKit.
+Tracks (parallel, one worktree each):
+- [ ] 12.A Audit of the Unknown rows by running them + replay all 43 official examples through the app's renderer and server compiler (tests + results table).
+- [ ] 12.B Feedback channel: renderer `error` -> agent (+ repair), `sendDataModel`, capabilities handshake, then function RPC (both directions, allowedCallers, requiresUserActivation).
+- [ ] 12.C Catalogs: mixed catalogs (per-component catalogId), register upstream catalogs, macros, blueprints; skills + check scripts.
+- [ ] 12.D Progressive rendering while the model streams (turn.py / feed).
+- [ ] 12.E Merge, full scenario suite, tsc/eslint/build, update a2ui-kb.
+Results: (fill in per track)
+
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and
   the lost shadcn catalog are replaced.

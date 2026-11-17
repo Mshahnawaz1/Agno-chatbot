@@ -163,6 +163,8 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
                 model_input, repair = turn.repair_prompt(), True
             if run["stopped"]:
                 return
+            for name, data in turn.finish():
+                yield sse(name, data)
             if run["metrics"]:
                 yield sse("metrics", run["metrics"])
             yield sse("done", {"run_id": run["run_id"]})

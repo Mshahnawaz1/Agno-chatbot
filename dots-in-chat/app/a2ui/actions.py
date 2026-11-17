@@ -45,7 +45,7 @@ def action_prompt(action: dict[str, Any], surface_ids: list[str]) -> str:
         text += f"\nThe user tapped the reply {json.dumps(context['text'])}: treat it as their message."
     if surface_ids:
         text += "\nSurfaces that exist now: " + ", ".join(surface_ids)
-    return text
+    return text + "\nAct on it now; don't show the same form again."
 
 
 def parse_action_prompt(text: str) -> dict[str, Any] | None:

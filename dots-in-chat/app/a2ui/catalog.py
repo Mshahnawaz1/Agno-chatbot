@@ -124,14 +124,18 @@ def upgrade_message(message: dict) -> dict:
     """A stored surface message from before mixed catalogs, in today's shape.
 
     `createSurface` named the one merged catalog; now it names none and each component names
-    its own. Anything else passes through unchanged.
+    its own. `updateComponents` of those turns named none at all. Anything else passes
+    through unchanged.
     """
     body = message.get("createSurface")
-    if not isinstance(body, dict) or body.get("catalogId") != CATALOG_ID:
-        return message
-    body = {k: v for k, v in body.items() if k != "catalogId"}
-    body["components"] = [_tag(c) for c in body.get("components", [])]
-    return {**message, "createSurface": body}
+    if isinstance(body, dict) and body.get("catalogId") == CATALOG_ID:
+        body = {k: v for k, v in body.items() if k != "catalogId"}
+        body["components"] = [_tag(c) for c in body.get("components", [])]
+        return {**message, "createSurface": body}
+    body = message.get("updateComponents")
+    if isinstance(body, dict):
+        return {**message, "updateComponents": {**body, "components": [_tag(c) for c in body.get("components", [])]}}
+    return message
 
 
 GENERATOR = A2uiGenerator(

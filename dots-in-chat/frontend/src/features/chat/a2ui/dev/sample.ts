@@ -6,6 +6,8 @@ export type Sample = {
   /** The user's message and the agent's lead sentence, drawn around the surface for context. */
   user?: string
   lead?: string
+  /** Sent the way surfaces were stored before mixed catalogs: createSurface names one merged catalog. */
+  legacy?: boolean
   /** Flat v1.0 component list; one must have id "root". */
   components: Record<string, unknown>[]
   data?: Record<string, unknown>

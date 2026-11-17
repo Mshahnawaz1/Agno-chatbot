@@ -1,7 +1,7 @@
 import { useLayoutEffect, useSyncExternalStore } from 'react'
 import { MessageProcessor, type ActionPayload } from '@a2ui/web_core/v1_0'
 import type { ReactCatalogComponent } from '@a2ui/react/v0_9'
-import { catalog } from './catalog'
+import { catalogs, upgradeMessage } from './catalog'
 import type { SurfaceFeed } from './feed'
 import type { A2uiMessage, UiAction } from './protocol'
 
@@ -21,7 +21,7 @@ type Entry = {
 const entries = new Map<string, Entry>()
 
 function newProcessor(entry: Entry) {
-  return new MessageProcessor<ReactCatalogComponent>([catalog], (a: ActionPayload) => entry.onAction(a as UiAction))
+  return new MessageProcessor<ReactCatalogComponent>(catalogs, (a: ActionPayload) => entry.onAction(a as UiAction))
 }
 
 function entryFor(key: string): Entry {
@@ -51,7 +51,7 @@ function sync(feed: SurfaceFeed) {
     entry.last = undefined
   }
   if (!replaced && entry.applied === messages.length) return
-  const errors = entry.processor.processMessagesWithErrors(messages.slice(entry.applied))
+  const errors = entry.processor.processMessagesWithErrors(messages.slice(entry.applied).map(upgradeMessage))
   // The server validated these against the same catalog, so an error here is a bug to look at.
   if (errors.length) console.warn('A2UI renderer errors:', errors)
   entry.applied = messages.length

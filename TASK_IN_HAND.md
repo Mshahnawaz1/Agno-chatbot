@@ -478,10 +478,24 @@ Not in scope: A2A / AG-UI / MCP transports (Agno SSE does this job), CopilotKit.
 Tracks (parallel, one worktree each):
 - [ ] 12.A Audit of the Unknown rows by running them + replay all 43 official examples through the app's renderer and server compiler (tests + results table).
 - [ ] 12.B Feedback channel: renderer `error` -> agent (+ repair), `sendDataModel`, capabilities handshake, then function RPC (both directions, allowedCallers, requiresUserActivation).
-- [ ] 12.C Catalogs: mixed catalogs (per-component catalogId), register upstream catalogs, macros, blueprints; skills + check scripts.
+- [x] 12.C (branch worktree-agent-ae7dc3cb43428508d, see Results) Catalogs: mixed catalogs (per-component catalogId), register upstream catalogs, macros, blueprints; skills + check scripts.
 - [ ] 12.D Progressive rendering while the model streams (turn.py / feed).
 - [ ] 12.E Merge, full scenario suite, tsc/eslint/build, update a2ui-kb.
-Results: (fill in per track)
+Results:
+- 12.C catalogs (2026-11-17): three renderer catalogs with their own ids (official basic, official VegaChart,
+  `dots-in-chat/blocks/v1`), a surface has no catalog and each component carries `catalogId` (server `app/a2ui/catalog.py`,
+  client `catalog/index.ts`, MessageProcessor with 3 catalogs). The whole basic catalog is registered (Modal, Video,
+  AudioPlayer added; client `catalog/media.tsx`). Stored surfaces with the old merged id `dots-in-chat/chat/v1` are upgraded
+  (`upgrade_message` server, `upgradeMessage` client). Macros `StatTile, InfoRow, Callout, ConfirmBar` (`app/a2ui/macros.py`):
+  a 4th model-only catalog, lowered to basic components in the response stream; the expansion root keeps the call in
+  `metadata.extensions.dotsMacro` and the store raises it back when a state is rebuilt (so updates work). Skill:
+  `references/macros.md`, `scripts/check.py` -> `app/a2ui/skill_check.py` (stale refs, undocumented components, example compile).
+  Tests: `tests/test_a2ui_catalogs.py` (15 scenarios), `frontend/e2e/catalogs.mjs` (4 browser scenarios); 76 python tests, blocks e2e 15/15.
+  Not done: the MCP v1 catalog (`catalogs/mcp/v1`) is not in a2ui-kb/reference/upstream and could not be fetched here;
+  the travel sample's catalog is domain-specific, not registered. Upstream blueprint `skill_generator.blueprint.md` describes what
+  `skill_build.py` already does (one reference per catalog + `--check`), so it was not adopted. turn.py still reads `CATALOG` (merged
+  legacy catalog) for the component-name hint; switch it to `CATALOGS` when the streaming track lands.
+- (other tracks: fill in)
 
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and

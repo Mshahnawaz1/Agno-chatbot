@@ -38,4 +38,22 @@ export const samples: Sample[] = [
       { id: 'calc', component: 'GrowthCalculator', monthly: 5000, rate: 10, years: 10 },
     ],
   },
+  {
+    id: 'macro-lowered',
+    title: 'A lowered macro (server expands Callout into basic components; its root keeps the call in metadata)',
+    components: [
+      { id: 'root', component: 'Column', children: ['tip'] },
+      {
+        id: 'tip',
+        component: 'Card',
+        child: 'tip__row_1',
+        metadata: { extensions: { dotsMacro: { id: 'tip', component: 'Callout', title: 'Heads up', body: 'Prices change daily.', tone: 'warning' } } },
+      },
+      { id: 'tip__row_1', component: 'Row', align: 'center', children: ['tip__icon_1', 'tip__column_1'] },
+      { id: 'tip__icon_1', component: 'Icon', name: 'warning' },
+      { id: 'tip__column_1', component: 'Column', children: ['tip__text_1', 'tip__text_2'] },
+      { id: 'tip__text_1', component: 'Text', text: 'Heads up' },
+      { id: 'tip__text_2', component: 'Text', text: 'Prices change daily.', variant: 'caption' },
+    ],
+  },
 ]

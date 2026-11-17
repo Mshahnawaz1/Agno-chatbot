@@ -3,6 +3,7 @@
  *   1. one surface mixes basic, VegaChart and chat-block components, each resolved by its own catalogId
  *   2. a basic Modal opens its content in a dialog
  *   3. a surface stored with the old single catalog id still renders (upgradeMessage)
+ *   4. a server-lowered macro (expansion root carrying metadata) renders
  *
  * Run with the dev server up (npm run dev):
  *   node e2e/catalogs.mjs [baseUrl]          default http://localhost:5173
@@ -60,6 +61,12 @@ await check('a surface stored with the old single catalog id renders', async () 
   assert(!text.includes('no surface'), 'legacy surface was not created')
   assert(text.includes('Stored with the old single catalog id.'), 'legacy basic Text missing')
   assert(text.includes('₹') || (await c.getByRole('slider').count()) > 0, 'legacy block missing')
+})
+
+await check('a lowered macro (root with metadata) renders as plain basic components', async () => {
+  const text = await card('macro-lowered').textContent()
+  assert(text.includes('Heads up') && text.includes('Prices change daily.'), 'macro expansion missing')
+  assert(errors.length === 0, errors.join('\n'))
 })
 
 await browser.close()

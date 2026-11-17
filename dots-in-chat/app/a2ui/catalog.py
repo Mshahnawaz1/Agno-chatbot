@@ -22,7 +22,10 @@ from a2ui.core.basic_catalog import BasicCatalog
 from a2ui.core.catalog.catalog import Catalog
 from a2ui.core.schema import ProtocolVersion
 from a2ui.inference_formats import ExpressFormatFactory
+from a2ui.parser import A2uiPart
 from a2ui.processor import A2uiGenerator, A2uiRequestProcessor, CatalogConfig
+
+from app.a2ui import macros
 
 PROTOCOL_VERSION = "1.0"
 
@@ -94,8 +97,16 @@ BLOCKS = Catalog.from_json(_catalog_doc(BLOCKS_ID, BLOCK_COMPONENTS))
 # Every catalog the chat renders, each under its own id. A surface has no catalog of its own:
 # each component names the catalog it is from (`catalogId` on the wire), so one card can mix
 # a basic Column, a VegaChart and a chat block.
-CATALOGS = [BASIC, VEGA, BLOCKS]
-CATALOG_IDS = [c.catalog_id for c in CATALOGS]
+RENDERER_CATALOGS = [BASIC, VEGA, BLOCKS]
+CATALOG_IDS = [c.catalog_id for c in RENDERER_CATALOGS]
+
+# The catalogs the model writes in: the renderer's, plus the macros (macros.py), which exist only
+# on the server. `lower` expands macro calls into basic components before the client sees them.
+EXPANDER = macros.new_expander()
+CATALOGS = EXPANDER.transform_catalogs(RENDERER_CATALOGS)
+CATALOGS[-1] = CATALOGS[-1].derive(catalog_id=macros.MACROS_ID, instructions=macros.INSTRUCTIONS)
+MACRO_CATALOG = CATALOGS[-1]
+MODEL_CATALOG_IDS = [c.catalog_id for c in CATALOGS]
 
 
 def _merged_catalog() -> Catalog:
@@ -112,7 +123,7 @@ def _merged_catalog() -> Catalog:
 
 
 CATALOG = _merged_catalog()
-COMPONENT_CATALOG = {name: cat.catalog_id for cat in CATALOGS for name in cat.components}
+COMPONENT_CATALOG = {name: cat.catalog_id for cat in RENDERER_CATALOGS for name in cat.components}
 
 
 def _tag(component: dict) -> dict:
@@ -143,13 +154,50 @@ GENERATOR = A2uiGenerator(
     inference_format_factory=ExpressFormatFactory(),
 )
 
-# The chat frontend renders all of them, so every request has the same capabilities.
-CAPABILITIES = {PROTOCOL_VERSION: {"supportedCatalogIds": CATALOG_IDS}}
+# Every request has the same capabilities: the renderer's catalogs and the macros.
+CAPABILITIES = {PROTOCOL_VERSION: {"supportedCatalogIds": MODEL_CATALOG_IDS}}
 
 
-def new_processor() -> A2uiRequestProcessor:
+class _LoweringStream:
+    """A response stream whose compiled messages have their macro calls expanded.
+
+    The SDK stream applies each message to the renderer state as the model wrote it (macro
+    calls in it), which is what the model reads back on update; what leaves it, and so what
+    the client shows and the store keeps, is the lowered form.
+    """
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def _lowered(self, parts):
+        return [A2uiPart(macros.lower_with_source(EXPANDER, p.a2ui)) if isinstance(p, A2uiPart) else p for p in parts]
+
+    def feed(self, chunk):
+        return self._lowered(self._stream.feed(chunk))
+
+    def close(self):
+        return self._lowered(self._stream.close())
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+class _LoweringProcessor:
+    """The SDK request processor, with `open_stream` lowering macros. Everything else is the SDK's."""
+
+    def __init__(self, processor: A2uiRequestProcessor):
+        self._processor = processor
+
+    def open_stream(self, *args, **kwargs):
+        return _LoweringStream(self._processor.open_stream(*args, **kwargs))
+
+    def __getattr__(self, name):
+        return getattr(self._processor, name)
+
+
+def new_processor() -> _LoweringProcessor:
     """A processor for one request: compiles replies and makes renderer states."""
-    return GENERATOR.create_processor(CAPABILITIES)
+    return _LoweringProcessor(GENERATOR.create_processor(CAPABILITIES))
 
 
 # The SDK writes the same `weight` note under every basic component (15 x 211 chars, ~800

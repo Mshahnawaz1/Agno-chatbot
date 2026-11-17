@@ -16,6 +16,7 @@ import re
 import sys
 from pathlib import Path
 
+from app.a2ui import macros
 from app.a2ui.catalog import (
     BASIC_ID,
     CATALOGS,
@@ -111,6 +112,13 @@ def build() -> dict[str, str]:
     )
 
     files["chart.md"] = f"# VegaChart: charts, graphs and live formulas\n\n{vega_sigs['VegaChart']}\n\n{INSTRUCTIONS}\n"
+
+    _, macro_sigs = _signatures(macros.MACROS_ID)
+    files["macros.md"] = (
+        f"# Macros: {', '.join(macro_sigs)} (shortcuts made of basic components)\n\n"
+        + "\n\n".join(macro_sigs.values())
+        + f"\n\n{macros.INSTRUCTIONS}\n"
+    )
 
     for path in sorted((CATALOGS_DIR / "blocks").glob("*.json")):
         doc = json.loads(path.read_text())

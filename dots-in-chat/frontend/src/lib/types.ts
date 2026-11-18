@@ -60,3 +60,11 @@ export type User = {
   name: string | null
   created_at: string
 }
+
+export type FileKind = 'docx' | 'md'
+export type FileAction = 'created' | 'updated' | 'deleted'
+
+/** A workspace file the agent touched (SSE `file` event, or derived from stored tool calls). */
+export type FileRef = { path: string; kind: FileKind; action: FileAction }
+
+export type FilePreview = { path: string; kind: FileKind; html: string; version: string }

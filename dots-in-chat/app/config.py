@@ -1,4 +1,7 @@
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+load_dotenv()  # os.getenv fallbacks elsewhere (GEMINI_API_KEY, GROQ_API_KEY) read the same .env
 
 
 class Settings(BaseSettings):
@@ -6,6 +9,7 @@ class Settings(BaseSettings):
 
     app_db_path: str = "data/app.db"
     agno_db_path: str = "data/agno.db"
+    agent_workspace_dir: str = "data/workspace"
     tool_cache_ttl: int = 3600 #seconds
     tool_cache_dir: str = "data/tools"
 

@@ -48,3 +48,34 @@ On the frontend, any 401 clears the token and opens login. This covers expiry wi
 The token is stored in localStorage. It's simple and fine for learning. The trade-off is that any XSS bug could read it. Production apps often use an httpOnly cookie instead, which brings CSRF handling with it. Your messages already go through DOMPurify, which helps.
 
 Changing the server URL logs you out, because a token from one server isn't valid on another. The login dialog can't be dismissed with Escape, since nothing works logged out. It has a "⚙ Server" button so you can still change the URL.
+
+### Agent file workspace (v1: .docx create / edit / preview), 18 nov 26
+Plan: `files_plan.md`, tracker: `files_todo.md`. Branch `feat/file-tools-docx`.
+
+Why Markdown: agno `FileTools` only reads and writes text, and a .docx is a zip. So the agent edits
+a `.md` with the stock FileTools (`save_file`, `replace_file_chunk`, ...) and a thin `build_docx`
+tool turns it into the `.docx`. `import_docx` goes the other way, so an existing .docx can be edited.
+
+Backend (`dots-in-chat/app`)
+- `agent/workspace.py`: one folder per user under `agent_workspace_dir`. `safe_path` rejects
+  absolute paths, `..`, hidden names and symlink escapes; only `.md` / `.docx` are served.
+- `agent/docx_tools.py`: `md_to_docx` (markdown-it-py to python-docx), `docx_to_md` and
+  `docx_to_html` (mammoth), HTML sanitised with nh3. `DocxTools` wraps them as agent tools.
+- `agent/core.py`: `agent_tools` adds `user_file_tools(user_id)` on every run, so each user is
+  confined to their own folder. A "Files" instruction tells the model to write long content to a
+  file and call `build_docx` after every edit.
+- `routers/files.py`: `GET /files`, `/files/preview` (sanitised HTML + version), `/files/download`.
+- `routers/chat.py`: after a file tool succeeds, the stream sends `event: file`
+  `{path, kind, action}`. History needs no new table: chips are rebuilt from `metrics.tools`.
+
+Frontend (`dots-in-chat/frontend/src`)
+- `features/files/`: `FilePanel` (sandboxed iframe preview, Download, close), `FileChip`,
+  `useFilePanel`, `fileRefs`. Download is an authenticated blob fetch, no token in the URL.
+- `ChatPage`: two columns on `lg+` (panel ~45%), full-screen overlay below. A `file` event opens
+  or refreshes the panel.
+
+Security: preview HTML is sanitised and shown in `sandbox=""`; markdown limited to 2 MB, docx
+preview to 10 MB (413).
+
+Known limits: `save_file` has no size cap; an overwrite in a later turn is labelled "Created";
+live end-to-end test with a real model not run yet; pytest runs via `uv run --with pytest`.

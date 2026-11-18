@@ -1,0 +1,41 @@
+# files_todo.md
+
+Plan: `files_plan.md`. Branch: `feat/file-tools-docx`. Status: [ ] todo, [~] in progress, [x] done.
+
+## Phase 0: setup
+- [x] Branch `feat/file-tools-docx` from `main`
+- [x] Write `files_plan.md` and this file
+- [x] Add deps (python-docx, mammoth, markdown-it-py, nh3) to requirements.txt + pyproject (uv add)
+
+## Phase 1: backend (agent A: Sonnet)
+- [x] `agent/workspace.py`: `workspace_for`, `safe_path`, allow-list
+- [x] `agent/docx_tools.py`: `md_to_docx`, `docx_to_md`, `docx_to_html` (+ nh3), `DocxTools` toolkit
+- [x] `agent/core.py`: per-user FileTools + DocxTools in `agent_tools`, INSTRUCTIONS entry, fix the
+      half-written line 38
+- [x] `routers/files.py` (list / preview / download) + register in `main.py` + `API_PREFIXES`
+- [x] `routers/chat.py`: emit SSE `file` event from tool_call_completed
+- [x] `tests/test_files.py`: converter, safe_path, endpoints, event; `uv run pytest` green
+
+## Phase 2: frontend (agent B: Sonnet)
+- [x] Types + api (`listFiles`, `getFilePreview`, blob download)
+- [x] `file` SSE event -> store -> `Turn.files`
+- [x] `features/files/` FilePanel, FileChip, useFilePanel
+- [x] ChatPage two-column layout (+ mobile overlay)
+- [x] History: chips from `metrics.tools`
+- [x] `npx tsc -b`, `npx eslint .`, `npm run build` clean
+
+## Phase 3: integrate and verify (agent C / me)
+- [x] Review both diffs against the API contract (tests/tsc/eslint re-run, see log)
+- [ ] Run app; E2E create-then-edit scenario in the browser; record results below
+- [ ] Fix findings; final lint/tests
+
+## Phase 4: wrap-up
+- [ ] Commit only feature files (not the user's unrelated WIP); no push without asking
+
+## Results log
+- Re-run by lead: pytest 57 passed / 1 skipped (symlink test, OS), tsc and eslint clean.
+- Converter smoke: md -> docx gives Heading 1, bullets, 1 table; preview HTML renders them and
+  escapes a raw `<script>` tag to text (no live script).
+- NOT yet done: live E2E with a real model in the browser (needs servers + API key).
+- Known limits: save_file has no 2 MB cap (only build_docx/preview enforce it); history chips
+  say "Created" even for overwrites; pytest is not a project dev dependency (run with --with).

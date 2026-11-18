@@ -184,6 +184,14 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
               // A block the server rejected; it never reaches the screen (a repair run follows).
               console.debug('A2UI block rejected by the server:', d.error)
               break
+            case 'file': {
+              const kind = d.kind === 'docx' || d.kind === 'md' ? d.kind : null
+              const act = d.action === 'created' || d.action === 'updated' || d.action === 'deleted' ? d.action : null
+              if (typeof d.path === 'string' && kind && act) {
+                dispatch({ type: 'file', runId, assistantId, file: { path: d.path, kind, action: act } })
+              }
+              break
+            }
             case 'metrics':
               flush()
               dispatch({ type: 'metrics', runId, assistantId, metrics: d as Metrics })

@@ -11,6 +11,10 @@ import type { Message } from '@/lib/types'
 import { useChatStream, type Turn } from './chatStore'
 import { SurfaceFeedContext, type SurfaceFeed } from './a2ui/feed'
 import { legacyParts, type A2uiMessage, type Part } from './a2ui/protocol'
+import { FilePanel } from '@/features/files/FilePanel'
+import { filesFromTools } from '@/features/files/fileRefs'
+import { FilePanelContext, useFilePanelState } from '@/features/files/useFilePanel'
+import type { FileRef } from '@/lib/types'
 import { Composer } from './Composer'
 import { MessageList, type MessageListHandle } from './MessageList'
 
@@ -61,12 +65,30 @@ function useSurfaceFeed(
   return useMemo(() => ({ key, messages, sendAction, busy }), [key, messages, sendAction, busy])
 }
 
+/** Opens or refreshes the file panel when the agent writes a file during a stream. */
+function useFileEvents(turns: Turn[], panel: ReturnType<typeof useFilePanelState>) {
+  const seen = useRef(new Map<string, FileRef>())
+  const { touch } = panel
+  const last = turns.at(-1)
+  useEffect(() => {
+    if (!last || last.role !== 'assistant') return
+    const changed = last.files.filter((f) => seen.current.get(`${last.id}:${f.path}`) !== f)
+    if (!changed.length) return
+    for (const f of changed) seen.current.set(`${last.id}:${f.path}`, f)
+    // The .docx built from a .md is what the user wants to see.
+    const shown = changed.filter((f) => f.action !== 'deleted')
+    const pick = shown.find((f) => f.kind === 'docx') ?? shown.at(-1)
+    touch(pick?.path ?? null, !!pick)
+  }, [last, touch])
+}
+
 export function ChatPage() {
   const { sessionId: routeId = null } = useParams()
   const stream = useChatStream()
   const [draft, setDraft] = useState('')
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<MessageListHandle>(null)
+  const panel = useFilePanelState()
 
   const history = useQuery({
     queryKey: ['messages', routeId],
@@ -88,6 +110,7 @@ export function ChatPage() {
         // Copy takes the text only (old replies kept their UI JSON inside the text).
         content: m.role === 'assistant' ? parts.flatMap((p) => (p.kind === 'text' ? [p.text] : [])).join('\n\n') : (m.content ?? ''),
         parts,
+        files: m.role === 'assistant' ? filesFromTools(m.metrics?.tools) : [],
         reasoning: m.reasoning ?? '',
         reasoningMs: null,
         action: m.action ?? undefined,
@@ -107,6 +130,15 @@ export function ChatPage() {
     [ownsTurns, historyTurns, stream.turns],
   )
   const feed = useSurfaceFeed(routeId ?? 'new', turns, stream.sendAction, stream.streaming)
+  useFileEvents(stream.turns, panel)
+
+  // Leaving a chat for another one closes its file; a new chat getting its id keeps it.
+  const [prevRoute, setPrevRoute] = useState(routeId)
+  if (prevRoute !== routeId) {
+    setPrevRoute(routeId)
+    if (prevRoute !== null) panel.close()
+  }
+
   const isEmpty = routeId === null && (!ownsTurns || stream.turns.length === 0)
   const loadingHistory = routeId !== null && history.isPending
 
@@ -157,7 +189,9 @@ export function ChatPage() {
   }
 
   return (
-    <div className="relative isolate flex h-full min-h-0 flex-col">
+    <FilePanelContext.Provider value={panel}>
+    <div className="flex h-full min-h-0">
+    <div className="relative isolate flex h-full min-h-0 min-w-0 flex-1 flex-col lg:min-w-[380px]">
       {isEmpty ? (
         <>
           <Backdrop orbClassName="top-1/2 w-[min(900px,150vw)] -translate-y-[55%]" fadeAt="70%" fadeTop />
@@ -206,5 +240,8 @@ export function ChatPage() {
 
       {isEmpty ? <div className="flex-1" /> : null}
     </div>
+    {panel.path ? <FilePanel path={panel.path} /> : null}
+    </div>
+    </FilePanelContext.Provider>
   )
 }

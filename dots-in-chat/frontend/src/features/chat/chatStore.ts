@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { Metrics } from '@/lib/types'
+import type { FileRef, Metrics } from '@/lib/types'
 import type { A2uiMessage, ActionMessage, Part, UiAction } from './a2ui/protocol'
 
 export type TurnStatus = 'streaming' | 'done' | 'stopped' | 'error'
@@ -19,6 +19,8 @@ export type Turn = {
   reasoningMs: number | null
   /** User turns started by a click on a surface. */
   action?: UiAction
+  /** Assistant turns: workspace files the agent created, updated or deleted. */
+  files: FileRef[]
   metrics: Metrics | null
   error: string | null
   errorKind: ErrorKind | null
@@ -45,6 +47,7 @@ export type StreamAction =
   | { type: 'reasoning'; runId: number; assistantId: string; content: string }
   | { type: 'reasoningDone'; runId: number; assistantId: string; ms: number }
   | { type: 'a2ui'; runId: number; assistantId: string; message: A2uiMessage }
+  | { type: 'file'; runId: number; assistantId: string; file: FileRef }
   | { type: 'metrics'; runId: number; assistantId: string; metrics: Metrics }
   | { type: 'fail'; runId: number; assistantId: string; message: string; kind: ErrorKind }
   | { type: 'finish'; runId: number; assistantId: string; status: Exclude<TurnStatus, 'streaming'> }
@@ -69,6 +72,14 @@ function appendText(parts: Part[], text: string): Part[] {
   return [...parts, { kind: 'text', text }]
 }
 
+/** One entry per path: a later event replaces the earlier one (a file created then edited stays "created"). */
+export function mergeFile(files: FileRef[], file: FileRef): FileRef[] {
+  const prev = files.find((f) => f.path === file.path)
+  if (!prev) return [...files, file]
+  const action = file.action === 'updated' && prev.action === 'created' ? 'created' : file.action
+  return files.map((f) => (f.path === file.path ? { ...file, action } : f))
+}
+
 export function streamReducer(state: StreamState, action: StreamAction): StreamState {
   if (action.type === 'reset') return initialStreamState(action.sessionId)
 
@@ -80,10 +91,10 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       turns: [
         ...state.turns,
         {
-          id: action.userId, role: 'user', parts: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'done',
+          id: action.userId, role: 'user', parts: [], files: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'done',
           ...('text' in action.input ? { content: action.input.text } : { content: '', action: action.input.action.action }),
         },
-        { id: action.assistantId, role: 'assistant', content: '', parts: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'streaming' },
+        { id: action.assistantId, role: 'assistant', content: '', parts: [], files: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'streaming' },
       ],
     }
   }
@@ -107,6 +118,8 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       return updateTurn(state, action.assistantId, (t) => ({
         parts: [...t.parts, { kind: 'a2ui', message: action.message }],
       }))
+    case 'file':
+      return updateTurn(state, action.assistantId, (t) => ({ files: mergeFile(t.files, action.file) }))
     case 'metrics':
       return updateTurn(state, action.assistantId, () => ({ metrics: action.metrics }))
     case 'fail':

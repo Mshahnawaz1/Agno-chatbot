@@ -68,6 +68,49 @@ def log_run(run_id, metrics, tools) -> None:
     )
 
 
+def file_event(tool, seen: set) -> dict | None:
+    """The `file` SSE payload for a completed file tool call, or None for any other call or a failed one.
+
+    "created" vs "updated" can't be known after the fact, so: save_file is "created" the first time
+    a path is seen in this stream and "updated" after that; replace_file_chunk is always "updated";
+    build_docx is "created" for the first sighting of its .docx and "updated" after. `seen` is
+    per-stream state (a file overwritten by save_file in a later chat turn reads "created" again).
+    """
+    name = getattr(tool, "tool_name", None)
+    args = getattr(tool, "tool_args", None) or {}
+    result = str(getattr(tool, "result", "") or "")
+    if name == "save_file":
+        path = args.get("file_name")
+    elif name == "replace_file_chunk":
+        path = args.get("file_name")
+    elif name == "build_docx":
+        path = result  # build_docx returns the .docx name it wrote
+    elif name == "delete_file":
+        path = args.get("file_name")
+    else:
+        return None
+    if not isinstance(path, str) or not path:
+        return None
+    if name == "delete_file":
+        failed = bool(result)  # empty result = success
+    else:
+        failed = result.startswith(("Error", "Incorrect")) or "already exists" in result
+    if failed:
+        return None
+    path = path.replace("\\", "/")
+    kind = "docx" if path.lower().endswith(".docx") else "md" if path.lower().endswith(".md") else "file"
+    if name == "delete_file":
+        action = "deleted"
+        seen.discard(path)
+    elif name == "replace_file_chunk":
+        action = "updated"
+        seen.add(path)
+    else:
+        action = "updated" if path in seen else "created"
+        seen.add(path)
+    return {"path": path, "kind": kind, "action": action}
+
+
 def sse(event: str, data: dict) -> str:
     # json.dumps keeps newlines inside tokens from breaking the SSE framing
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
@@ -132,6 +175,9 @@ async def model_pass(
                     yield sse(name, data)
         elif event.event == RunEvent.tool_call_completed:
             run["tools"].append(event.tool)
+            payload = file_event(event.tool, run.setdefault("seen_files", set()))
+            if payload:
+                yield sse("file", payload)
         elif event.event == RunEvent.run_completed:
             run["run_id"] = run.get("run_id") or event.run_id
             run["all_ids"].append(event.run_id)

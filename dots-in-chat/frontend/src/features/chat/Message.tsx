@@ -14,6 +14,8 @@ import {
   TraceTitle,
 } from '@/components/shadcn/trace'
 import type { Turn } from './chatStore'
+import { FileChip } from '@/features/files/FileChip'
+import { visibleFiles } from '@/features/files/fileRefs'
 import { MetricsPanel } from './MetricsPanel'
 import { LegacySurface, Surface } from './a2ui'
 import { createdSurfaceId, type Part, type UiAction } from './a2ui/protocol'
@@ -206,6 +208,14 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
         ) : (
           <ReplyBody parts={turn.parts} streaming={streaming} />
         )}
+
+        {turn.files.length ? (
+          <div className="mt-3 flex flex-col gap-2">
+            {visibleFiles(turn.files).map((f) => (
+              <FileChip key={f.path} file={f} />
+            ))}
+          </div>
+        ) : null}
 
         {turn.status === 'stopped' ? (
           <p className="mt-2 text-xs text-fg-subtle">{turn.parts.length ? 'Stopped' : 'Stopped before a reply'}</p>

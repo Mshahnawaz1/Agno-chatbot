@@ -1,5 +1,5 @@
 import { clearToken, getToken } from './token'
-import type { Connector, Message, Session, Skill, User } from './types'
+import type { Connector, FilePreview, Message, Session, Skill, User } from './types'
 
 export class ApiError extends Error {
   status: number
@@ -141,4 +141,23 @@ export function openChatStream(
     body: JSON.stringify({ ...input, session_id: sessionId }),
     signal,
   })
+}
+
+// ---- files ----
+
+export const getFilePreview = (path: string) =>
+  request<FilePreview>(`/files/preview?path=${enc(path)}`)
+
+/** Downloads through an authenticated fetch (the token never goes into a URL) and saves the blob. */
+export async function downloadFile(path: string): Promise<void> {
+  const res = await rawRequest(`/files/download?path=${enc(path)}`)
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = path.split('/').pop() || 'download'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }

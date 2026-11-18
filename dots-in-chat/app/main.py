@@ -14,13 +14,13 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import db
-from app.routers import auth, sessions, users, chat, connectors
+from app.routers import auth, sessions, users, chat, connectors, files
 from app.connectors import tools as connector_tools
 from app.agent import warm_embedder
 
 logger = logging.getLogger("app")
 
-API_PREFIXES = {"auth", "users", "sessions", "chat", "connectors", "health"}
+API_PREFIXES = {"auth", "users", "sessions", "chat", "connectors", "files", "health"}
 DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 
@@ -80,6 +80,7 @@ app.include_router(users.router)
 app.include_router(sessions.router)
 app.include_router(chat.router)
 app.include_router(connectors.router)
+app.include_router(files.router)
 
 
 @app.get("/health")

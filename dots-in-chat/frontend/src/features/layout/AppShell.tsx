@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router'
-import * as RadixDialog from '@radix-ui/react-dialog'
+import { Dialog as RadixDialog } from 'radix-ui'
 import { ChatStreamProvider } from '@/features/chat/ChatStreamProvider'
 import { useChatStream } from '@/features/chat/chatStore'
 import { Sidebar } from './Sidebar'

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { DropdownMenu } from 'radix-ui'
 import { ChevronsUpDown, LogOut, Plug } from 'lucide-react'
 import * as api from '@/lib/api'
 import { useAuth } from '@/auth'

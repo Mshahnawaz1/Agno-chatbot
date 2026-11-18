@@ -1,5 +1,5 @@
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from 'react'
-import * as RadixSwitch from '@radix-ui/react-switch'
+import { Switch as RadixSwitch } from 'radix-ui'
 import clsx from 'clsx'
 
 export const Switch = forwardRef<

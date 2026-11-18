@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import * as RadixDialog from '@radix-ui/react-dialog'
+import { Dialog as RadixDialog } from 'radix-ui'
 import { X } from 'lucide-react'
 import clsx from 'clsx'
 

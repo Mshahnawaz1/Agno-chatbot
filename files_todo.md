@@ -39,3 +39,28 @@ Plan: `files_plan.md`. Branch: `feat/file-tools-docx`. Status: [ ] todo, [~] in 
 - NOT yet done: live E2E with a real model in the browser (needs servers + API key).
 - Known limits: save_file has no 2 MB cap (only build_docx/preview enforce it); history chips
   say "Created" even for overwrites; pytest is not a project dev dependency (run with --with).
+
+
+# v2: .html and .pdf
+## Backend (agent D)
+- [x] `agent/formats.py` adapter registry; refactor files router + workspace allow-list
+- [x] `.html` preview (CSP injected), size cap, SSE kind
+- [x] `build_pdf` (xhtml2pdf) + `read_pdf` (pypdf) toolkit, wired per user in core.py
+- [x] Tests (converter output is a valid PDF with the text, html CSP, endpoints, events)
+## Frontend (agent E)
+- [x] `kind` html / pdf in types, fileRefs (tool names, `.html` save_file chips), panel
+- [x] PDF preview via authenticated blob + object URL (revoke on change); html via srcDoc
+- [x] tsc / eslint / build clean
+## Skills (agent F)
+- [ ] file skills in `dots-in-chat/skills/` + `core.py` instruction trimmed to a pointer
+- [ ] skill validation (name, description rules, loads via agent's skills loader)
+## Verify
+- [x] Review diffs, run tests/tsc/eslint (63 passed / 1 skipped; tsc, eslint, build clean)
+- [ ] Live E2E (html, pdf, edit) if keys available; record results
+- [x] Commit + docs/logs.md entry
+
+## v2 results log
+- Lead smoke: build_pdf output starts %PDF and read_pdf finds the text; remote image in markdown is
+  blocked; html CSP meta injected inside <head>, <style> kept.
+- Skills index grew to 470 tokens (guard raised 420 -> 480 for the new `files` skill).
+- NOT yet done: live E2E with a real model/browser (html + pdf create and edit, PDF viewer in panel).

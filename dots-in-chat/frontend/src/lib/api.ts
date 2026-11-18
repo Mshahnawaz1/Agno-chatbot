@@ -148,6 +148,12 @@ export function openChatStream(
 export const getFilePreview = (path: string) =>
   request<FilePreview>(`/files/preview?path=${enc(path)}`)
 
+/** The raw file as a blob, via an authenticated fetch (for in-page PDF preview). */
+export async function fetchFileBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  const res = await rawRequest(`/files/download?path=${enc(path)}`, { signal })
+  return res.blob()
+}
+
 /** Downloads through an authenticated fetch (the token never goes into a URL) and saves the blob. */
 export async function downloadFile(path: string): Promise<void> {
   const res = await rawRequest(`/files/download?path=${enc(path)}`)

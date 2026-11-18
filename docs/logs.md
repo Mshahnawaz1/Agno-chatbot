@@ -79,3 +79,24 @@ preview to 10 MB (413).
 
 Known limits: `save_file` has no size cap; an overwrite in a later turn is labelled "Created";
 live end-to-end test with a real model not run yet; pytest runs via `uv run --with pytest`.
+
+
+### File workspace v2: .html and .pdf + a `files` skill, 18 nov 26
+Same loop as docx (agent writes, panel previews, Download), via an adapter registry.
+
+- `agent/formats.py`: registry `{.md,.docx,.html,.pdf}` with kind, mime, size cap and preview
+  function; the files router and the workspace allow-list read from it, so a new format is one entry.
+- `.html`: written directly with `save_file`, edited with `replace_file_chunk` (it is text). Preview is
+  a sandboxed iframe (no scripts). The server injects a CSP meta (`default-src 'none'; style-src
+  'unsafe-inline'; img-src data:`) instead of running nh3, which would strip the agent's styling.
+- `.pdf`: `build_pdf(source, output="")` turns the `.md` into a PDF (markdown-it-py + xhtml2pdf, pure
+  Python, A4 default CSS, remote images blocked). `read_pdf(path)` extracts text with pypdf. Editing a
+  PDF = read, rewrite as markdown, rebuild (lossy). The panel fetches the PDF with the login token as a
+  blob and shows it from an object URL in an unsandboxed iframe (Chrome's viewer needs that).
+- Frontend: `kind` is `docx|pdf|html|md` end to end; chips and auto-open pick docx/pdf before html.
+- One `files` skill (`dots-in-chat/skills/files/`, 3 html templates) holds the quality rules: file vs
+  chat, per-format workflow, markdown subset, edit-don't-rewrite, HTML design rules. One skill, not
+  three: more than 8 skills turns the index into a search step (extra model call). The long "Files"
+  entry in `core.py` is now one line pointing at it.
+- Gotcha: a skill description containing `: ` breaks the YAML frontmatter.
+- Not done: live run with a real model; `save_file` still has no write-size cap.

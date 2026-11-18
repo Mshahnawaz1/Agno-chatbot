@@ -4,9 +4,10 @@ from pathlib import Path
 
 from app.config import settings
 
-PREVIEW_EXTENSIONS = {".md", ".docx"}
 MAX_MD_BYTES = 2 * 1024 * 1024
 MAX_DOCX_BYTES = 10 * 1024 * 1024
+MAX_HTML_BYTES = 2 * 1024 * 1024
+MAX_PDF_BYTES = 10 * 1024 * 1024
 _SAFE_ID = re.compile(r"[^A-Za-z0-9_.-]")
 
 
@@ -47,3 +48,9 @@ def safe_path(user_id: str, rel: str) -> Path:
 
 def rel_posix(user_id: str, path: Path) -> str:
     return path.relative_to(workspace_for(user_id)).as_posix()
+
+
+def is_allowed_ext(path: Path | str) -> bool:
+    """Allow-list for preview/download/listing: the extensions in the format registry."""
+    from app.agent.formats import adapter_for  # lazy: formats imports this module's constants
+    return adapter_for(path) is not None

@@ -17,7 +17,8 @@ from docx import Document  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.agent import docx_tools, workspace  # noqa: E402
+from app.agent import docx_tools, formats, workspace  # noqa: E402
+from app.agent.pdf_tools import PdfTools, md_to_pdf  # noqa: E402
 from app.agent.docx_tools import DocxTools, md_to_docx  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.deps import get_current_user  # noqa: E402
@@ -208,7 +209,8 @@ def test_users_are_isolated(client):
 
 def test_oversize_preview_rejected(client, monkeypatch):
     seed("big.md", docx=False)
-    monkeypatch.setattr(files_router, "MAX_MD_BYTES", 10)
+    from dataclasses import replace
+    monkeypatch.setitem(formats.ADAPTERS, ".md", replace(formats.ADAPTERS[".md"], max_bytes=10))
     assert client.get("/files/preview", params={"path": "big.md"}).status_code == 413
 
 
@@ -234,3 +236,89 @@ def test_file_events():
     assert file_event(tool("build_docx", {"source": "x.md"}, "Error: x.md does not exist"), seen) is None
     assert file_event(tool("delete_file", {"file_name": "x.md"}, "Incorrect file_name"), seen) is None
     assert file_event(tool("get_weather", {"city": "x"}, "sunny"), seen) is None
+
+
+# ---- v2: html + pdf -----------------------------------------------------------------------------
+
+HTML_DOC = "<!doctype html><html><head><title>T</title><style>h1{color:red}</style></head><body><h1>Hi</h1><script>alert(1)</script></body></html>"
+
+
+def test_md_to_pdf_and_read_pdf(ws):
+    data = md_to_pdf(MD)
+    assert data.startswith(b"%PDF")
+    base = workspace.workspace_for("u1")
+    tools = PdfTools(base)
+    (base / "r.md").write_text(MD, encoding="utf-8")
+    assert tools.build_pdf("r.md") == "r.pdf"
+    assert (base / "r.pdf").read_bytes().startswith(b"%PDF")
+    text = tools.read_pdf("r.pdf")
+    assert "Project Brief" in text and "Second goal" in text and "Dev" in text
+    assert tools.build_pdf("r.md", output="sub/out.pdf") == "sub/out.pdf"
+
+
+def test_pdf_tools_never_raise(ws):
+    base = workspace.workspace_for("u1")
+    tools = PdfTools(base)
+    (base / "bad.pdf").write_bytes(b"not a pdf")
+    (base / "odd.md").write_text("<script>x</script>\n\n![i](http://127.0.0.1/x.png)\n\n| a |\n|---|\n", encoding="utf-8")
+    assert tools.build_pdf("odd.md") == "odd.pdf"
+    for r in [tools.build_pdf("missing.md"), tools.build_pdf("../x.md"), tools.build_pdf("odd.md", "o.txt"),
+              tools.build_pdf("odd.md", "/abs.pdf"), tools.build_pdf("bad.pdf"), tools.read_pdf("bad.pdf"),
+              tools.read_pdf("missing.pdf"), tools.read_pdf("../x.pdf"), tools.read_pdf("/etc/passwd")]:
+        assert r.startswith("Error"), r
+
+
+def test_inject_csp_variants():
+    out = formats.inject_csp(HTML_DOC)
+    assert out.count("Content-Security-Policy") == 1 and "<style>h1{color:red}</style>" in out
+    assert out.index("Content-Security-Policy") < out.index("<style>")
+    for doc in ["<html><body>x</body></html>", "<!doctype html><p>x</p>", "<p>x</p>", "", "<HEAD><style>a{}</style></HEAD>"]:
+        r = formats.inject_csp(doc)
+        assert r.count("Content-Security-Policy") == 1
+        assert r.lower().index("<head") < r.index("Content-Security-Policy")
+
+
+def test_html_pdf_endpoints(client):
+    base = workspace.workspace_for("u1")
+    (base / "p.html").write_text(HTML_DOC, encoding="utf-8")
+    (base / "d.md").write_text(MD, encoding="utf-8")
+    PdfTools(base).build_pdf("d.md")
+    r = client.get("/files/preview", params={"path": "p.html"})
+    b = r.json()
+    assert r.status_code == 200 and b["kind"] == "html"
+    assert "Content-Security-Policy" in b["html"] and "<style>h1{color:red}</style>" in b["html"]
+    assert "default-src 'none'" in b["html"]
+
+    pdf = client.get("/files/preview", params={"path": "d.pdf"}).json()
+    assert pdf["kind"] == "pdf" and pdf["html"] == "" and pdf["version"].isdigit()
+    assert client.get("/files/preview", params={"path": "d.md"}).json()["kind"] == "pdf"  # pdf twin
+    DocxTools(base).build_docx("d.md")
+    assert client.get("/files/preview", params={"path": "d.md"}).json()["kind"] == "docx"  # docx wins
+
+    d = client.get("/files/download", params={"path": "d.pdf"})
+    assert d.headers["content-type"].startswith("application/pdf") and d.content.startswith(b"%PDF")
+    h = client.get("/files/download", params={"path": "p.html"})
+    assert h.headers["content-type"].startswith("text/html") and h.content.decode() == HTML_DOC
+    assert {f["kind"] for f in client.get("/files").json()} == {"html", "pdf", "md", "docx"}
+
+
+def test_html_pdf_error_codes(client, monkeypatch):
+    for bad, code in [("../x.html", 400), ("/etc/x.pdf", 400), ("..%2Fx.pdf", 400), ("a.html", 404),
+                      ("a.pdf", 404), ("a.exe", 415), ("a.svg", 415)]:
+        assert client.get("/files/preview", params={"path": bad}).status_code == code, bad
+    with pytest.raises(workspace.PathEscape):
+        workspace.safe_path("u1", "../u2/x.html")
+    (workspace.workspace_for("u1") / "big.html").write_text("<p>x</p>")
+    from dataclasses import replace
+    monkeypatch.setitem(formats.ADAPTERS, ".html", replace(formats.ADAPTERS[".html"], max_bytes=3))
+    assert client.get("/files/preview", params={"path": "big.html"}).status_code == 413
+
+
+def test_html_pdf_file_events():
+    seen: set = set()
+    assert file_event(tool("save_file", {"file_name": "p.html"}, "p.html"), seen) ==         {"path": "p.html", "kind": "html", "action": "created"}
+    assert file_event(tool("replace_file_chunk", {"file_name": "p.html"}, "p.html"), seen) ==         {"path": "p.html", "kind": "html", "action": "updated"}
+    assert file_event(tool("build_pdf", {"source": "r.md"}, "r.pdf"), seen) ==         {"path": "r.pdf", "kind": "pdf", "action": "created"}
+    assert file_event(tool("build_pdf", {"source": "r.md"}, "r.pdf"), seen)["action"] == "updated"
+    assert file_event(tool("build_pdf", {"source": "x.md"}, "Error: x.md does not exist"), seen) is None
+    assert file_event(tool("delete_file", {"file_name": "p.html"}, ""), seen)["kind"] == "html"

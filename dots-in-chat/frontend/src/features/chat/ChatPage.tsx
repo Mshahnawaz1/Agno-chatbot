@@ -75,9 +75,9 @@ function useFileEvents(turns: Turn[], panel: ReturnType<typeof useFilePanelState
     const changed = last.files.filter((f) => seen.current.get(`${last.id}:${f.path}`) !== f)
     if (!changed.length) return
     for (const f of changed) seen.current.set(`${last.id}:${f.path}`, f)
-    // The .docx built from a .md is what the user wants to see.
+    // The .docx/.pdf built from a .md is what the user wants to see.
     const shown = changed.filter((f) => f.action !== 'deleted')
-    const pick = shown.find((f) => f.kind === 'docx') ?? shown.at(-1)
+    const pick = shown.find((f) => f.kind === 'docx' || f.kind === 'pdf') ?? shown.find((f) => f.kind === 'html') ?? shown.at(-1)
     touch(pick?.path ?? null, !!pick)
   }, [last, touch])
 }

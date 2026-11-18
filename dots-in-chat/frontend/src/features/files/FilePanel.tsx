@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, CircleAlert, Download, FileX, X } from 'lucide-react'
 import * as api from '@/lib/api'
 import { ApiError } from '@/lib/api'
@@ -30,6 +30,64 @@ function pageDoc(html: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${PAGE_CSS}</style></head><body><div class="page">${html}</div></body></html>`
 }
 
+type PdfState = { status: 'loading' } | { status: 'ready'; url: string } | { status: 'gone' } | { status: 'error'; message: string }
+
+/** The real PDF: fetched with auth, shown from an object URL (unsandboxed; Chrome's viewer needs it). */
+function PdfView({ path }: { path: string }) {
+  const [state, setState] = useState<PdfState>({ status: 'loading' })
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    let url: string | null = null
+    api
+      .fetchFileBlob(path, ctrl.signal)
+      .then((blob) => {
+        url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+        setState({ status: 'ready', url })
+      })
+      .catch((err: unknown) => {
+        if (ctrl.signal.aborted) return
+        if (err instanceof ApiError && err.status === 404) setState({ status: 'gone' })
+        else setState({ status: 'error', message: err instanceof Error ? err.message : 'Download failed' })
+      })
+    return () => {
+      ctrl.abort()
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [path, attempt])
+
+  if (state.status === 'loading') {
+    return (
+      <div className="flex h-full items-center justify-center gap-2 text-sm text-fg-muted">
+        <Spinner label="Loading PDF" /> Loading PDF…
+      </div>
+    )
+  }
+  if (state.status === 'gone' || state.status === 'error') {
+    const gone = state.status === 'gone'
+    const Icon = gone ? FileX : CircleAlert
+    return (
+      <div role={gone ? 'status' : 'alert'} className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+        <Icon className={gone ? 'size-8 text-fg-subtle' : 'size-8 text-danger'} aria-hidden />
+        <p className="font-medium text-fg">{gone ? 'This file was deleted' : 'Could not load the PDF'}</p>
+        <p className="max-w-xs text-sm text-fg-muted">
+          {gone ? 'It no longer exists in your workspace.' : state.message}
+        </p>
+        {!gone ? (
+          <Button size="sm" variant="secondary" onClick={() => {
+              setState({ status: 'loading' })
+              setAttempt((n) => n + 1)
+            }}>
+            Try again
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
+  return <iframe title={`Preview of ${fileName(path)}`} src={state.url} className="block size-full border-0 bg-white" />
+}
+
 function PanelBody({ path }: { path: string }) {
   const { rev } = useFilePanelContext()
   const q = useFilePreview(path, rev)
@@ -59,13 +117,16 @@ function PanelBody({ path }: { path: string }) {
       </div>
     )
   }
+  if (q.data.kind === 'pdf') return <PdfView key={`${path}:${q.data.version}`} path={path} />
+  // html: the server's full document (CSP already injected), shown as is; docx/md: paper wrapper.
+  const doc = q.data.kind === 'html' ? q.data.html : pageDoc(q.data.html)
   return (
     <iframe
       key={q.data.version}
       title={`Preview of ${fileName(path)}`}
       sandbox=""
-      srcDoc={pageDoc(q.data.html)}
-      className="block size-full border-0 bg-[#e7e7ec]"
+      srcDoc={doc}
+      className={`block size-full border-0 ${q.data.kind === 'html' ? 'bg-white' : 'bg-[#e7e7ec]'}`}
     />
   )
 }
@@ -75,7 +136,7 @@ export function FilePanel({ path }: { path: string }) {
   const { close } = useFilePanelContext()
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
-  const isDocx = path.toLowerCase().endsWith('.docx')
+  const ext = path.toLowerCase().split('.').pop()
 
   async function download() {
     setDownloading(true)
@@ -103,7 +164,7 @@ export function FilePanel({ path }: { path: string }) {
         </h2>
         <Button size="sm" variant="secondary" onClick={() => void download()} loading={downloading}>
           <Download className="size-4" aria-hidden />
-          {isDocx ? 'Download' : 'Download .md'}
+          {ext ? `Download .${ext}` : 'Download'}
         </Button>
         <IconButton aria-label="Close preview" size="sm" onClick={close} className="max-lg:hidden">
           <X className="size-4" aria-hidden />

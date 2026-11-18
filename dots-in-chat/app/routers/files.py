@@ -5,18 +5,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
 
-from app.agent.docx_tools import docx_to_html, md_to_html
-from app.agent.workspace import (
-    MAX_DOCX_BYTES, MAX_MD_BYTES, PREVIEW_EXTENSIONS, PathEscape, safe_path, workspace_for,
-)
+from app.agent.formats import adapter_for, md_twin
+from app.agent.workspace import PathEscape, safe_path, workspace_for
 from app.deps import CurrentUser
 
 router = APIRouter(prefix="/files", tags=["files"])
-
-MIME = {
-    ".md": "text/markdown; charset=utf-8",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-}
 
 
 def resolve(user: dict, path: str):
@@ -25,7 +18,7 @@ def resolve(user: dict, path: str):
         p = safe_path(user["id"], path)
     except PathEscape:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid path")
-    if p.suffix.lower() not in PREVIEW_EXTENSIONS:
+    if adapter_for(p) is None:
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Unsupported file type")
     if not p.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
@@ -39,7 +32,7 @@ def list_files(user: CurrentUser):
     for p in sorted(base.rglob("*")):
         rel = p.relative_to(base)
         if (
-            not p.is_file() or p.is_symlink() or p.suffix.lower() not in PREVIEW_EXTENSIONS
+            not p.is_file() or p.is_symlink() or adapter_for(p) is None
             or any(part.startswith(".") for part in rel.parts)
         ):
             continue
@@ -49,7 +42,7 @@ def list_files(user: CurrentUser):
             "name": p.name,
             "size": st.st_size,
             "modified": datetime.fromtimestamp(st.st_mtime, timezone.utc).isoformat(),
-            "kind": p.suffix.lower().lstrip("."),
+            "kind": adapter_for(p).kind,
         })
     return out
 
@@ -57,24 +50,18 @@ def list_files(user: CurrentUser):
 @router.get("/preview")
 async def preview(user: CurrentUser, path: str = Query(...)):
     p = resolve(user, path)
-    ext = p.suffix.lower()
-    # A .md with a .docx twin previews the twin: that is what the user will download.
-    if ext == ".md" and p.with_suffix(".docx").is_file():
-        p, ext = p.with_suffix(".docx"), ".docx"
-    size = p.stat().st_size
+    # A .md with a .docx / .pdf twin previews the twin: that is what the user will download.
+    if p.suffix.lower() == ".md" and (twin := md_twin(p)):
+        p = twin
+    ad = adapter_for(p)
     try:
-        if ext == ".docx":
-            if size > MAX_DOCX_BYTES:
-                raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large to preview")
-            html = await asyncio.to_thread(docx_to_html, p)
-        else:
-            if size > MAX_MD_BYTES:
-                raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large to preview")
-            html = md_to_html(p.read_text(encoding="utf-8", errors="replace"))
+        if p.stat().st_size > ad.max_bytes:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large to preview")
+        html = await asyncio.to_thread(ad.preview, p)
         version = str(p.stat().st_mtime_ns)
     except FileNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
-    return {"path": path.replace("\\", "/"), "kind": ext.lstrip("."), "html": html, "version": version}
+    return {"path": path.replace("\\", "/"), "kind": ad.kind, "html": html, "version": version}
 
 
 @router.get("/download")
@@ -82,6 +69,6 @@ def download(user: CurrentUser, path: str = Query(...)):
     p = resolve(user, path)
     return Response(
         p.read_bytes(),
-        media_type=MIME[p.suffix.lower()],
+        media_type=adapter_for(p).mime,
         headers={"Content-Disposition": f'attachment; filename="{p.name}"'},
     )

@@ -11,6 +11,7 @@ from app import db
 from app.a2ui.actions import InvalidAction, action_prompt, read_action
 from app.a2ui.turn import A2uiTurn
 from app.agent import agent
+from app.agent.formats import kind_for
 from app.deps import CurrentUser
 from app.schemas import ChatRequest, ChatResponse
 from app.agent.skills import stub_skill_loads
@@ -73,7 +74,7 @@ def file_event(tool, seen: set) -> dict | None:
 
     "created" vs "updated" can't be known after the fact, so: save_file is "created" the first time
     a path is seen in this stream and "updated" after that; replace_file_chunk is always "updated";
-    build_docx is "created" for the first sighting of its .docx and "updated" after. `seen` is
+    build_docx / build_pdf are "created" for the first sighting of its .docx and "updated" after. `seen` is
     per-stream state (a file overwritten by save_file in a later chat turn reads "created" again).
     """
     name = getattr(tool, "tool_name", None)
@@ -83,8 +84,8 @@ def file_event(tool, seen: set) -> dict | None:
         path = args.get("file_name")
     elif name == "replace_file_chunk":
         path = args.get("file_name")
-    elif name == "build_docx":
-        path = result  # build_docx returns the .docx name it wrote
+    elif name in ("build_docx", "build_pdf"):
+        path = result  # these return the file name they wrote
     elif name == "delete_file":
         path = args.get("file_name")
     else:
@@ -98,7 +99,7 @@ def file_event(tool, seen: set) -> dict | None:
     if failed:
         return None
     path = path.replace("\\", "/")
-    kind = "docx" if path.lower().endswith(".docx") else "md" if path.lower().endswith(".md") else "file"
+    kind = kind_for(path)
     if name == "delete_file":
         action = "deleted"
         seen.discard(path)

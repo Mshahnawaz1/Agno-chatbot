@@ -117,3 +117,46 @@ format-agnostic via `kind`.
 2. Workspace per user (default) vs. per chat session.
 3. The user's uncommitted WIP in `core.py` / `config.py` / `agent/__init__.py` is not committed
    wholesale; only lines this feature needs are staged.
+
+
+---
+# v2: .html and .pdf (branch `feat/file-tools-docx`, continuing)
+
+Goal: same create / edit / preview loop for `.html` and `.pdf`, plus agent **skills** that steer
+quality (the inline "Files" instruction in `agent/core.py` moves into skills).
+
+## Design
+- **.html**: written directly with FileTools (`save_file`, `replace_file_chunk`); it is text, so no
+  build step. Single self-contained file (inline `<style>`, no external resources, no scripts).
+  Preview: sandboxed iframe (`sandbox=""`, no scripts) with a CSP meta injected server-side
+  (`default-src 'none'; style-src 'unsafe-inline'; img-src data:`). The raw HTML is NOT run
+  through nh3 (it would strip the styling the agent wrote); the sandbox + CSP are the guard.
+  Download = the `.html`.
+- **.pdf**: binary, so same pattern as docx: edit `<name>.md`, call `build_pdf(source, output=None)`
+  (markdown-it-py to HTML to PDF with `xhtml2pdf`, pure Python, no system libs). `read_pdf(path)`
+  extracts text with `pypdf` (already a dependency) so the agent can read PDFs; editing an existing
+  PDF = read, rewrite as markdown, rebuild (lossy; the skill says so).
+  Preview: the real PDF in the browser viewer. Download = the `.pdf`.
+- **Format adapters** (`agent/formats.py`, new): registry `{ext: Adapter(kind, preview(path), mime,
+  twin_of_md)}` replacing the docx special cases in `routers/files.py` and `workspace.py`'s
+  allow-list. `.md` with a `.docx` or `.pdf` twin previews the twin (docx wins if both exist; panel
+  tabs not needed in v2).
+- **Skills** (`dots-in-chat/skills/`, agno SKILL.md format, see `app/agent/skills.py`): `file-docx`,
+  `file-html`, `file-pdf` (or one `files` skill with references/; the skills agent decides, keep
+  each SKILL.md < 500 lines, description < 1024 chars starting with a "Use ..." trigger). Contents:
+  when to create a file vs answer in chat, the workflow, the supported markdown subset, document
+  structure/quality rules, edit-don't-rewrite rule, naming, what to say in chat afterwards, HTML
+  design templates (`templates/`). `core.py` INSTRUCTIONS keeps one line pointing at the skills.
+
+## Contract additions (shared; do not drift)
+- Tools: `build_pdf(source: str, output: str = "")` -> `.pdf` path (`<source>.pdf` if empty, trailing
+  `.md` stripped), `read_pdf(path: str)` -> text. Results starting with "Error" mean failure.
+- SSE `file` event `kind`: `"docx" | "pdf" | "html" | "md"`; same `{path, kind, action}`.
+  `build_pdf` emits for the `.pdf` path; `save_file`/`replace_file_chunk` on `.html` emit for the
+  `.html` path.
+- `GET /files/preview?path=x.html` -> `{path, kind:"html", html:"<full document string>", version}`
+  (html already has the CSP meta injected; client puts it in `<iframe sandbox="" srcDoc>`).
+- `GET /files/preview?path=x.pdf` -> `{path, kind:"pdf", html:"", version}`; client fetches
+  `/files/download?path=x.pdf` (authenticated blob) and shows it via an object URL in
+  `<iframe>`/`<object>` (no sandbox: Chrome's PDF viewer does not run in sandboxed frames).
+- Allow-list becomes `.md .docx .html .pdf`; size caps: html 2 MB, pdf preview 10 MB.

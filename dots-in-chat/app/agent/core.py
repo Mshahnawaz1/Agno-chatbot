@@ -9,6 +9,7 @@ from agno.tools.function import Function
 from agno.tools.yfinance import YFinanceTools
 
 from app.agent.docx_tools import DocxTools
+from app.agent.pdf_tools import PdfTools
 from app.agent.guardrails import tool_logger_hook
 from app.agent.knowledge import knowledge
 from app.agent.memory import MEMORY_INSTRUCTIONS, make_memory_tool
@@ -45,6 +46,7 @@ def user_file_tools(user_id: str) -> list:
             enable_search_content=False,
         ),
         DocxTools(base_dir=base),
+        PdfTools(base_dir=base),
     ]
 
 
@@ -61,11 +63,8 @@ INSTRUCTIONS = [
     "your tool list fits, call it directly. Only when none fits: search_tools, "
     "then get_tool, then call_tool.",
     MEMORY_INSTRUCTIONS,
-    "Files: write long content (documents, reports) to a file with save_file instead of pasting "
-    "it in chat, then say what you created in one line. Word documents are written as Markdown "
-    "(.md); then call build_docx(source) to produce the .docx. After any edit to a .md that has "
-    "a .docx twin, call build_docx again. Edit with replace_file_chunk rather than rewriting. "
-    "To edit an existing .docx, call import_docx first. Delete only files you created.",
+    "Files: before creating, editing or reading a document (.docx, .pdf, .html, .md), load the "
+    "`files` skill and follow it.",
 ]
 
 agent = Agent(

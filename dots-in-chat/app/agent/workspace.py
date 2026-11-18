@@ -11,6 +11,7 @@ MAX_PDF_BYTES = 10 * 1024 * 1024
 MAX_XLSX_BYTES = 10 * 1024 * 1024
 MAX_PPTX_BYTES = 10 * 1024 * 1024
 _SAFE_ID = re.compile(r"[^A-Za-z0-9_.-]")
+APP_ROOT = Path(__file__).resolve().parents[2]  # dots-in-chat/: relative settings are anchored here, not to the cwd
 
 
 class PathEscape(ValueError):
@@ -20,7 +21,8 @@ class PathEscape(ValueError):
 def workspace_for(user_id: str) -> Path:
     """`<workspace root>/<user_id>/`, created on demand. The id is sanitised so it cannot climb."""
     name = _SAFE_ID.sub("_", str(user_id)).lstrip(".") or "_"
-    path = (Path(settings.agent_workspace_dir) / name).resolve()
+    root = Path(settings.agent_workspace_dir)
+    path = ((root if root.is_absolute() else APP_ROOT / root) / name).resolve()
     path.mkdir(parents=True, exist_ok=True)
     return path
 

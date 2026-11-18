@@ -430,3 +430,32 @@ def test_xlsx_pptx_file_events():
                   {"path": "b.pptx", "kind": "pptx", "action": "updated"}]
     ev = file_events(SimpleNamespace(tool_name="delete_file", tool_args={"file_name": "a.xlsx"}, result=""), seen)
     assert ev == [{"path": "a.xlsx", "kind": "xlsx", "action": "deleted"}]
+
+
+def test_workspace_relative_setting_is_anchored_to_app_root_not_cwd(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "agent_workspace_dir", "data/_ws_anchor_test")
+    monkeypatch.chdir(tmp_path)
+    p = workspace.workspace_for("u-anchor")
+    try:
+        assert p.is_relative_to(workspace.APP_ROOT) and not p.is_relative_to(tmp_path)
+    finally:
+        import shutil
+        shutil.rmtree(workspace.APP_ROOT / "data" / "_ws_anchor_test", ignore_errors=True)
+
+
+def test_read_file_points_skill_paths_to_the_skill_loader_and_hides_server_paths(tmp_path):
+    t = WorkspaceFileTools(base_dir=tmp_path)
+    for name in ("scripts/pdf_create.py", "skills/pdf/scripts/pdf_create.py", "../skills/pdf/scripts/x.py"):
+        msg = t.read_file(name)
+        assert "get_skill_instructions" in msg and "outside your workspace" in msg
+    missing = t.read_file("nope.txt")
+    assert str(tmp_path) not in missing
+
+
+def test_script_usage_returns_the_spec_docstring_and_rejects_bad_names():
+    from app.agent.skills import script_usage, skills
+
+    sk = skills.get_skill("pdf")
+    assert "elements" in script_usage(sk, "scripts/pdf_create.py")
+    assert script_usage(sk, "pdf_create") is not None
+    assert script_usage(sk, "../pdf_create") is None and script_usage(sk, "nope") is None

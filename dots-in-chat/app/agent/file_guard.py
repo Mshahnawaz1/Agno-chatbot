@@ -6,6 +6,7 @@ fails, so a model that "edits" one through save_file destroys it. Those files ar
 skill scripts through run_skill_script (app/agent/skill_runner.py). Unlike hermes we refuse
 .pdf always (not only on overwrite): nothing here should hand-write PDF syntax.
 """
+import os
 from pathlib import Path
 
 from agno.tools.file import FileTools
@@ -77,4 +78,14 @@ class WorkspaceFileTools(FileTools):
         :param encoding: Encoding to use, default - utf-8
         :return: The contents of the file if successful, otherwise returns an error message.
         """
-        return binary_read_error(file_name) or super().read_file(file_name, encoding)
+        norm = str(file_name).replace("\\", "/")
+        if norm.startswith(("..", "/")) or "skills/" in norm or "scripts/" in norm:
+            return (
+                f"Error: '{file_name}' is outside your workspace. Skill scripts cannot be read with "
+                "read_file: get a script's usage and JSON spec format with "
+                "get_skill_instructions(skill, paths=['scripts/<name>.py']), or run it with "
+                "run_skill_script(skill, script, ['--help']). Your files are workspace-relative names."
+            )
+        result = binary_read_error(file_name) or super().read_file(file_name, encoding)
+        # agno's errors quote the absolute server path; the model only needs the workspace-relative one
+        return result.replace(str(self.base_dir) + os.sep, "").replace(str(self.base_dir), "<workspace>")

@@ -123,3 +123,16 @@ Details and how hermes does it: `docs/hermes_file_skills.md`.
   pdf works but needed 25 tool calls; one html edit (hero colour) was reported but not applied; one run
   hit a 429. Details in `files_todo.md`.
 - Fixed: xlsx preview showed 8+ blank columns (openpyxl read-only mode pads rows to max_col).
+
+
+### Fix: agent tried to read_file skill scripts (18 nov 26)
+Cause: the agent needs a script's JSON spec format, which lives in the script's module docstring, but
+`read_file` only sees the user's workspace (`data/workspace/<user_id>/`); the scripts live in
+`skills/<skill>/scripts/`. It tried `scripts/x.py`, `skills/pdf/scripts/x.py` and `../skills/...` and failed
+(and `--help` does not print the spec for pdf/docx/xlsx), which also made PDF runs take 25 tool calls.
+- `get_skill_instructions(skill, paths=["scripts/<name>.py"])` now returns the script's usage docstring.
+- `read_file` on a skill/script/`..` path returns a pointer to that instead of a raw error; absolute server
+  paths are stripped from its errors.
+- The pdf and microsoft-office skills say so under "Runtime here".
+- Workspace root: a relative `agent_workspace_dir` is now anchored to `dots-in-chat/`, not the process cwd.
+- Live re-run: pdf 25 calls / 232 s -> 5 calls / 8 s; docx create 10 -> 6 calls; no file-read errors.

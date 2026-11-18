@@ -27,6 +27,8 @@ browser, `soffice` (LibreOffice) or `skill_view` (use `get_skill_instructions(sk
 files). Where this text or a reference says `skill_view`/`vision_analyze`/`"$PY"`/`soffice`, use the
 mapping above or skip the step.
 
+**Script spec formats:** scripts are NOT in your workspace, so never `read_file` them. To see a script's usage and JSON spec, call `get_skill_instructions("microsoft-office", paths=["scripts/<name>.py"])` (e.g. `scripts/docx_create.py`), then write the spec with `save_file`.
+
 ## When to Use
 
 Pick the format, then load its reference with `get_skill_instructions` before working:

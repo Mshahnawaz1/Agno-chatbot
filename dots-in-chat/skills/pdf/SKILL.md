@@ -27,6 +27,8 @@ the working directory and the app's Python (libraries are installed); all paths 
 browser or `skill_view` (use `get_skill_instructions(skill, paths=[...])` for files). Where this text
 says `skill_view`/`vision_analyze`/`"$PY"`, use the mapping above or skip the step.
 
+**Script spec formats:** scripts are NOT in your workspace, so never `read_file` them. To see a script's usage and JSON spec, call `get_skill_instructions("pdf", paths=["scripts/<name>.py"])` (e.g. `scripts/pdf_create.py`), then write the spec with `save_file`.
+
 ## When to Use
 
 - Generate a report, invoice, or multi-page document as PDF.

@@ -21,7 +21,9 @@ Compared with plain agno Skills:
   (stub_skill_loads), so it isn't replayed in the next turns' context.
 """
 
+import ast
 import asyncio
+import re
 from pathlib import Path
 
 from agno.run import RunContext
@@ -63,6 +65,27 @@ def _resolve(f: str, available: list[str]) -> str:
         if cand in available:
             return cand
     return f
+
+
+def script_usage(skill, f: str) -> str | None:
+    """Usage text of a script the skill ships (its module docstring: arguments and JSON spec format).
+
+    `f` is `scripts/pdf_create.py` or just `pdf_create`. Scripts live outside the user's workspace,
+    so read_file cannot open them; this is how the model learns a script's spec. None if `f` names
+    no script of this skill.
+    """
+    name = f.strip().replace("\\", "/").removeprefix("./")
+    name = name.removeprefix("scripts/").removesuffix(".py")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", name):
+        return None
+    path = Path(skill.source_path) / "scripts" / f"{name}.py"
+    if not path.is_file():
+        return None
+    try:
+        doc = ast.get_docstring(ast.parse(path.read_text(encoding="utf-8")))
+    except (SyntaxError, UnicodeDecodeError, OSError):
+        doc = None
+    return f"scripts/{name}.py usage:\n" + (doc or "(no docstring; run it with args=['--help'])")
 
 
 def skill_files(skill) -> list[str]:
@@ -154,7 +177,13 @@ class LazySkills(Skills):
             paths = (skill.metadata or {}).get("preload", "").split() + list(paths or [])
         for f in dict.fromkeys(paths or []):
             f = _resolve(f, available)
-            if f not in available:
+            if f not in available and (usage := script_usage(skill, f)) is not None:
+                if (skill.name, usage[:60]) in seen:
+                    out.append(f"[{f}: already loaded above in this turn]")
+                else:
+                    seen.add((skill.name, usage[:60]))
+                    out.append(usage)
+            elif f not in available:
                 out.append(f"[No file '{f}' in {skill.name}. Files: {', '.join(available)}]")
             elif (skill.name, f) in seen:
                 out.append(f"[{f}: already loaded above in this turn]")

@@ -74,3 +74,17 @@ Plan: `files_plan.md`. Branch: `feat/file-tools-docx`. Status: [ ] todo, [~] in 
 - [x] Docs: docs/hermes_file_skills.md (how hermes does it + how we adapted)
 - [x] Verify: run copied scripts through the runner (create docx/pdf from spec, edit), tests, tsc/eslint
 - [x] Commit + logs.md
+
+## Live test results (18 nov 26, real Gemini flash-lite, local server, API + browser)
+| step | result |
+| --- | --- |
+| docx create | OK in 30 s (10 tool calls), heading, bullets, table; `file` event + preview + download OK |
+| docx edit | OK (title changed, Risks section added) but the run hit a Gemini 429 mid-way and sent an error event |
+| pdf create | content correct, but 25 tool calls / 232 s (several script retries); no table, plain text lines |
+| html create | OK, 11 s |
+| html edit | PARTIAL: name changed to "Bean Here" but the hero background stayed cream, not brown; model rewrote with read_file + save_file instead of replace_file_chunk |
+| xlsx create/edit | OK, 10-17 s; Rent Actual also reads 450 (unclear if the model's own data or an edit slip) |
+| pptx create/edit | OK, 11 s / 5 s; title edit applied |
+| browser | history chips render, click opens the right-hand panel, pptx and xlsx previews and Download button OK |
+Fixed during the run: xlsx preview padded blank columns (read-only mode); now trimmed, test added.
+Open: pdf skill efficiency; html edits should use replace_file_chunk and verify; free-tier 429s.

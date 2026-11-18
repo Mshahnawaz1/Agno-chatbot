@@ -68,16 +68,21 @@ def xlsx_to_html(path: Path) -> str:
             parts.append(f"<h2>{_e(name)}</h2>")
             rows_v = wb_v[name].iter_rows(max_row=XLSX_MAX_ROWS + 1, max_col=XLSX_MAX_COLS + 1, values_only=True)
             rows_f = wb_f[name].iter_rows(max_row=XLSX_MAX_ROWS + 1, max_col=XLSX_MAX_COLS + 1, values_only=True)
-            body: list[str] = []
+            grid: list[list[str]] = []
             truncated = False
             for i, (rv, rf) in enumerate(zip(rows_v, rows_f)):
                 if i >= XLSX_MAX_ROWS:
                     truncated = True
                     break
-                if len(rv) > XLSX_MAX_COLS:
+                if len(rv) > XLSX_MAX_COLS and any(c is not None for c in rv[XLSX_MAX_COLS:]):
                     truncated = True
                 cells = [v if v is not None else f for v, f in zip(rv[:XLSX_MAX_COLS], rf[:XLSX_MAX_COLS])]
-                body.append("<tr>" + "".join(f"<td>{_e('' if c is None else str(c))}</td>" for c in cells) + "</tr>")
+                grid.append(["" if c is None else str(c) for c in cells])
+            # read-only mode pads every row to max_col: trim to the used width and drop empty tail rows
+            while grid and not any(grid[-1]):
+                grid.pop()
+            width = max((max((j for j, c in enumerate(r) if c), default=-1) + 1 for r in grid), default=0)
+            body = ["<tr>" + "".join(f"<td>{_e(c)}</td>" for c in r[:width]) + "</tr>" for r in grid]
             if body:
                 parts.append("<table><tbody>" + "".join(body) + "</tbody></table>")
             else:

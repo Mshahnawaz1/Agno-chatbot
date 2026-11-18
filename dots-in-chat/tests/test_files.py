@@ -376,6 +376,18 @@ def test_xlsx_preview(tmp_path):
     assert "Truncated" in html and html.count("<tr>") == 2 + 200
 
 
+def test_xlsx_preview_has_no_blank_padding_columns(tmp_path):
+    import openpyxl
+
+    p = tmp_path / "small.xlsx"
+    wb = openpyxl.Workbook()
+    wb.active.append(["Category", "Planned", "Actual"])
+    wb.active.append(["Rent", 1200, 1100])
+    wb.save(p)
+    html = previews.xlsx_to_html(p)
+    assert html.count("<td>") == 6 and "Truncated" not in html
+
+
 def test_pptx_preview(tmp_path):
     p = tmp_path / "a.pptx"
     make_pptx(p)

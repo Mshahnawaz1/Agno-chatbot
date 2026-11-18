@@ -114,3 +114,12 @@ Details and how hermes does it: `docs/hermes_file_skills.md`.
   sqlalchemy...). Restored; now listed in requirements.txt. Use `--no-sync` or `uv pip install`.
 - Verified: 109 tests pass; create/edit/read/validate docx and create/read pdf through the runner; escape
   attempts (`..`, absolute paths, image outside workspace) are refused. Not run: live model in a browser.
+
+
+### File workspace: xlsx + pptx and the first live test, 18 nov 26
+- Restored the full hermes microsoft-office skill (pptx/xlsx scripts, references); added xlsx and pptx
+  adapters, HTML previews (xlsx one table per sheet, pptx one card per slide) and frontend kinds.
+- Live run (API + browser, Gemini flash-lite): docx, html, xlsx, pptx create/edit work and open the panel;
+  pdf works but needed 25 tool calls; one html edit (hero colour) was reported but not applied; one run
+  hit a 429. Details in `files_todo.md`.
+- Fixed: xlsx preview showed 8+ blank columns (openpyxl read-only mode pads rows to max_col).

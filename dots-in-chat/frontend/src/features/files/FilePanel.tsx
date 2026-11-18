@@ -19,7 +19,7 @@ p{margin:0 0 .9em}ul,ol{margin:0 0 .9em;padding-left:1.5em}
 a{color:#4c1d95}
 blockquote{margin:0 0 .9em;padding-left:1em;border-left:3px solid #c9c9d3;color:#555}
 code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.92em;background:#f0f0f4;padding:.1em .3em;border-radius:3px}
-table{border-collapse:collapse;width:100%;margin:0 0 1em;font-size:.95em}
+table{border-collapse:collapse;display:block;max-width:100%;overflow-x:auto;margin:0 0 1em;font-size:.95em}
 th,td{border:1px solid #cfcfd8;padding:6px 10px;text-align:left;vertical-align:top}
 th{background:#f3f3f7}
 img{max-width:100%;height:auto}

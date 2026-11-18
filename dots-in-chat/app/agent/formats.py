@@ -1,4 +1,4 @@
-"""Format adapter registry: one entry per previewable file type (.md .docx .html .pdf).
+"""Format adapter registry: one entry per previewable file type (.md .docx .html .pdf .xlsx .pptx).
 
 The files router and the workspace allow-list read from here, so a new format is one adapter.
 `kind` is the value sent to the client (preview + SSE); `preview(path)` returns the `html` field.
@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from app.agent.previews import docx_to_html, md_to_html
-from app.agent.workspace import MAX_DOCX_BYTES, MAX_HTML_BYTES, MAX_MD_BYTES, MAX_PDF_BYTES
+from app.agent.previews import docx_to_html, md_to_html, pptx_to_html, xlsx_to_html
+from app.agent.workspace import MAX_DOCX_BYTES, MAX_HTML_BYTES, MAX_MD_BYTES, MAX_PDF_BYTES, MAX_PPTX_BYTES, MAX_XLSX_BYTES
 
 HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
 _CSP_META = f'<meta http-equiv="Content-Security-Policy" content="{HTML_CSP}">'
@@ -43,6 +43,14 @@ def _preview_html(p: Path) -> str:
     return inject_csp(p.read_text(encoding="utf-8", errors="replace"))
 
 
+def _preview_xlsx(p: Path) -> str:
+    return xlsx_to_html(p)
+
+
+def _preview_pptx(p: Path) -> str:
+    return pptx_to_html(p)
+
+
 def _preview_pdf(p: Path) -> str:
     return ""  # the client fetches /files/download and shows the real PDF
 
@@ -63,6 +71,10 @@ ADAPTERS: dict[str, Adapter] = {a.ext: a for a in [
             MAX_DOCX_BYTES, _preview_docx, twin_priority=2),
     Adapter(".html", "html", "text/html; charset=utf-8", MAX_HTML_BYTES, _preview_html),
     Adapter(".pdf", "pdf", "application/pdf", MAX_PDF_BYTES, _preview_pdf, twin_priority=1),
+    Adapter(".xlsx", "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            MAX_XLSX_BYTES, _preview_xlsx),
+    Adapter(".pptx", "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            MAX_PPTX_BYTES, _preview_pptx),
 ]}
 
 

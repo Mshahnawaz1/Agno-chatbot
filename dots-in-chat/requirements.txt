@@ -34,3 +34,5 @@ yfinance
 sqlalchemy
 groq
 greenlet
+openpyxl
+python-pptx

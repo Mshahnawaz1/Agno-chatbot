@@ -69,7 +69,7 @@ def log_run(run_id, metrics, tools) -> None:
     )
 
 
-PREVIEW_KINDS = {"docx", "pdf", "html", "md"}  # what the files panel can show
+PREVIEW_KINDS = {"docx", "pdf", "html", "md", "xlsx", "pptx"}  # what the files panel can show
 TEXT_KINDS = {"html", "md"}  # what FileTools may write (binaries come from skill scripts)
 
 

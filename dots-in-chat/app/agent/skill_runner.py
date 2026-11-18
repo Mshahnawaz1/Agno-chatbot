@@ -1,7 +1,7 @@
 """run_skill_script: lets the agent run a skill's bundled script (e.g. microsoft-office's
 docx_create.py, pdf's pdf_create.py) on files in its own workspace.
 
-This is how binary documents (.docx, .pdf) get made: the model writes a JSON spec with save_file,
+This is how binary documents (.docx, .pdf, .xlsx, .pptx) get made: the model writes a JSON spec with save_file,
 then calls run_skill_script("microsoft-office", "docx_create", ["spec.json", "out.docx"]).
 
 Layers (none of them alone is a sandbox; see skill_sandbox.py for the honest version):
@@ -245,7 +245,7 @@ class SkillScriptTools(Toolkit):
         """Run a script bundled with a skill (skills/<skill>/scripts/<script>.py) on files in your
         workspace, e.g. skill="microsoft-office", script="docx_create", args=["spec.json", "out.docx"].
         Load the skill first: it documents each script's arguments. This is the ONLY way to create
-        or change .docx / .pdf files (never save_file them).
+        or change .docx / .pdf / .xlsx / .pptx files (never save_file them).
 
         :param skill: The skill name, e.g. "microsoft-office" or "pdf".
         :param script: The script name, with or without ".py", e.g. "docx_create".

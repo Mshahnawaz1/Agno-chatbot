@@ -1,20 +1,20 @@
 ---
 name: microsoft-office
-description: 'Use for Word (.docx): create reports/letters, read, edit, fill templates, tracked changes, comments.'
+description: 'Use for Word (.docx), PowerPoint (.pptx) and Excel (.xlsx/.csv): create documents, decks and workbooks, read, edit, fill templates, tracked changes, comments, formulas, charts.'
 license: MIT
 metadata:
   author: Nous Research
   version: "2.0.0"
-  tags: "office word docx documents"
+  tags: "office word docx powerpoint pptx excel xlsx csv documents slides spreadsheets"
 ---
 
-# Microsoft Office Skill (Word only)
+# Microsoft Office Skill
 
-Adapted from hermes-agent (MIT, Nous Research). Only the Word (`.docx`) part is kept here; PowerPoint and
-Excel helpers are not installed.
+Adapted from hermes-agent (MIT, Nous Research).
 
-Create, read, edit, and template Word files offline with small Python CLIs built on python-docx. Office
-itself is never needed. It does not open legacy `.doc` files and does not render pages.
+Create, read, edit, and template Word (`.docx`), PowerPoint (`.pptx`), and Excel (`.xlsx`, `.csv`) files
+offline with small Python CLIs built on python-docx, python-pptx, and openpyxl. Office itself is never
+needed. It does not open legacy binary formats (`.doc`, `.ppt`, `.xls`) and does not render pages.
 
 ## Runtime here
 
@@ -23,19 +23,31 @@ Tool mapping (hermes -> this app): `write_file` -> `save_file`, `patch` -> `repl
 `run_skill_script(skill="microsoft-office", script="x.py", args=["..."])`. Scripts run with the user's workspace as
 the working directory and the app's Python (libraries are installed); all paths are workspace-relative
 (no absolute paths, no `..`). Not available: the `hermes` CLI, `vision_analyze`, `browser_exec`, a
-browser or `skill_view` (use `get_skill_instructions(skill, paths=[...])` for files). Where this text
-says `skill_view`/`vision_analyze`/`"$PY"`, use the mapping above or skip the step.
+browser, `soffice` (LibreOffice) or `skill_view` (use `get_skill_instructions(skill, paths=[...])` for
+files). Where this text or a reference says `skill_view`/`vision_analyze`/`"$PY"`/`soffice`, use the
+mapping above or skip the step.
 
 ## When to Use
 
-Read `references/word.md` first (reports, letters, contracts, `{{token}}` templates, tracked changes,
-comments); `references/revisions-and-comments.md` has the deeper review-markup notes.
+Pick the format, then load its reference with `get_skill_instructions` before working:
 
-- Not for `.doc`/`.odt`, or WYSIWYG layout work. Not for `.pptx`/`.xlsx` (no helpers here).
+| File | Reference | Typical asks |
+| --- | --- | --- |
+| `.docx` | `references/word.md` | reports, letters, contracts, `{{token}}` templates, tracked changes, comments |
+| `.pptx` | `references/powerpoint.md` | pitch decks, brand-template decks, chart refreshes, speaker notes |
+| `.xlsx`, `.csv` | `references/excel.md` | styled multi-sheet workbooks, formulas, charts, CSV conversion, row/column restructures |
+
+Deeper notes: `references/revisions-and-comments.md` (Word review markup) and
+`references/restructuring.md` (Excel reference shifting).
+
+- Not for `.doc`/`.ppt`/`.xls` (no converter here, since `soffice` is not available) or
+  `.odt`/`.odp`/`.ods`, or WYSIWYG layout work.
 
 ## Prerequisites
 
-Word only here. `python-docx` is already installed; there is no environment to set up. Ignore any `$PY` instruction below. LibreOffice (`soffice`) is not available.
+`python-docx`, `python-pptx` and `openpyxl` are already installed; there is no environment to set up.
+Ignore any `$PY` instruction in the references. LibreOffice (`soffice`) and poppler are not available, so
+`xlsx_recalc.py`, `pptx_render.py` and PDF/PNG conversion cannot run here.
 
 ## How to Run
 
@@ -44,39 +56,50 @@ non-zero on failure. Author JSON specs with `save_file`; read results from stdou
 
 ```bash
 python scripts/docx_create.py spec.json out.docx    # run_skill_script(skill="microsoft-office", script="docx_create.py", args=["spec.json","out.docx"])
+python scripts/pptx_create.py deck.json out.pptx
+python scripts/xlsx_create.py spec.json report.xlsx
 ```
 
 ## Quick Reference
 
-| Task | Helper |
-| --- | --- |
-| Create from JSON spec | `docx_create.py` |
-| Read back | `docx_read.py --text/--structure` |
-| Edit | `docx_edit.py` |
-| Fill a template | `docx_template.py` |
-| Review / check | `docx_revisions.py`, `docx_comments.py`, `docx_validate.py` |
+| Task | Word | PowerPoint | Excel |
+| --- | --- | --- | --- |
+| Create from JSON spec | `docx_create.py` | `pptx_create.py` | `xlsx_create.py`, `csv_to_xlsx.py` |
+| Read back | `docx_read.py --text/--structure` | `pptx_read.py --outline` | `xlsx_read.py --sheets/--json` |
+| Edit | `docx_edit.py` | `pptx_edit.py` | `xlsx_edit.py`, `xlsx_restructure.py` |
+| Fill a template | `docx_template.py` | `pptx_from_template.py` | none |
+| Review / check | `docx_revisions.py`, `docx_comments.py`, `docx_validate.py` | `pptx_render.py` (unavailable here) | `xlsx_recalc.py` (unavailable here), `xlsx_to_csv.py` |
 
-`references/word.md` has the full flag table.
+The per-format reference has the full flag table.
 
 ## Procedure
 
-1. Load `references/word.md`.
-2. Create, edit, or read with the helpers; pass an output path to keep the original whenever the helper
-   supports one.
+1. Identify the format from the file extension or the ask, and load its reference.
+2. Create, edit, or read with that format's helpers; pass an output path to keep the original whenever the
+   helper supports one.
 3. Verify the result as the reference's Verification section says, then give the user the exact output path.
+
+## Converting to PDF
+
+Not available here (`soffice` is not installed). There is no pure-Python path to PDF for these formats:
+say so rather than approximating. For other sheets use `xlsx_to_csv.py --sheet NAME`.
 
 ## Pitfalls
 
-- **Never unzip-and-edit the XML.** `.docx` is a zip package; raw text substitution corrupts it. Edit
-  through the helpers and use `replace_file_chunk`/`save_file` only for JSON inputs.
-- **Text is split into runs.** The replace helpers merge equal-format runs first, but a match across
-  differently formatted runs takes the first run's formatting.
-- **Nothing computes fields.** Word TOC/page fields are filled in by Word on open.
-- **No PDF conversion here** (`soffice` is not available): say so rather than approximating.
+- **Never unzip-and-edit the XML.** These files are zip packages; raw text substitution corrupts them.
+  Edit through the helpers and use `replace_file_chunk`/`save_file` only for JSON inputs.
+- **Text is split into runs.** Word and PowerPoint fragment text at edit boundaries; the replace helpers
+  merge equal-format runs first, but a match across differently formatted runs takes the first run's
+  formatting.
+- **Nothing computes fields or formulas here.** Word TOC/page fields and Excel formulas are filled in by
+  the office app on open; `xlsx_recalc.py` needs `soffice`, so cached values stay empty.
 - **Encoding.** Write specs as UTF-8; the helpers read UTF-8 explicitly.
-- Format-specific traps are in the reference.
+- Format-specific traps are in each reference.
 
 ## Verification
 
-- Re-read every output with `docx_read.py` and check the expected content is there and the old content is gone.
-- `docx_validate.py out.docx` exits 0 after revision, comment, or field surgery.
+- Re-read every output with the format's read helper and check the expected content is there and the old
+  content is gone.
+- Word: `docx_validate.py out.docx` exits 0 after revision, comment, or field surgery.
+- PowerPoint: `pptx_read.py --outline` (no rendering or image review here).
+- Excel: `xlsx_read.py --formulas` lists written formulas.

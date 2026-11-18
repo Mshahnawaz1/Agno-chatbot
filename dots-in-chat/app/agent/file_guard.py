@@ -21,6 +21,10 @@ _HOW = {
              "(docx_read --text / docx_edit to read or change one)",
     ".pdf": "load the pdf skill: write a JSON spec with save_file, then "
             'run_skill_script("pdf", "pdf_create", ["spec.json", "-o", "out.pdf"]) (pdf_read --text to read one)',
+    ".xlsx": "load the xlsx skill (microsoft-office): write a JSON spec with save_file, then run its "
+             "xlsx_create script through run_skill_script (xlsx_read to read one, xlsx_edit to change one)",
+    ".pptx": "load the pptx skill (microsoft-office): write a JSON spec with save_file, then run its "
+             "pptx_create script through run_skill_script (pptx_read to read one, pptx_edit to change one)",
 }
 
 
@@ -40,6 +44,12 @@ def binary_read_error(file_name: str) -> str | None:
                 f'run_skill_script("microsoft-office", "docx_read", ["--text", "{file_name}"]).')
     if ext == ".pdf":
         return f'Error: .pdf is binary; read it with run_skill_script("pdf", "pdf_read", ["--text", "{file_name}"]).'
+    if ext == ".xlsx":
+        return ("Error: .xlsx is binary; read it with "
+                f'run_skill_script("microsoft-office", "xlsx_read", ["{file_name}"]).')
+    if ext == ".pptx":
+        return ("Error: .pptx is binary; read it with "
+                f'run_skill_script("microsoft-office", "pptx_read", ["{file_name}"]).')
     if ext in BINARY_EXTENSIONS:
         return f"Error: '{file_name}' is a binary file and cannot be read as text."
     return None
@@ -50,7 +60,7 @@ class WorkspaceFileTools(FileTools):
 
     def save_file(self, contents: str, file_name: str, overwrite: bool = True, encoding: str = "utf-8") -> str:
         """Saves the contents to a text file called `file_name` and returns the file name if successful.
-        Never use it for .docx / .pdf (binary): those are made by skill scripts via run_skill_script.
+        Never use it for .docx / .pdf / .xlsx / .pptx (binary): those are made by skill scripts via run_skill_script.
 
         :param contents: The contents to save.
         :param file_name: The name of the file to save to.
@@ -61,7 +71,7 @@ class WorkspaceFileTools(FileTools):
 
     def read_file(self, file_name: str, encoding: str = "utf-8") -> str:
         """Reads the contents of the text file `file_name` and returns the contents if successful.
-        For .docx / .pdf use the skill read scripts via run_skill_script.
+        For .docx / .pdf / .xlsx / .pptx use the skill read scripts via run_skill_script.
 
         :param file_name: The name of the file to read.
         :param encoding: Encoding to use, default - utf-8

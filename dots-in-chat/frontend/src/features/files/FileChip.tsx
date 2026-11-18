@@ -1,11 +1,11 @@
-import { FileCode, FileText, type LucideIcon } from 'lucide-react'
+import { FileCode, FileSpreadsheet, FileText, Presentation, type LucideIcon } from 'lucide-react'
 import clsx from 'clsx'
 import type { FileRef } from '@/lib/types'
 import { fileName } from './fileRefs'
 import { useFilePanelContext } from './useFilePanel'
 
-const KIND_LABEL = { docx: 'Word document', pdf: 'PDF document', html: 'HTML page', md: 'Markdown' } as const
-const KIND_ICON: Record<FileRef['kind'], LucideIcon> = { docx: FileText, pdf: FileText, html: FileCode, md: FileText }
+const KIND_LABEL = { docx: 'Word document', pdf: 'PDF document', html: 'HTML page', md: 'Markdown', xlsx: 'Excel workbook', pptx: 'PowerPoint deck' } as const
+const KIND_ICON: Record<FileRef['kind'], LucideIcon> = { docx: FileText, pdf: FileText, html: FileCode, md: FileText, xlsx: FileSpreadsheet, pptx: Presentation }
 const LABEL = { created: 'Created', updated: 'Updated', deleted: 'Deleted' } as const
 
 /** Card under an assistant reply for a file the agent touched; a click opens it in the panel. */

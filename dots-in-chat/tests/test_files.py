@@ -328,3 +328,93 @@ def test_html_pdf_file_events():
     assert one(tool("delete_file", {"file_name": "p.html"}, ""), seen)["kind"] == "html"
     assert one(tool("delete_file", {"file_name": "r.pdf"}, ""), seen) == \
         {"path": "r.pdf", "kind": "pdf", "action": "deleted"}
+
+
+# ---- xlsx / pptx ---------------------------------------------------------------------------------
+
+def make_xlsx(path: Path) -> None:
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Sales <1>"
+    ws.append(["Item", "Qty", "Total"])
+    ws.append(["<script>alert(1)</script>", 2, "=B2*3"])
+    ws2 = wb.create_sheet("Big")
+    for _ in range(250):
+        ws2.append(list(range(35)))
+    wb.save(path)
+
+
+def make_pptx(path: Path) -> None:
+    from PIL import Image
+    from pptx import Presentation
+    from pptx.util import Inches
+    prs = Presentation()
+    s = prs.slides.add_slide(prs.slide_layouts[1])
+    s.shapes.title.text = "Plan <A>"
+    s.placeholders[1].text_frame.text = "first point"
+    s.placeholders[1].text_frame.add_paragraph().text = "second point"
+    s.notes_slide.notes_text_frame.text = "say hello"
+    s2 = prs.slides.add_slide(prs.slide_layouts[5])
+    s2.shapes.title.text = "Data"
+    t = s2.shapes.add_table(2, 2, Inches(1), Inches(2), Inches(4), Inches(1)).table
+    t.cell(0, 0).text = "k"
+    t.cell(1, 1).text = "v"
+    png = path.parent / "pic.png"
+    Image.new("RGB", (4, 4)).save(png)
+    s2.shapes.add_picture(str(png), Inches(1), Inches(4))
+    prs.save(path)
+
+
+def test_xlsx_preview(tmp_path):
+    p = tmp_path / "a.xlsx"
+    make_xlsx(p)
+    html = previews.xlsx_to_html(p)
+    assert "<h2>Sales &lt;1&gt;</h2>" in html and "<h2>Big</h2>" in html
+    assert "<script>" not in html and "&lt;script&gt;" in html
+    assert "=B2*3" in html  # never opened in Excel, so no cached value: formula text
+    assert "Truncated" in html and html.count("<tr>") == 2 + 200
+
+
+def test_pptx_preview(tmp_path):
+    p = tmp_path / "a.pptx"
+    make_pptx(p)
+    html = previews.pptx_to_html(p)
+    assert "Slide 1: Plan &lt;A&gt;" in html and "Slide 2: Data" in html
+    assert html.index("first point") < html.index("second point") and "<li>first point</li>" in html
+    assert "Speaker notes: say hello" in html and "<blockquote>" in html
+    assert "<td>v</td>" in html and "[image]" in html
+
+
+def test_office_previews_never_raise(tmp_path):
+    for name, fn in [("bad.xlsx", previews.xlsx_to_html), ("bad.pptx", previews.pptx_to_html)]:
+        p = tmp_path / name
+        p.write_bytes(b"not a zip")
+        assert "Could not preview" in fn(p)
+
+
+def test_xlsx_pptx_endpoints_and_guard(client):
+    base = workspace.workspace_for("u1")
+    make_xlsx(base / "a.xlsx")
+    make_pptx(base / "b.pptx")
+    assert {(f["path"], f["kind"]) for f in client.get("/files").json()} >= {("a.xlsx", "xlsx"), ("b.pptx", "pptx")}
+    for path, kind in [("a.xlsx", "xlsx"), ("b.pptx", "pptx")]:
+        body = client.get("/files/preview", params={"path": path}).json()
+        assert body["kind"] == kind and body["html"] and body["version"].isdigit()
+    assert "spreadsheetml" in client.get("/files/download", params={"path": "a.xlsx"}).headers["content-type"]
+    assert "presentationml" in client.get("/files/download", params={"path": "b.pptx"}).headers["content-type"]
+    ft = WorkspaceFileTools(base_dir=base)
+    assert "xlsx_create" in ft.save_file("x", "n.xlsx") and "pptx_create" in ft.save_file("x", "n.pptx")
+    assert "xlsx_read" in ft.read_file("a.xlsx") and "pptx_read" in ft.read_file("b.pptx")
+    assert formats.kind_for("x/y.XLSX") == "xlsx" and formats.kind_for("y.pptx") == "pptx"
+
+
+def test_xlsx_pptx_file_events():
+    seen: set = set()
+    r = json.dumps({"ok": True, "exit_code": 0, "stdout": "", "stderr": "", "changed": [
+        {"path": "a.xlsx", "action": "created", "kind": "xlsx"}, {"path": "b.pptx", "action": "updated", "kind": "pptx"}]})
+    ev = file_events(SimpleNamespace(tool_name="run_skill_script", tool_args={}, result=r), seen)
+    assert ev == [{"path": "a.xlsx", "kind": "xlsx", "action": "created"},
+                  {"path": "b.pptx", "kind": "pptx", "action": "updated"}]
+    ev = file_events(SimpleNamespace(tool_name="delete_file", tool_args={"file_name": "a.xlsx"}, result=""), seen)
+    assert ev == [{"path": "a.xlsx", "kind": "xlsx", "action": "deleted"}]

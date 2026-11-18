@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -13,8 +14,12 @@ from app.agent import agent
 from app.deps import CurrentUser
 from app.schemas import ChatRequest, ChatResponse
 from app.skills import stub_skill_loads
+from app.titles import generate_title
 
 logger = logging.getLogger(__name__)
+
+# How long the end of a stream waits for the generated title before keeping the fallback.
+TITLE_WAIT_SECONDS = 5
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 # A reply whose A2UI block the compiler rejects gets this many hidden runs to correct it.
@@ -141,6 +146,12 @@ async def model_pass(
 async def chat_stream(body: ChatRequest, user: CurrentUser):
     session = resolve_session(body, user)      # 404 is raised here, before streaming
     turn = A2uiTurn(session["id"])
+    # New chat typed by the user: name it from the message's meaning, in parallel with the reply.
+    # make_title's first-words title (set by resolve_session) stays if this fails or is slow.
+    title_task = (
+        asyncio.create_task(generate_title(body.message))
+        if body.message and not body.session_id else None
+    )
     if body.action is not None:
         try:
             action = await read_action(body.action)  # a bad action is a plain 400
@@ -174,6 +185,13 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
             logger.exception("stream failed")
             yield sse("error", {"message": f"Generation failed. Error {e}"})
         finally:
+            if title_task is not None:
+                try:
+                    title = await asyncio.wait_for(title_task, TITLE_WAIT_SECONDS)
+                    if title:
+                        db.set_chat_session_title(session["id"], title)
+                except Exception:  # timeout, cancel or failure: keep the first-words title
+                    title_task.cancel()
             turn.save(run["run_id"])
             try:
                 await stub_skill_loads(agent, session["id"], run["all_ids"])

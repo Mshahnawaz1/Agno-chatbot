@@ -93,6 +93,8 @@ export function signup(email: string, password: string, name?: string | null): P
 
 export const me = () => request<User>('/users/me')
 export const listSessions = () => request<Session[]>('/sessions')
+export const deleteSession = (sessionId: string) =>
+  request<void>(`/sessions/${enc(sessionId)}`, { method: 'DELETE' })
 export const listMessages = (sessionId: string) =>
   request<Message[]>(`/sessions/${enc(sessionId)}/messages`)
 

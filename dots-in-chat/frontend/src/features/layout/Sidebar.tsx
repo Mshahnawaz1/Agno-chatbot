@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link, NavLink } from 'react-router'
-import { useQuery } from '@tanstack/react-query'
-import { ArrowUpRight, PanelLeftClose, Plug, Search } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { DropdownMenu } from 'radix-ui'
+import { ArrowUpRight, MoreHorizontal, PanelLeftClose, Plug, Search, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import * as api from '@/lib/api'
 import { groupSessionsByDate } from '@/lib/format'
-import { IconButton, Logo } from '@/components/ui'
+import type { Session } from '@/lib/types'
+import { Button, Dialog, DialogClose, DialogContent, IconButton, Logo } from '@/components/ui'
 import { useChatStream } from '@/features/chat/chatStore'
 import { UserMenu } from './UserMenu'
 import { IS_MAC } from './useMediaQuery'
@@ -17,6 +19,19 @@ const rowBase =
 
 function SessionList({ query, onNavigate }: { query: string; onNavigate: () => void }) {
   const sessions = useQuery({ queryKey: ['sessions'], queryFn: api.listSessions })
+  const queryClient = useQueryClient()
+  const { sessionId, newChat } = useChatStream()
+  const [toDelete, setToDelete] = useState<Session | null>(null)
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.deleteSession(id),
+    onSuccess: (_, id) => {
+      queryClient.setQueryData<Session[]>(['sessions'], (old) => old?.filter((s) => s.id !== id))
+      queryClient.removeQueries({ queryKey: ['messages', id] })
+      if (sessionId === id) newChat()  // the open chat is gone: back to an empty one
+      setToDelete(null)
+    },
+  })
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -60,12 +75,33 @@ function SessionList({ query, onNavigate }: { query: string; onNavigate: () => v
 
   return (
     <div className="flex flex-col gap-4">
+      <Dialog open={!!toDelete} onOpenChange={(o) => !o && !remove.isPending && (setToDelete(null), remove.reset())}>
+        <DialogContent
+          title="Delete chat?"
+          description={`“${toDelete?.title || 'Untitled'}” and its messages will be permanently deleted.`}
+          className="max-w-sm"
+        >
+          {remove.isError ? <p role="alert" className="mb-3 text-sm text-danger">Could not delete the chat.</p> : null}
+          <div className="flex justify-end gap-2">
+            <DialogClose asChild>
+              <Button variant="secondary" disabled={remove.isPending}>Cancel</Button>
+            </DialogClose>
+            <Button
+              variant="danger"
+              disabled={remove.isPending}
+              onClick={() => toDelete && remove.mutate(toDelete.id)}
+            >
+              {remove.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {groups.map((g) => (
         <section key={g.label} aria-label={g.label}>
           <h2 className="px-2.5 pb-1 font-sans text-xs font-medium tracking-normal text-fg-subtle">{g.label}</h2>
           <ul className="flex flex-col gap-px">
             {g.sessions.map((s) => (
-              <li key={s.id}>
+              <li key={s.id} className="group relative">
                 <NavLink
                   to={`/c/${encodeURIComponent(s.id)}`}
                   onClick={onNavigate}
@@ -73,12 +109,37 @@ function SessionList({ query, onNavigate }: { query: string; onNavigate: () => v
                   className={({ isActive }) =>
                     clsx(
                       rowBase,
+                      'pr-9',
                       isActive ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-2 hover:text-fg',
                     )
                   }
                 >
                   <span className="truncate">{s.title || 'Untitled'}</span>
                 </NavLink>
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger
+                    aria-label={`Options for chat ${s.title || 'Untitled'}`}
+                    className="absolute right-1 top-1 inline-flex size-7 items-center justify-center rounded-md text-fg-muted opacity-0 transition-opacity hover:bg-surface-3 hover:text-fg focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:bg-surface-3 data-[state=open]:opacity-100 max-md:opacity-100"
+                  >
+                    <MoreHorizontal className="size-4" aria-hidden />
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      side="bottom"
+                      align="start"
+                      sideOffset={4}
+                      className="z-50 min-w-[160px] rounded-xl border border-white/10 bg-surface-2/95 p-1 shadow-2xl backdrop-blur-xl"
+                    >
+                      <DropdownMenu.Item
+                        className="flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-sm px-2.5 text-sm text-danger outline-none data-[highlighted]:bg-danger/10"
+                        onSelect={() => setToDelete(s)}
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                        Delete
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
               </li>
             ))}
           </ul>

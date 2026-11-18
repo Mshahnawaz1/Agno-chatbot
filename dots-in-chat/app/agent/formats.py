@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from app.agent.previews import docx_to_html, md_to_html
 from app.agent.workspace import MAX_DOCX_BYTES, MAX_HTML_BYTES, MAX_MD_BYTES, MAX_PDF_BYTES
 
 HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
@@ -31,12 +32,10 @@ def inject_csp(doc: str) -> str:
 
 
 def _preview_docx(p: Path) -> str:
-    from app.agent.docx_tools import docx_to_html
     return docx_to_html(p)
 
 
 def _preview_md(p: Path) -> str:
-    from app.agent.docx_tools import md_to_html
     return md_to_html(p.read_text(encoding="utf-8", errors="replace"))
 
 

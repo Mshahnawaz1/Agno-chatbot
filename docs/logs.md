@@ -100,3 +100,17 @@ Same loop as docx (agent writes, panel previews, Download), via an adapter regis
   entry in `core.py` is now one line pointing at it.
 - Gotcha: a skill description containing `: ` breaks the YAML frontmatter.
 - Not done: live run with a real model; `save_file` still has no write-size cap.
+
+
+### File workspace v3: hermes-agent file skills replace our converters, 18 nov 26
+Details and how hermes does it: `docs/hermes_file_skills.md`.
+- Copied hermes skills (MIT): microsoft-office (Word only), pdf, claude-design, popular-web-designs.
+  Scripts take a JSON spec and print JSON; HTML is written directly with save_file / replace_file_chunk.
+- New `run_skill_script` tool (cwd = user workspace, stripped env, 60 s, audit-hook sandbox, returns the
+  files that changed) drives the preview panel. `WorkspaceFileTools` refuses binary writes like hermes.
+- Removed our md to docx/pdf converters and the `files` skill. Skills index limit is 10; the 54-template
+  skill shows a count only.
+- Incident: two agents ran `uv sync` / `uv remove` and uninstalled hand-installed packages (agno, yfinance,
+  sqlalchemy...). Restored; now listed in requirements.txt. Use `--no-sync` or `uv pip install`.
+- Verified: 109 tests pass; create/edit/read/validate docx and create/read pdf through the runner; escape
+  attempts (`..`, absolute paths, image outside workspace) are refused. Not run: live model in a browser.

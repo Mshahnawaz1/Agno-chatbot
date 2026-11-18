@@ -160,3 +160,38 @@ quality (the inline "Files" instruction in `agent/core.py` moves into skills).
   `/files/download?path=x.pdf` (authenticated blob) and shows it via an object URL in
   `<iframe>`/`<object>` (no sandbox: Chrome's PDF viewer does not run in sandboxed frames).
 - Allow-list becomes `.md .docx .html .pdf`; size caps: html 2 MB, pdf preview 10 MB.
+
+
+---
+# v3: replace our md converters with hermes-agent's file skills
+
+Source: `External-Repos/hermes-agent` (MIT, Nous Research; keep each skill's LICENSE + attribution).
+
+## How hermes does it (findings)
+- File tools (`tools/file_tools.py`): `read_file`, `write_file`, `patch`, `search_files`, with guards
+  (read-size cap, stale-write check, `_check_binary_document_write` refuses writing .docx/.pdf as text).
+- Binary documents are made ONLY by skill scripts: the model writes a JSON spec with `write_file`, then
+  runs `scripts/docx_create.py spec.json out.docx` (python-docx), `docx_read.py`, `docx_edit.py`
+  (replace/set-cell/insert/delete/style/toc/page-numbers), `docx_template.py`, `docx_revisions.py`,
+  `docx_comments.py`, `docx_validate.py`; `pdf_create.py` (reportlab spec), `pdf_read.py` (pdfplumber),
+  `pdf_merge/split/stamp/watermark/fill_form/...`. Scripts are argparse CLIs that print JSON.
+  Skill: `skills/productivity/microsoft-office` (+ references/word.md) and `skills/productivity/pdf`.
+- HTML has no script: written with `write_file`/`patch`; quality comes from `skills/creative/claude-design`
+  (process, taste, verification) and `popular-web-designs` (54 ready design systems as templates).
+
+## What we do
+- Copy to `dots-in-chat/skills/`: `microsoft-office` (Word parts only: no pptx/xlsx), `pdf`,
+  `claude-design`, `popular-web-designs`. Keep scripts/references/templates; add a short "Runtime here"
+  note mapping hermes tools to ours (`write_file`->`save_file`, `patch`->`replace_file_chunk`,
+  `read_file`->`read_file`, `terminal`->`run_skill_script`). Remove our `files` skill.
+- New tool `run_skill_script(skill, script, args)` (backend): runs `scripts/<script>` of an installed
+  skill with the app interpreter, cwd = the user's workspace, 60 s timeout, output capped, args must not be
+  absolute or contain `..`; the child runs under a small runner with a `sys.addaudithook` that denies file
+  access outside {workspace (rw), skill dir (r), python install (r)}. Returns JSON
+  `{"ok","exit_code","stdout","stderr","changed":[{"path","action","kind"}]}` where `changed` comes from a
+  before/after workspace snapshot (this drives the preview panel).
+- Remove: `DocxTools`/`PdfTools`, `build_docx`/`build_pdf`/`import_docx`/`read_pdf`, `md_to_docx`/`md_to_pdf`
+  and their tests. Keep: workspace, formats registry, previews (docx via mammoth, html + CSP, pdf blob), /files.
+- SSE `file` events: from FileTools writes (as now) and from `run_skill_script`'s `changed` list.
+- Frontend chips: from `run_skill_script` results' `changed` (and FileTools args), not build_* names.
+- Skills index: 10 skills > INLINE_MAX 8, so raise INLINE_MAX to 10 (terse descriptions) and re-measure the budget.

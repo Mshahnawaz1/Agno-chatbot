@@ -4,16 +4,15 @@ from pathlib import Path
 from agno.agent import Agent
 from agno.db.sqlite import SqliteDb
 from agno.memory import MemoryManager
-from agno.tools.file import FileTools
 from agno.tools.function import Function
 from agno.tools.yfinance import YFinanceTools
 
-from app.agent.docx_tools import DocxTools
-from app.agent.pdf_tools import PdfTools
+from app.agent.file_guard import WorkspaceFileTools
 from app.agent.guardrails import tool_logger_hook
 from app.agent.knowledge import knowledge
 from app.agent.memory import MEMORY_INSTRUCTIONS, make_memory_tool
 from app.agent.models import fallbacks, primary_model
+from app.agent.skill_runner import SkillScriptTools
 from app.agent.skills import skills
 from app.agent.tools import get_weather, primes_below
 from app.agent.workspace import workspace_for
@@ -31,10 +30,11 @@ BASE_TOOLS = [
 ]
 
 def user_file_tools(user_id: str) -> list:
-    """This user's file tools. FileTools refuses paths outside base_dir (their own workspace)."""
+    """This user's file tools, all confined to their own workspace: FileTools (text files; refuses
+    .docx/.pdf/other binaries, see file_guard.py) and run_skill_script (skill scripts make those)."""
     base = workspace_for(user_id)
     return [
-        FileTools(
+        WorkspaceFileTools(
             base_dir=base,
             enable_save_file=True,
             enable_replace_file_chunk=True,
@@ -45,8 +45,7 @@ def user_file_tools(user_id: str) -> list:
             enable_read_file_chunk=False,
             enable_search_content=False,
         ),
-        DocxTools(base_dir=base),
-        PdfTools(base_dir=base),
+        SkillScriptTools(base_dir=base),
     ]
 
 
@@ -63,8 +62,10 @@ INSTRUCTIONS = [
     "your tool list fits, call it directly. Only when none fits: search_tools, "
     "then get_tool, then call_tool.",
     MEMORY_INSTRUCTIONS,
-    "Files: before creating, editing or reading a document (.docx, .pdf, .html, .md), load the "
-    "`files` skill and follow it.",
+    "Files: before creating, editing or reading a document, load the matching skill and follow "
+    "it: microsoft-office for Word (.docx), pdf for .pdf, claude-design for .html. Binary files "
+    "(.docx, .pdf) are NEVER written with save_file; only the skill's scripts make or change them, "
+    "through run_skill_script.",
 ]
 
 agent = Agent(

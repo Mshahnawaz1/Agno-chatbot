@@ -69,47 +69,56 @@ def log_run(run_id, metrics, tools) -> None:
     )
 
 
-def file_event(tool, seen: set) -> dict | None:
-    """The `file` SSE payload for a completed file tool call, or None for any other call or a failed one.
+PREVIEW_KINDS = {"docx", "pdf", "html", "md"}  # what the files panel can show
+TEXT_KINDS = {"html", "md"}  # what FileTools may write (binaries come from skill scripts)
 
-    "created" vs "updated" can't be known after the fact, so: save_file is "created" the first time
-    a path is seen in this stream and "updated" after that; replace_file_chunk is always "updated";
-    build_docx / build_pdf are "created" for the first sighting of its .docx and "updated" after. `seen` is
-    per-stream state (a file overwritten by save_file in a later chat turn reads "created" again).
+
+def file_events(tool, seen: set) -> list[dict]:
+    """The `file` SSE payloads ({path, kind, action}) for a completed tool call; [] for any other
+    call or a failed one.
+
+    - save_file / replace_file_chunk on .html / .md: one event. "created" vs "updated" can't be
+      known after the fact, so save_file is "created" the first time a path is seen in this stream
+      and "updated" after; replace_file_chunk is always "updated".
+    - delete_file of a previewable file: "deleted".
+    - run_skill_script: one event per previewable entry of its JSON result's `changed` list (the
+      runner diffs the workspace, so its actions are exact).
+    `seen` is per-stream state (a file overwritten by save_file in a later turn reads "created").
     """
     name = getattr(tool, "tool_name", None)
     args = getattr(tool, "tool_args", None) or {}
     result = str(getattr(tool, "result", "") or "")
-    if name == "save_file":
-        path = args.get("file_name")
-    elif name == "replace_file_chunk":
-        path = args.get("file_name")
-    elif name in ("build_docx", "build_pdf"):
-        path = result  # these return the file name they wrote
-    elif name == "delete_file":
-        path = args.get("file_name")
-    else:
-        return None
+    if name == "run_skill_script":
+        try:
+            changed = json.loads(result).get("changed") or []
+        except (ValueError, AttributeError):
+            return []
+        events = []
+        for c in changed:
+            if not isinstance(c, dict) or c.get("kind") not in PREVIEW_KINDS or not isinstance(c.get("path"), str):
+                continue
+            if c.get("action") not in ("created", "updated", "deleted"):
+                continue
+            (seen.discard if c["action"] == "deleted" else seen.add)(c["path"])
+            events.append({"path": c["path"], "kind": c["kind"], "action": c["action"]})
+        return events
+    if name not in ("save_file", "replace_file_chunk", "delete_file"):
+        return []
+    path = args.get("file_name")
     if not isinstance(path, str) or not path:
-        return None
-    if name == "delete_file":
-        failed = bool(result)  # empty result = success
-    else:
-        failed = result.startswith(("Error", "Incorrect")) or "already exists" in result
-    if failed:
-        return None
+        return []
     path = path.replace("\\", "/")
     kind = kind_for(path)
     if name == "delete_file":
-        action = "deleted"
+        if result or kind not in PREVIEW_KINDS:  # empty result = success
+            return []
         seen.discard(path)
-    elif name == "replace_file_chunk":
-        action = "updated"
-        seen.add(path)
-    else:
-        action = "updated" if path in seen else "created"
-        seen.add(path)
-    return {"path": path, "kind": kind, "action": action}
+        return [{"path": path, "kind": kind, "action": "deleted"}]
+    if kind not in TEXT_KINDS or result.startswith(("Error", "Incorrect")) or "already exists" in result:
+        return []
+    action = "updated" if name == "replace_file_chunk" or path in seen else "created"
+    seen.add(path)
+    return [{"path": path, "kind": kind, "action": action}]
 
 
 def sse(event: str, data: dict) -> str:
@@ -176,8 +185,7 @@ async def model_pass(
                     yield sse(name, data)
         elif event.event == RunEvent.tool_call_completed:
             run["tools"].append(event.tool)
-            payload = file_event(event.tool, run.setdefault("seen_files", set()))
-            if payload:
+            for payload in file_events(event.tool, run.setdefault("seen_files", set())):
                 yield sse("file", payload)
         elif event.event == RunEvent.run_completed:
             run["run_id"] = run.get("run_id") or event.run_id

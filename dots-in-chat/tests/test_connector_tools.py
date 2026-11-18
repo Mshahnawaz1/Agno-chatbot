@@ -196,7 +196,7 @@ class SkillsTest(unittest.IsolatedAsyncioTestCase):
         from app.agent.skills import skills
 
         # ~tokens; the index names each skill's files so the model loads them in its first call.
-        self.assertLess(len(skills.get_system_prompt_snippet()) // 4, 480)  # was 420 before the `files` skill (~50 tokens)
+        self.assertLess(len(skills.get_system_prompt_snippet()) // 4, 560)  # measured 541 with 10 skills (hermes file skills added ~120 tokens)
         # Few skills: the index lists them all, so no search_skills round trip (see skills.INLINE_MAX).
         self.assertEqual([f.name for f in skills.get_tools()], ["get_skill_instructions"])
         self.assertTrue(skills.search_skills("schedule focus time on my calendar").startswith("reclaim"))

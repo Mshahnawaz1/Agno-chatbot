@@ -1,8 +1,10 @@
-"""Offline tests for the file workspace: md->docx, path safety, /files endpoints, SSE file events.
+"""Offline tests for the file workspace: previews, path safety, /files endpoints, SSE file events,
+and the FileTools binary-write guard. (Skill scripts and the runner: test_skill_runner.py.)
 
 Run from the repo root:  uv run pytest dots-in-chat/tests/test_files.py -q
 """
 import io
+import json
 import os
 import sys
 from pathlib import Path
@@ -17,13 +19,12 @@ from docx import Document  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.agent import docx_tools, formats, workspace  # noqa: E402
-from app.agent.pdf_tools import PdfTools, md_to_pdf  # noqa: E402
-from app.agent.docx_tools import DocxTools, md_to_docx  # noqa: E402
+from app.agent import formats, previews, workspace  # noqa: E402
+from app.agent.file_guard import WorkspaceFileTools  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.deps import get_current_user  # noqa: E402
 from app.routers import files as files_router  # noqa: E402
-from app.routers.chat import file_event  # noqa: E402
+from app.routers.chat import file_events  # noqa: E402
 
 MD = """# Project Brief
 
@@ -63,43 +64,34 @@ def client(ws):
     return c
 
 
-# ---- md_to_docx ---------------------------------------------------------------------------------
+# ---- previews -----------------------------------------------------------------------------------
 
-def read_back(md: str):
-    return Document(io.BytesIO(md_to_docx(md)))
-
-
-def test_md_to_docx_structure():
-    doc = read_back(MD)
-    heads = [(p.style.name, p.text) for p in doc.paragraphs if p.style.name.startswith("Heading")]
-    assert ("Heading 1", "Project Brief") in heads and ("Heading 2", "Goals") in heads
-    intro = next(p for p in doc.paragraphs if p.text.startswith("Intro"))
-    assert any(r.bold and r.text == "bold" for r in intro.runs)
-    assert any(r.italic and r.text == "italic" for r in intro.runs)
-    assert "https://example.com" in intro.text
-    styles = {p.text: p.style.name for p in doc.paragraphs}
-    assert styles["First goal"] == "List Bullet"
-    assert styles["Nested goal"] == "List Bullet 2"
-    assert styles["Step one"] == "List Number"
-    assert styles["A quote"] == "Quote"
-    assert len(doc.tables) == 1
-    t = doc.tables[0]
-    assert t.cell(0, 0).text == "Item" and t.cell(1, 1).text == "10"
-    assert t.cell(0, 0).paragraphs[0].runs[0].bold
+def make_docx(path: Path) -> None:
+    """A small .docx (heading, bullet, table) made with python-docx, like the skill scripts do."""
+    doc = Document()
+    doc.add_heading("Project Brief", level=1)
+    doc.add_paragraph("First goal", style="List Bullet")
+    t = doc.add_table(rows=2, cols=2)
+    t.cell(0, 0).text, t.cell(1, 1).text = "Item", "10"
+    doc.save(path)
 
 
-def test_md_to_docx_never_raises_on_odd_input():
-    for md in ["", "<script>alert(1)</script>", "#### deep\n\n```\ncode\n```\n\n---\n", "| a |\n|---|\n"]:
-        assert read_back(md) is not None
+def make_pdf(path: Path, text: str = "Project Brief") -> None:
+    from reportlab.pdfgen import canvas
+    c = canvas.Canvas(str(path))
+    c.drawString(72, 720, text)
+    c.save()
 
 
 def test_html_is_sanitised(ws):
     p = ws / "x.docx"
-    p.write_bytes(md_to_docx("# T\n\nhello"))
-    assert "<h1>" in docx_tools.docx_to_html(p)
-    out = docx_tools.sanitize_html('<p onclick="x()">a</p><script>alert(1)</script><a href="javascript:evil()">l</a>')
+    make_docx(p)
+    html = previews.docx_to_html(p)
+    assert "<h1>" in html and "<table>" in html and "<li>" in html
+    out = previews.sanitize_html('<p onclick="x()">a</p><script>alert(1)</script><a href="javascript:evil()">l</a>')
     assert "script" not in out and "onclick" not in out and "javascript" not in out
-    assert "<script" not in docx_tools.md_to_html("hi <script>alert(1)</script>")
+    assert "<script" not in previews.md_to_html("hi <script>alert(1)</script>")
+    assert "<h1>" in previews.md_to_html(MD) and "<table>" in previews.md_to_html(MD)
 
 
 # ---- workspace / safe_path ----------------------------------------------------------------------
@@ -132,22 +124,6 @@ def test_user_id_cannot_climb(ws):
     assert workspace.workspace_for("../../evil").is_relative_to((ws / "ws").resolve())
 
 
-# ---- DocxTools ----------------------------------------------------------------------------------
-
-def test_build_and_import_docx(ws):
-    base = workspace.workspace_for("u1")
-    tools = DocxTools(base)
-    (base / "r.md").write_text(MD, encoding="utf-8")
-    assert tools.build_docx("r.md") == "r.docx"
-    assert (base / "r.docx").is_file()
-    assert tools.import_docx("r.docx") == "r.md"
-    assert "Project Brief" in (base / "r.md").read_text(encoding="utf-8")
-    assert tools.build_docx("missing.md").startswith("Error")
-    assert tools.build_docx("../x.md").startswith("Error")
-    assert tools.build_docx("r.md", output="r.txt").startswith("Error")
-    assert tools.import_docx("/etc/passwd").startswith("Error")
-
-
 # ---- /files endpoints ---------------------------------------------------------------------------
 
 def test_auth_required(ws):
@@ -160,7 +136,7 @@ def seed(name="brief.md", docx=True):
     base = workspace.workspace_for("u1")
     (base / name).write_text(MD, encoding="utf-8")
     if docx:
-        DocxTools(base).build_docx(name)
+        make_docx(base / Path(name).with_suffix(".docx"))
 
 
 def test_list_preview_download(client):
@@ -220,52 +196,81 @@ def tool(name, args=None, result=""):
     return SimpleNamespace(tool_name=name, tool_args=args or {}, result=result)
 
 
+def one(t, seen):
+    events = file_events(t, seen)
+    assert len(events) <= 1, events
+    return events[0] if events else None
+
+
 def test_file_events():
     seen: set = set()
-    assert file_event(tool("save_file", {"file_name": "r.md"}, "r.md"), seen) == \
+    assert one(tool("save_file", {"file_name": "r.md"}, "r.md"), seen) == \
         {"path": "r.md", "kind": "md", "action": "created"}
-    assert file_event(tool("save_file", {"file_name": "r.md"}, "r.md"), seen)["action"] == "updated"
-    assert file_event(tool("replace_file_chunk", {"file_name": "r.md"}, "r.md"), seen)["action"] == "updated"
-    assert file_event(tool("build_docx", {"source": "r.md"}, "r.docx"), seen) == \
-        {"path": "r.docx", "kind": "docx", "action": "created"}
-    assert file_event(tool("build_docx", {"source": "r.md"}, "r.docx"), seen)["action"] == "updated"
-    assert file_event(tool("delete_file", {"file_name": "r.docx"}, ""), seen) == \
+    assert one(tool("save_file", {"file_name": "r.md"}, "r.md"), seen)["action"] == "updated"
+    assert one(tool("replace_file_chunk", {"file_name": "r.md"}, "r.md"), seen)["action"] == "updated"
+    assert one(tool("delete_file", {"file_name": "r.docx"}, ""), seen) == \
         {"path": "r.docx", "kind": "docx", "action": "deleted"}
-    # failures and unrelated tools emit nothing
-    assert file_event(tool("save_file", {"file_name": "x.md"}, "Error saving file"), seen) is None
-    assert file_event(tool("build_docx", {"source": "x.md"}, "Error: x.md does not exist"), seen) is None
-    assert file_event(tool("delete_file", {"file_name": "x.md"}, "Incorrect file_name"), seen) is None
-    assert file_event(tool("get_weather", {"city": "x"}, "sunny"), seen) is None
+    assert one(tool("save_file", {"file_name": "sub\\p.html"}, "sub\\p.html"), seen)["path"] == "sub/p.html"
+    # failures, non-previewable files (a JSON spec), refused binary writes and unrelated tools: nothing
+    assert one(tool("save_file", {"file_name": "x.md"}, "Error saving file"), seen) is None
+    assert one(tool("save_file", {"file_name": "spec.json"}, "spec.json"), seen) is None
+    assert one(tool("save_file", {"file_name": "x.docx"}, "Error: refusing to write"), seen) is None
+    assert one(tool("delete_file", {"file_name": "x.md"}, "Incorrect file_name"), seen) is None
+    assert one(tool("delete_file", {"file_name": "spec.json"}, ""), seen) is None
+    assert one(tool("get_weather", {"city": "x"}, "sunny"), seen) is None
+    assert one(tool("build_docx", {"source": "r.md"}, "r.docx"), seen) is None  # removed tool
+
+
+def test_run_skill_script_events():
+    seen: set = set()
+    result = json.dumps({"ok": True, "exit_code": 0, "stdout": "", "stderr": "", "changed": [
+        {"path": "out.docx", "action": "created", "kind": "docx"},
+        {"path": "r/out.pdf", "action": "updated", "kind": "pdf"},
+        {"path": "old.md", "action": "deleted", "kind": "md"},
+        {"path": "spec.json", "action": "created", "kind": "file"},
+        {"path": "x.png", "action": "created", "kind": "file"},
+        {"path": "bad.docx", "action": "exploded", "kind": "docx"},
+    ]})
+    events = file_events(tool("run_skill_script", {"skill": "microsoft-office"}, result), seen)
+    assert events == [
+        {"path": "out.docx", "kind": "docx", "action": "created"},
+        {"path": "r/out.pdf", "kind": "pdf", "action": "updated"},
+        {"path": "old.md", "kind": "md", "action": "deleted"},
+    ]
+    assert "out.docx" in seen and "old.md" not in seen
+    failed = json.dumps({"ok": False, "exit_code": 1, "stdout": "", "stderr": "boom", "changed": []})
+    for r in [failed, "not json", "", "[1, 2]", json.dumps({"changed": "nope"})]:
+        assert file_events(tool("run_skill_script", {}, r), seen) == []
+
+
+# ---- binary-write guard -------------------------------------------------------------------------
+
+def test_file_tools_refuse_binary_writes(ws):
+    base = workspace.workspace_for("u1")
+    ft = WorkspaceFileTools(base_dir=base, enable_delete_file=True)
+    for name in ["r.docx", "R.PDF", "sub/x.xlsx", "img.png"]:
+        r = ft.save_file("PK fake", name)
+        assert r.startswith("Error") and "run_skill_script" in r, r
+        assert not (base / name).exists()
+    assert "docx_create" in ft.save_file("x", "r.docx") and "pdf_create" in ft.save_file("x", "r.pdf")
+    assert ft.save_file("# hi\n", "r.md") == "r.md" and (base / "r.md").read_text() == "# hi\n"
+    assert ft.save_file("<p>x</p>", "p.html") == "p.html"
+    assert ft.save_file("{}", "spec.json") == "spec.json"
+    # replace_file_chunk writes through save_file, so it is guarded too
+    make_pdf(base / "d.pdf")
+    before = (base / "d.pdf").read_bytes()
+    assert ft.replace_file_chunk("d.pdf", 0, 0, "x").startswith("Error")
+    assert (base / "d.pdf").read_bytes() == before
+    # reading a binary points at the read scripts
+    assert "docx_read" in ft.read_file("a.docx") and "pdf_read" in ft.read_file("d.pdf")
+    assert ft.read_file("r.md") == "# hi\n"
+    # the agent still sees the stock tool names
+    assert {"save_file", "read_file", "replace_file_chunk"} <= set(ft.functions)
 
 
 # ---- v2: html + pdf -----------------------------------------------------------------------------
 
 HTML_DOC = "<!doctype html><html><head><title>T</title><style>h1{color:red}</style></head><body><h1>Hi</h1><script>alert(1)</script></body></html>"
-
-
-def test_md_to_pdf_and_read_pdf(ws):
-    data = md_to_pdf(MD)
-    assert data.startswith(b"%PDF")
-    base = workspace.workspace_for("u1")
-    tools = PdfTools(base)
-    (base / "r.md").write_text(MD, encoding="utf-8")
-    assert tools.build_pdf("r.md") == "r.pdf"
-    assert (base / "r.pdf").read_bytes().startswith(b"%PDF")
-    text = tools.read_pdf("r.pdf")
-    assert "Project Brief" in text and "Second goal" in text and "Dev" in text
-    assert tools.build_pdf("r.md", output="sub/out.pdf") == "sub/out.pdf"
-
-
-def test_pdf_tools_never_raise(ws):
-    base = workspace.workspace_for("u1")
-    tools = PdfTools(base)
-    (base / "bad.pdf").write_bytes(b"not a pdf")
-    (base / "odd.md").write_text("<script>x</script>\n\n![i](http://127.0.0.1/x.png)\n\n| a |\n|---|\n", encoding="utf-8")
-    assert tools.build_pdf("odd.md") == "odd.pdf"
-    for r in [tools.build_pdf("missing.md"), tools.build_pdf("../x.md"), tools.build_pdf("odd.md", "o.txt"),
-              tools.build_pdf("odd.md", "/abs.pdf"), tools.build_pdf("bad.pdf"), tools.read_pdf("bad.pdf"),
-              tools.read_pdf("missing.pdf"), tools.read_pdf("../x.pdf"), tools.read_pdf("/etc/passwd")]:
-        assert r.startswith("Error"), r
 
 
 def test_inject_csp_variants():
@@ -282,7 +287,7 @@ def test_html_pdf_endpoints(client):
     base = workspace.workspace_for("u1")
     (base / "p.html").write_text(HTML_DOC, encoding="utf-8")
     (base / "d.md").write_text(MD, encoding="utf-8")
-    PdfTools(base).build_pdf("d.md")
+    make_pdf(base / "d.pdf")
     r = client.get("/files/preview", params={"path": "p.html"})
     b = r.json()
     assert r.status_code == 200 and b["kind"] == "html"
@@ -292,7 +297,7 @@ def test_html_pdf_endpoints(client):
     pdf = client.get("/files/preview", params={"path": "d.pdf"}).json()
     assert pdf["kind"] == "pdf" and pdf["html"] == "" and pdf["version"].isdigit()
     assert client.get("/files/preview", params={"path": "d.md"}).json()["kind"] == "pdf"  # pdf twin
-    DocxTools(base).build_docx("d.md")
+    make_docx(base / "d.docx")
     assert client.get("/files/preview", params={"path": "d.md"}).json()["kind"] == "docx"  # docx wins
 
     d = client.get("/files/download", params={"path": "d.pdf"})
@@ -316,9 +321,10 @@ def test_html_pdf_error_codes(client, monkeypatch):
 
 def test_html_pdf_file_events():
     seen: set = set()
-    assert file_event(tool("save_file", {"file_name": "p.html"}, "p.html"), seen) ==         {"path": "p.html", "kind": "html", "action": "created"}
-    assert file_event(tool("replace_file_chunk", {"file_name": "p.html"}, "p.html"), seen) ==         {"path": "p.html", "kind": "html", "action": "updated"}
-    assert file_event(tool("build_pdf", {"source": "r.md"}, "r.pdf"), seen) ==         {"path": "r.pdf", "kind": "pdf", "action": "created"}
-    assert file_event(tool("build_pdf", {"source": "r.md"}, "r.pdf"), seen)["action"] == "updated"
-    assert file_event(tool("build_pdf", {"source": "x.md"}, "Error: x.md does not exist"), seen) is None
-    assert file_event(tool("delete_file", {"file_name": "p.html"}, ""), seen)["kind"] == "html"
+    assert one(tool("save_file", {"file_name": "p.html"}, "p.html"), seen) == \
+        {"path": "p.html", "kind": "html", "action": "created"}
+    assert one(tool("replace_file_chunk", {"file_name": "p.html"}, "p.html"), seen) == \
+        {"path": "p.html", "kind": "html", "action": "updated"}
+    assert one(tool("delete_file", {"file_name": "p.html"}, ""), seen)["kind"] == "html"
+    assert one(tool("delete_file", {"file_name": "r.pdf"}, ""), seen) == \
+        {"path": "r.pdf", "kind": "pdf", "action": "deleted"}

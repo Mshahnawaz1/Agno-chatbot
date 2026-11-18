@@ -33,7 +33,8 @@ from app.connectors import tools as connector_tools
 
 ROOT = Path(__file__).resolve().parents[2]  # dots-in-chat/
 SKILL_DIRS = [ROOT / "skills", ROOT / "connector_skills"]
-INLINE_MAX = 8
+INLINE_MAX = 10
+FILES_LISTED_MAX = 20  # more extra files than this: the index gives a count + folder, not every name
 FILE_DIRS = ("references", "templates")  # agno scans only references/ (and scripts/)
 SKILL_TOOLS = ("get_skill_instructions",)
 STUB = (
@@ -50,6 +51,8 @@ def _files_line(files: list[str]) -> str:
     for f in files:
         d, name = f.split("/", 1)
         groups.setdefault(d, []).append(name.removesuffix(".md"))
+    if len(files) > FILES_LISTED_MAX:  # e.g. 54 design templates: names are in the skill's own text
+        return " Files: " + "; ".join(f"{d}/ ({len(n)} files, by name: {d}/<name>)" for d, n in groups.items())
     return " Files: " + "; ".join(f"{d}/{{{','.join(n)}}}.md" for d, n in groups.items())
 
 

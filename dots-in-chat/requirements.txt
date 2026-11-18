@@ -23,4 +23,14 @@ python-docx
 mammoth
 markdown-it-py
 nh3
-xhtml2pdf
+# hermes skill scripts (skills/microsoft-office, skills/pdf), run via run_skill_script
+lxml
+reportlab
+pdfplumber
+pypdfium2
+pillow
+agno
+yfinance
+sqlalchemy
+groq
+greenlet

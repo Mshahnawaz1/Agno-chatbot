@@ -64,3 +64,13 @@ Plan: `files_plan.md`. Branch: `feat/file-tools-docx`. Status: [ ] todo, [~] in 
   blocked; html CSP meta injected inside <head>, <style> kept.
 - Skills index grew to 470 tokens (guard raised 420 -> 480 for the new `files` skill).
 - NOT yet done: live E2E with a real model/browser (html + pdf create and edit, PDF viewer in panel).
+
+
+# v3: hermes skills (see files_plan.md v3)
+- [x] Skills agent: copy + adapt 4 skills, drop `files` skill, INLINE_MAX/budget, validate
+- [x] Backend agent: run_skill_script runner + sandbox, remove md converters/toolkits, events, tests, deps
+      (skill_runner.py + skill_sandbox.py, file_guard.py, previews.py; pytest 109 passed / 2 skipped)
+- [x] Frontend agent: chips from `changed`, drop build_* logic
+- [x] Docs: docs/hermes_file_skills.md (how hermes does it + how we adapted)
+- [x] Verify: run copied scripts through the runner (create docx/pdf from spec, edit), tests, tsc/eslint
+- [x] Commit + logs.md

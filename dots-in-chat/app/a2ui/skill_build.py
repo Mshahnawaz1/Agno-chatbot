@@ -11,7 +11,7 @@ Skills (one per use case, so a reply loads only what it needs):
 - ui-display: show results (card/list/table components, VegaChart, media)
 
 Generated per skill: references/*.md, references/rules.md and templates/update.md (copied from
-app/a2ui/skill_shared/), scripts/check.py (copied from app/a2ui/skill_shared/). Hand-written:
+app/a2ui/skill_shared/), Hand-written:
 SKILL.md and the other templates.
 
     PYTHONPATH=. python -m app.a2ui.skill_build          # write the files
@@ -75,14 +75,12 @@ def build() -> dict[str, str]:
     )
     rules = (SHARED / "rules.md").read_text(encoding="utf-8")
     update = (SHARED / "update.md").read_text(encoding="utf-8")
-    check = (SHARED / "check.py").read_text(encoding="utf-8")
 
     files: dict[str, str] = {}
     for skill in UI_SKILLS:
         files[f"{skill}/references/grammar.md"] = grammar
         files[f"{skill}/references/rules.md"] = rules
         files[f"{skill}/templates/update.md"] = update
-        files[f"{skill}/scripts/check.py"] = check  # no HEAD: keeps its shebang and docstring
 
     files["ui-forms/references/components.md"] = _components_file(
         "Form components", FORM_COMPONENTS, intro, sigs)
@@ -105,11 +103,11 @@ def build() -> dict[str, str]:
         files[f"ui-blocks/references/block-{path.stem}.md"] = (
             f"# {', '.join(names)} (chat block)\n\n{body}\n\n{doc['guide']}\n")
 
-    return {p: (t if p.endswith("check.py") else HEAD + t) for p, t in files.items()}
+    return {p: HEAD + t for p, t in files.items()}
 
 
 def _generated_on_disk() -> set[str]:
-    """Files under each UI skill that this script owns (references/, update.md, check.py)."""
+    """Files under each UI skill that this script owns (references/, update.md)."""
     out: set[str] = set()
     for skill in UI_SKILLS:
         root = SKILLS_DIR / skill

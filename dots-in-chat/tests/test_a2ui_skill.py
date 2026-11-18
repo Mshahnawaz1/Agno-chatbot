@@ -1,4 +1,4 @@
-"""Offline tests for the a2ui skill (skills/a2ui/) and the lazy skill tools (app/skills.py).
+"""Offline tests for the a2ui skill (skills/a2ui/) and the lazy skill tools (app/agent/skills.py).
 
 Run from dots-in-chat/:
     PYTHONPATH=. python -m unittest tests.test_a2ui_skill -v
@@ -16,9 +16,10 @@ _tmp = tempfile.mkdtemp()
 os.environ["APP_DB_PATH"] = os.path.join(_tmp, "app.db")  # before app.config is imported
 
 from app import db  # noqa: E402
+from app.a2ui.turn import A2uiTurn  # noqa: E402
 from app.a2ui.skill_build import SKILLS_DIR, UI_SKILLS, stale  # noqa: E402
 from app.agent import agent  # noqa: E402
-from app.skills import skill_files, skills  # noqa: E402
+from app.agent.skills import skill_files, skills  # noqa: E402
 
 db.init_db()
 BLOCK = re.compile(r"<a2ui>.*?</a2ui>", re.DOTALL)
@@ -69,15 +70,22 @@ class SkillFilesTest(unittest.TestCase):
                 if "update=true" in block or "deleteSurface" in block:
                     continue  # needs an earlier surface; covered in test_a2ui
                 with self.subTest(f.name):
-                    out = skills.get_skill_script(f.parents[1].name, "check.py", ctx(), args=[block])
-                    self.assertTrue(out.startswith("OK"), out)
+                    turn = A2uiTurn("check-only")
+                    turn.start_pass()
+                    turn.feed(block)
+                    turn.close()
+                    self.assertEqual(turn.rejected, [])
 
-    def test_check_reports_errors_with_a_fix(self):
-        out = skills.get_skill_script(
-            "ui-forms", "check.py", ctx(), args=['<a2ui>\nsurface("s")\ncard = Card(Text("Hi"))\nroot = card\n</a2ui>']
-        )
-        self.assertTrue(out.startswith("ERRORS"), out)
-        self.assertIn("Fix:", out)
+    def test_repair_prompt_quotes_the_rejected_reply_and_the_error(self):
+        reply = '<a2ui>\nsurface("s")\ncard = Card(Text("Hi"))\nroot = card\n</a2ui>'
+        turn = A2uiTurn("check-only")
+        turn.start_pass()
+        turn.feed(reply)
+        turn.close()
+        self.assertTrue(turn.rejected)
+        prompt = turn.repair_prompt()
+        self.assertIn("card = Card(", prompt)
+        self.assertIn(turn.rejected[0][:40], prompt)
 
 
 class LazyLoadTest(unittest.TestCase):
@@ -115,7 +123,7 @@ class LazyLoadTest(unittest.TestCase):
         self.assertIn("already loaded above", again)
         self.assertIn("paths=[...]", again)  # tells the model how to get more
         self.assertNotIn("--- ", again)
-        fresh = asyncio.run(skills.get_skill_instructions("ui-forms", ctx("next-run")))
+        fresh = asyncio.run(skills.get_skill_instructions("ui-forms", ctx("next-run"), paths=[]))
         self.assertIn("## Workflow", fresh)  # a new run loads it again
 
 

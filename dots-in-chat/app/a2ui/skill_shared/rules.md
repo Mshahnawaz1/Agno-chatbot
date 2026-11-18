@@ -11,10 +11,9 @@
 - Never draw charts as text or ASCII.
 - Reply with one short sentence, then the block. Don't repeat in text what the UI shows.
 
-## Check before sending
-`get_skill_script("<this skill>", "check.py", args=["<the whole block, with <a2ui> tags>"])`
-compiles the block against this chat's real surfaces. On errors, fix and check again (at most
-twice). Send the block once it prints OK, unchanged.
+## Validation
+The server compiles your block as it streams, against this chat's real surfaces. If it is
+rejected you get the errors once to fix; there is nothing to run before replying.
 
 ## Surfaces across turns
 Earlier surfaces stay in the chat where they were shown; leave them there.

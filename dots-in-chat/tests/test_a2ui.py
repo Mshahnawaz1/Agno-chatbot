@@ -133,7 +133,6 @@ class TurnTest(unittest.TestCase):
         again = A2uiTurn(session)
         events = run_reply(again, FORM_REPLY.replace('"2"]', '"1"]'), chunk=3)  # split mid-line
         self.assertEqual(again.rejected, [])
-        self.assertEqual(again.upgraded, ["trip_prefs"])
         kinds = {k for n, d in events if n == "a2ui" for k in d["message"] if k != "version"}
         self.assertNotIn("createSurface", kinds)
 

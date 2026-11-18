@@ -16,6 +16,7 @@ from app.a2ui.prompt import REPAIR_PROMPT
 from app.a2ui.store import Part, keep_earlier_surfaces, load_state, save_parts
 
 Event = tuple[str, dict[str, Any]]  # (SSE event name, data)
+RAW_MAX = 4000  # chars of the rejected reply that a repair prompt quotes
 
 # Compiler errors whose wording doesn't point at the mistake the model made (seen live), with
 # what to do instead. Matched on the error text; added to the repair prompt.
@@ -62,7 +63,7 @@ class A2uiTurn:
         # is dropped (see keep_earlier_surfaces), so earlier messages keep their cards.
         self._held: list[Part] = []
         self._line = ""  # an unfinished line that may be a `surface(...)` statement
-        self.upgraded: list[str] = []  # surfaces whose `surface(id)` became an update
+        self._raw = ""  # what the model wrote in this pass, for the repair prompt
 
     @property
     def surface_ids(self) -> list[str]:
@@ -71,10 +72,12 @@ class A2uiTurn:
     def start_pass(self) -> None:
         """Starts reading one model run (the reply, or a repair)."""
         self.rejected = []
+        self._raw = ""
         self._line = ""
         self._stream = self._processor.open_stream(state=self._state, after_rejected_block="continue")
 
     def feed(self, chunk: str) -> list[Event]:
+        self._raw += chunk
         return self._events(self._stream.feed(self._upgrade(chunk)))
 
     def close(self) -> list[Event]:
@@ -100,12 +103,12 @@ class A2uiTurn:
     def _fix_line(self, line: str) -> str:
         m = _SURFACE_LINE.match(line)
         if m and m.group(2) in self._state.surface_ids:
-            self.upgraded.append(m.group(2))
             return f"{m.group(1)}, update=true){m.group(3)}"
         return line
 
     def repair_prompt(self) -> str:
         return REPAIR_PROMPT.format(
+            previous=self._raw[-RAW_MAX:],
             errors="\n".join(f"- {e}{_hint(e)}" for e in self.rejected),
             surfaces=", ".join(self.surface_ids) or "none (create the surface)",
         )

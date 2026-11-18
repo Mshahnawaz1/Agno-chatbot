@@ -1,6 +1,6 @@
 ---
 name: ui-forms
-description: Asks the user for details, a choice or approval with a form. Use instead of asking two or more questions, offering options or confirming an action as plain text.
+description: Asks the user for details, a choice or approval with a form. ALWAYS load it BEFORE replying when you would otherwise ask the user anything (a question, preferences, details, options, confirmation, a date or amount), e.g. "help me plan ...", "which one should I ..."; use it instead of plain-text questions. Load it again for every reply that shows a form, also when earlier turns did.
 metadata:
   preload: references/grammar.md references/rules.md references/components.md templates/form.md
 ---
@@ -21,7 +21,7 @@ Not for plain answers, explanations or code. For a ready-made calculator or an a
 ## Workflow
 1. Put ALL the questions in ONE form with one submit button, starting from `templates/form.md`
    (already loaded). Rename the surface id, fields and event; keep the shape.
-2. Check the block (see rules.md), then reply with one sentence and the block. Stop and wait.
+2. Reply with one sentence and the block (see rules.md). Stop and wait.
 3. Input checks beyond `?required` (email, regex, length) and number formatting:
    `get_skill_instructions("ui-forms", paths=["references/functions.md"])`.
 
@@ -29,7 +29,7 @@ Not for plain answers, explanations or code. For a ready-made calculator or an a
 | File | What it holds |
 |---|---|
 | references/grammar.md | Express syntax: bindings, events, checks (loaded) |
-| references/rules.md | output rules, check step, updating and deleting surfaces (loaded) |
+| references/rules.md | output rules, updating and deleting surfaces (loaded) |
 | references/components.md | signatures of the form components (loaded) |
 | templates/form.md | a complete form (loaded) |
 | references/functions.md | all input checks and formatting functions |

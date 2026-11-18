@@ -13,8 +13,8 @@ from app.a2ui.turn import A2uiTurn
 from app.agent import agent
 from app.deps import CurrentUser
 from app.schemas import ChatRequest, ChatResponse
-from app.skills import stub_skill_loads
-from app.titles import generate_title
+from app.agent.skills import stub_skill_loads
+from app.agent.titles import generate_title
 
 logger = logging.getLogger(__name__)
 

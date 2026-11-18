@@ -2,7 +2,7 @@ import logging
 
 from agno.agent import Agent
 
-from app.agent import primary_model
+from app.agent.models import primary_model
 
 logger = logging.getLogger(__name__)
 

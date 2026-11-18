@@ -9,7 +9,7 @@ from app.connectors import auth, tools
 from app.connectors.registry import CONNECTORS, Connector
 from app.deps import CurrentUser
 from app.schemas import ApiKeyIn, AuthorizeOut, ConnectorOut, ConnectorUpdate, SkillOut
-from app.skills import skills
+from app.agent.skills import skills
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/connectors", tags=["connectors"])

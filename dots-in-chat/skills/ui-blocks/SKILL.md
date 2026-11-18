@@ -8,7 +8,7 @@ metadata:
 # Live chat blocks
 
 Each block keeps its own live state in the browser and sends its own events. Pick the one that
-matches the request, then load its signature in ONE call:
+matches the request, then load its signature in your FIRST call, naming the file:
 `get_skill_instructions("ui-blocks", paths=["references/block-<name>.md"])`
 (load two only when one reply needs two blocks).
 
@@ -28,9 +28,9 @@ matches the request, then load its signature in ONE call:
 | suggestions | Suggestions | 2-4 tap-to-reply follow-ups under a block |
 
 ## Workflow
-1. Load the block's file (above). Start from `templates/block-card.md`: the block first in
+1. Start from `templates/block-card.md`: the block first in
    `root = Column([...])`, a Suggestions under it.
 2. Fill the block's arguments from the user's numbers; don't compute results yourself.
-3. Check the block (see rules.md), then reply with one sentence and the block.
+3. Reply with one sentence and the block (see rules.md).
 
 No block fits? A form is `ui-forms`; results, tables, other charts are `ui-display`.

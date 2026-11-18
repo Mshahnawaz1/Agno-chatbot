@@ -43,6 +43,11 @@ HINTS = {
 # `surface("<id>")` alone on a line: the start of a block for that surface.
 _SURFACE_LINE = re.compile(r'^(\s*surface\(\s*"([^"]+)"\s*)\)(\s*)$')
 _SURFACE_START = "surface("
+# `surface("<id>", update=true)`: an update of an existing surface.
+_UPDATE_LINE = re.compile(r'^(\s*surface\(\s*")([^"]+)("\s*),\s*update\s*=\s*true\s*\)[ \t]*$', re.MULTILINE)
+_A2UI_BLOCK = re.compile(r"<a2ui>.*?</a2ui>", re.DOTALL)
+NOT_REACHABLE = "is not reachable from"
+FALLBACK_TEXT = "Sorry, I couldn't display that. Please try again."
 
 
 def _hint(error: str) -> str:
@@ -105,6 +110,42 @@ class A2uiTurn:
         if m and m.group(2) in self._state.surface_ids:
             return f"{m.group(1)}, update=true){m.group(3)}"
         return line
+
+    def replace_dropped_updates(self) -> list[Event] | None:
+        """Retries a rejected update that dropped components as a NEW surface, with no model call.
+
+        Seen live (pick a chart from a gallery, tap a suggestion): the model answered with
+        `surface("<gallery id>", update=true)` and a different root, which the compiler rejects
+        ("not reachable from root"), twice, so the user saw nothing. Replacing a card's layout
+        means a new surface (rules.md), so the update line gets a fresh id and the block is read
+        again. None if this doesn't apply (other errors, or no update line to change).
+        """
+        if not self.rejected or any(NOT_REACHABLE not in e for e in self.rejected):
+            return None
+        taken, renamed = set(self.surface_ids), {}
+
+        def fresh(m: re.Match) -> str:
+            old = m.group(2)
+            if old not in self._state.surface_ids:
+                return m.group(0)
+            if old not in renamed:
+                n = 2
+                while f"{old}_{n}" in taken:
+                    n += 1
+                renamed[old] = f"{old}_{n}"
+                taken.add(renamed[old])
+            return f'{m.group(1)}{renamed[old]}{m.group(3)})'
+
+        blocks = [_UPDATE_LINE.sub(fresh, b) for b in _A2UI_BLOCK.findall(self._raw)]
+        if not renamed or not blocks:
+            return None
+        self.start_pass()
+        return self.feed("\n".join(blocks)) + self.close()
+
+    def fallback(self) -> list[Event]:
+        """What the user sees when no repair worked: a note instead of a blank reply."""
+        self._add_text(FALLBACK_TEXT)
+        return [("token", {"content": FALLBACK_TEXT})]
 
     def repair_prompt(self) -> str:
         return REPAIR_PROMPT.format(

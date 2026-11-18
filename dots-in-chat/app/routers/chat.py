@@ -23,7 +23,7 @@ TITLE_WAIT_SECONDS = 5
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 # A reply whose A2UI block the compiler rejects gets this many hidden runs to correct it.
-REPAIR_ATTEMPTS = 1
+REPAIR_ATTEMPTS = 2  # the A2UI docs' validate-and-retry loop uses 2 retries
 
 # agno's error types for guardrail checks; any other run error is a failure, not a block.
 GUARDRAIL_ERRORS = {"input_check_error", "output_check_error"}
@@ -140,6 +140,9 @@ async def model_pass(
             log_run(event.run_id, event.metrics, run["tools"])
     for name, data in turn.close():
         yield sse(name, data)
+    # An update that dropped components becomes a new surface here, without another model call.
+    for name, data in turn.replace_dropped_updates() or []:
+        yield sse(name, data)
 
 
 @router.post("/stream")
@@ -176,6 +179,9 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
                 model_input, repair = turn.repair_prompt(), True
             if run["stopped"]:
                 return
+            if turn.rejected:  # every repair failed: say so instead of showing nothing
+                for name, data in turn.fallback():
+                    yield sse(name, data)
             for name, data in turn.finish():
                 yield sse(name, data)
             if run["metrics"]:

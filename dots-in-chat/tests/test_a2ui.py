@@ -136,6 +136,33 @@ class TurnTest(unittest.TestCase):
         kinds = {k for n, d in events if n == "a2ui" for k in d["message"] if k != "version"}
         self.assertNotIn("createSurface", kinds)
 
+    def test_update_that_drops_components_becomes_a_new_surface(self):
+        # Seen live: a gallery's pick answered with surface(<gallery id>, update=true) and a new
+        # root, rejected as "not reachable from root" twice: the user saw nothing.
+        session = new_session()
+        first = A2uiTurn(session)
+        run_reply(first, FORM_REPLY)
+        first.save("run-1")
+        again = A2uiTurn(session)
+        reply = (
+            'Here.\n<a2ui>\nsurface("trip_prefs", update=true)\nroot = Card(note)\n'
+            'note = Text("### Done")\n</a2ui>'
+        )
+        events = run_reply(again, reply)
+        self.assertTrue(again.rejected)  # the compiler refuses the update...
+        events = again.replace_dropped_updates()  # ...so it is retried under a new id
+        self.assertEqual(again.rejected, [])
+        created = [d["message"]["createSurface"]["surfaceId"] for n, d in events
+                   if n == "a2ui" and "createSurface" in d["message"]]
+        self.assertEqual(created, ["trip_prefs_2"])
+        self.assertIn("trip_prefs", again.surface_ids)  # the earlier card stays
+
+    def test_other_rejections_are_not_retried_as_new_surfaces(self):
+        turn = A2uiTurn(new_session())
+        run_reply(turn, BAD_REPLY)
+        self.assertIsNone(turn.replace_dropped_updates())
+        self.assertIn("couldn't display", turn.fallback()[0][1]["content"])
+
     def test_prose_streams_without_waiting_for_a_newline(self):
         turn = A2uiTurn(new_session())
         turn.start_pass()

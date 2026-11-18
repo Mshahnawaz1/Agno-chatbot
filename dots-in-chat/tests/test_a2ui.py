@@ -17,7 +17,7 @@ os.environ["APP_DB_PATH"] = os.path.join(_tmp, "app.db")  # before app.config is
 from app import db  # noqa: E402
 from app.a2ui.actions import InvalidAction, action_prompt, parse_action_prompt, read_action  # noqa: E402
 from app.a2ui.catalog import BASIC_COMPONENTS, CATALOG_ID  # noqa: E402
-from app.a2ui.skill_build import SKILL_DIR, build  # noqa: E402
+from app.a2ui.skill_build import SKILLS_DIR, build  # noqa: E402
 from app.a2ui.store import parts_by_run  # noqa: E402
 from app.a2ui.turn import A2uiTurn  # noqa: E402
 
@@ -66,12 +66,14 @@ def run_reply(turn: A2uiTurn, reply: str, chunk: int = 7) -> list[tuple[str, dic
 class PromptTest(unittest.TestCase):
     def test_skill_references_come_from_the_pruned_catalog(self):
         refs = build()
-        self.assertIn("A2UI Express", refs["grammar.md"])
-        self.assertIn("ChoicePicker(", refs["components.md"])
-        self.assertNotIn("AudioPlayer(", "".join(refs.values()))
+        self.assertIn("A2UI Express", refs["ui-forms/references/grammar.md"])
+        self.assertIn("ChoicePicker(", refs["ui-forms/references/components.md"])
+        self.assertNotIn("Tabs(", refs["ui-forms/references/components.md"])  # forms don't need them
+        self.assertIn("AudioPlayer(", refs["ui-display/references/components-media.md"])
+        self.assertNotIn("AudioPlayer(", refs["ui-display/references/components.md"])
         self.assertIn("DateTimeInput", BASIC_COMPONENTS)
-        self.assertIn("VegaChart(spec, height?)", refs["chart.md"])
-        self.assertIn("When to show UI", (SKILL_DIR / "SKILL.md").read_text())
+        self.assertIn("VegaChart(spec, height?)", refs["ui-display/references/chart.md"])
+        self.assertIn("When to use", (SKILLS_DIR / "ui-forms" / "SKILL.md").read_text(encoding="utf-8"))
 
 
 class TurnTest(unittest.TestCase):
@@ -217,7 +219,7 @@ class RootAliasTest(unittest.TestCase):
         turn = A2uiTurn(new_session())
         run_reply(turn, '<a2ui>\nsurface("s")\ncard = Card(Text("Hi"))\nroot = card\n</a2ui>')
         self.assertEqual(len(turn.rejected), 1)
-        self.assertIn("root = card", (SKILL_DIR / "SKILL.md").read_text())
+        self.assertIn("root = card", (SKILLS_DIR / "ui-forms" / "references" / "rules.md").read_text(encoding="utf-8"))
 
 
 class ActionTest(unittest.TestCase):

@@ -65,7 +65,7 @@ class BlockFilesTest(unittest.TestCase):
                     self.assertIn(name + "(", doc["guide"], "guide must show the signature")
 
     def test_skill_has_a_reference_for_every_block(self):
-        refs = "".join(text for name, text in build().items() if name.startswith("block-"))
+        refs = "".join(text for name, text in build().items() if "/block-" in name)
         for name in BLOCK_COMPONENTS:
             self.assertIn(f"• {name}(", refs)
 

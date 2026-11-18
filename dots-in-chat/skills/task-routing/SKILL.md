@@ -1,6 +1,6 @@
 ---
 name: task-routing
-description: Decide where to create a task when both Todoist and Reclaim are connected. Use before creating any task.
+description: Picks Todoist or Reclaim for a new task when both are connected. Use before creating any task.
 ---
 
 # Task routing

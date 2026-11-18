@@ -7,6 +7,7 @@ Run from dots-in-chat/:
 import asyncio
 import os
 import re
+from pathlib import Path
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -15,7 +16,7 @@ _tmp = tempfile.mkdtemp()
 os.environ["APP_DB_PATH"] = os.path.join(_tmp, "app.db")  # before app.config is imported
 
 from app import db  # noqa: E402
-from app.a2ui.skill_build import SKILL_DIR, stale  # noqa: E402
+from app.a2ui.skill_build import SKILLS_DIR, UI_SKILLS, stale  # noqa: E402
 from app.agent import agent  # noqa: E402
 from app.skills import skill_files, skills  # noqa: E402
 
@@ -31,26 +32,49 @@ class SkillFilesTest(unittest.TestCase):
     def test_references_match_the_catalog(self):
         self.assertEqual(stale(), [], "run: PYTHONPATH=. python -m app.a2ui.skill_build")
 
-    def test_skill_md_names_only_files_that_exist(self):
-        a2ui = skills.get_skill("a2ui")
-        files = skill_files(a2ui)
-        named = set(re.findall(r"((?:references|templates)/[\w.<>-]+\.md)", a2ui.instructions))
-        for f in named - {"references/block-<name>.md"}:
-            self.assertIn(f, files)
-        self.assertLess(len(a2ui.instructions), 6000, "SKILL.md must stay small: it is loaded often")
+    def test_skills_follow_the_agent_skills_format(self):
+        # Anthropic's rules: name <= 64 chars, lowercase/digits/hyphens, matches the folder;
+        # description non-empty, <= 1024 chars, says what the skill does AND when to use it;
+        # SKILL.md < 500 lines; every file it names exists (one level deep).
+        for name in skills.get_skill_names():
+            skill = skills.get_skill(name)
+            with self.subTest(name):
+                self.assertRegex(name, r"^[a-z0-9]+(-[a-z0-9]+)*$")
+                self.assertLessEqual(len(name), 64)
+                self.assertEqual(Path(skill.source_path).name, name)
+                self.assertTrue(0 < len(skill.description) <= 1024)
+                self.assertRegex(skill.description, r"\b[Uu]se\b", "say when to use the skill")
+                self.assertLess(len(skill.instructions.splitlines()), 500)
+                files = skill_files(skill)
+                named = set(re.findall(r"((?:references|templates)/[\w.<>-]+\.md)", skill.instructions))
+                for f in named - {"references/block-<name>.md"}:
+                    self.assertIn(f, files)
+
+    def test_ui_skills_preload_only_what_their_use_case_needs(self):
+        for name in UI_SKILLS:
+            skill = skills.get_skill(name)
+            files = skill_files(skill)
+            preload = skill.metadata["preload"].split()
+            size = len(skill.instructions) + sum((Path(skill.source_path) / f).stat().st_size for f in preload)
+            with self.subTest(name):
+                for f in preload:
+                    self.assertIn(f, files)
+                self.assertLess(size, 17000, "a UI turn resends this on every model call")
+        blocks = skills.get_skill("ui-blocks")
+        self.assertNotIn("references/components.md", blocks.metadata["preload"])
 
     def test_every_template_passes_check(self):
-        for f in (SKILL_DIR / "templates").glob("*.md"):
-            for block in BLOCK.findall(f.read_text()):
+        for f in (p for s in UI_SKILLS for p in (SKILLS_DIR / s / "templates").glob("*.md")):
+            for block in BLOCK.findall(f.read_text(encoding="utf-8")):
                 if "update=true" in block or "deleteSurface" in block:
                     continue  # needs an earlier surface; covered in test_a2ui
                 with self.subTest(f.name):
-                    out = skills.get_skill_script("a2ui", "check.py", ctx(), args=[block])
+                    out = skills.get_skill_script(f.parents[1].name, "check.py", ctx(), args=[block])
                     self.assertTrue(out.startswith("OK"), out)
 
     def test_check_reports_errors_with_a_fix(self):
         out = skills.get_skill_script(
-            "a2ui", "check.py", ctx(), args=['<a2ui>\nsurface("s")\ncard = Card(Text("Hi"))\nroot = card\n</a2ui>']
+            "ui-forms", "check.py", ctx(), args=['<a2ui>\nsurface("s")\ncard = Card(Text("Hi"))\nroot = card\n</a2ui>']
         )
         self.assertTrue(out.startswith("ERRORS"), out)
         self.assertIn("Fix:", out)
@@ -69,7 +93,8 @@ class LazyLoadTest(unittest.TestCase):
 
     def test_system_prompt_has_no_a2ui_catalog(self):
         snippet = skills.get_system_prompt_snippet()
-        self.assertIn("a2ui:", snippet)
+        for name in UI_SKILLS:
+            self.assertIn(f"{name}:", snippet)
         joined = " ".join(map(str, agent.instructions))
         for text in (snippet, joined):
             self.assertNotIn("Positional Component Signatures", text)
@@ -78,19 +103,19 @@ class LazyLoadTest(unittest.TestCase):
     def test_one_call_loads_instructions_and_files_and_repeats_are_stubbed(self):
         c = ctx("run-batch")
         out = asyncio.run(skills.get_skill_instructions(
-            "a2ui", c, paths=["references/grammar.md", "templates/form.md", "references/nope.md"]))
+            "ui-forms", c, paths=["references/grammar.md", "templates/form.md", "references/nope.md"]))
         self.assertIn("## Workflow", out)
         self.assertIn("--- references/grammar.md ---", out)  # preloaded and also asked for: once
         self.assertEqual(out.count("--- references/grammar.md ---"), 1)
         self.assertIn("--- references/components.md ---", out)  # preloaded
         self.assertIn("--- templates/form.md ---", out)
         self.assertIn("No file 'references/nope.md'", out)
-        again = asyncio.run(skills.get_skill_instructions("a2ui", c, paths=["references/grammar.md"]))
+        again = asyncio.run(skills.get_skill_instructions("ui-forms", c, paths=["references/grammar.md"]))
         self.assertNotIn("## Workflow", again)
         self.assertIn("already loaded above", again)
         self.assertIn("paths=[...]", again)  # tells the model how to get more
         self.assertNotIn("--- ", again)
-        fresh = asyncio.run(skills.get_skill_instructions("a2ui", ctx("next-run")))
+        fresh = asyncio.run(skills.get_skill_instructions("ui-forms", ctx("next-run")))
         self.assertIn("## Workflow", fresh)  # a new run loads it again
 
 

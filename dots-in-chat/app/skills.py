@@ -84,8 +84,8 @@ class LazySkills(Skills):
             return ""
         lines = [
             "<skills>",
-            "Skills are playbooks for specific tasks. When a request matches one, call "
-            "get_skill_instructions(skill_name) before acting and follow it.",
+            "Playbooks, loaded only when a request matches: call get_skill_instructions(name) "
+            "first, then follow it.",
         ]
         if len(skills) <= INLINE_MAX:
             for s in skills:

@@ -403,6 +403,50 @@ Rule from the user: nothing goes straight into the system prompt; it is a skill 
 - Open: the check call costs one round trip per UI turn; listing skill file names in the index
   (~80 tokens/turn) would let block turns load in one call instead of two.
 
+## Phase 10: Browser audit of A2UI and token cost (2026-11-18, not committed)
+Chrome extension against the real UI (vite :5173, API :8000), gemini-3.5-flash-lite first; token numbers are the `metrics` SSE event of each run.
+| Prompt | Rendered | Input tokens | Out | Tool calls |
+|---|---|---|---|---|
+| capital of France (no UI) | text | 1,320 | 7 | 0 |
+| plan a weekend trip (form) | TextField, DateTimeInput, number, ChoicePicker, Button: OK | 14,403 | 684 | 2 |
+| click "Plan Trip" (action round trip) | itinerary card: OK | 17,673 | 423 | 2 |
+| SIP 10k/month (GrowthCalculator) | OK; slider drag recomputes in the browser, no request | 21,687 | 239 | 3 |
+| split 80,000 salary (BudgetSplit + Suggestions) | OK | 23,550 | 440 | 4 |
+| quadratic (QuadraticExplorer) | OK; roots 3 and 2, vertex (2.5, -0.25) correct | 20,844 | 186 | 3 |
+| rank priorities (RankList), 1st try | FAIL: raw JSON code block; chain flash-lite -> flash -> Groq, 25.7k in, 60 s | 25,691 | 705 | 6 |
+| rank priorities, 2nd try | OK on first model | 23,124 | 308 | 4 |
+| spending chart "switch bar/line/pie" | Vega bar chart with a select, not ChartSwitcher; Food bar white, Rent grey | 22,658 | 1,549 | 3 |
+- Offline: 27 tests pass after fixing a Windows-only bug (`skill_build.py` read/wrote references without
+  `encoding="utf-8"`, so `test_references_match_the_catalog` failed; `block-quadratic.md` regenerated).
+- Not run: `e2e/blocks.mjs` (needs `npx playwright install`), OrderReview, ReminderPicker, MessageApproval,
+  DraftDiff, BatchSend live (BatchSend, BudgetSplit seen in the `/dev/blocks` gallery, no console errors).
+- 2026-11-18 follow-up, "use every official A2UI component, keep context small": the released packages ship one
+  catalog, basic v1.0 (18 components) plus the VegaChart we already use; Video, AudioPlayer and Modal were the
+  ones left out. Added them to the catalog (`app/a2ui/catalog.py` `BASIC_COMPONENTS`, `RARE_COMPONENTS`) and to the
+  client (`catalog/content.tsx`, `layout.tsx`). Their signatures go to a separate on-demand file
+  `skills/a2ui/references/components-media.md` (917 chars), so the preloaded `components.md` stays 7.9k chars and
+  system prompt is unchanged. Live: card + Modal (opens a dialog) + Video + AudioPlayer drawn from one prompt,
+  30.5k input tokens (5 tool calls). 27 offline tests, tsc, eslint, build pass.
+- Test user `a2ui-audit@example.com` created in `data/app.db`.
+
+## Phase 11: Skills split by use case (2026-11-18, not committed)
+Goal: a turn pays only for the context it needs. Following Anthropic's Agent Skills format: metadata always in
+the prompt (name + what + when to use, one line), SKILL.md on trigger, references/templates/scripts on demand.
+- One `a2ui` skill (19k chars loaded on every UI turn, then resent on every model call) became three narrow skills:
+  `ui-forms` (ask for details/choices/approval), `ui-blocks` (12 ready-made live cards; block names are in the
+  description so the first call can load the block file), `ui-display` (cards, tables, VegaChart, media).
+  Each preloads grammar + rules + only its own components/template (blocks: ~10k chars with no components file;
+  forms ~16k; display ~14k). Shared parts (`rules.md`, `check.py`, `update.md`) live in `app/a2ui/skill_shared/` and
+  `app/a2ui/skill_build.py` copies them and the catalog-generated references into each skill; `--check` is a test.
+- Skills index in every request: 973 chars (~245 tokens, was ~330); every description rewritten as what + when.
+  Todoist, Reclaim and task-routing descriptions too. Test `test_skills_follow_the_agent_skills_format` enforces name
+  rules, description <= 1024 chars with a "Use ..." trigger, SKILL.md < 500 lines, named files exist.
+- Live, same prompts, flash-lite, input tokens before -> after: hello 1,320 -> 1,336 (memories grew; index is smaller);
+  trip form 14,403 -> 8,464; SIP 21,687 -> 15,726; spending chart 22,658 -> 16,421 (now routed to ChartSwitcher
+  with good colours, was a Vega bar chart with white/grey bars). 43 offline tests pass.
+- Not done: the Express grammar (4.9k chars) is sent to every UI turn; trimming it would need care because it is the SDK's
+  text. The backend on :8000 died during a --reload while I edited; I restarted it with `uvicorn app.main:app --reload`.
+
 ## Notes
 - `dots-in-chat/` now runs A2UI v1.0 through the SDK (6.2); the v0.9 integration (b96aed0) and
   the lost shadcn catalog are replaced.

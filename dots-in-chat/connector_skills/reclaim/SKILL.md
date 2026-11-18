@@ -1,6 +1,6 @@
 ---
 name: reclaim
-description: Schedule focus time and tasks on the calendar with Reclaim.ai, and check what's at risk.
+description: Blocks focus time and schedules tasks on the calendar (Reclaim.ai). Use to reserve calendar time or check the schedule.
 allowed-tools:
   - reclaim_get_schedule
   - reclaim_find_open_time

@@ -1,6 +1,6 @@
 ---
 name: todoist
-description: Add, find, reschedule and complete Todoist tasks without duplicates or wrong dates.
+description: Adds, finds, reschedules and completes Todoist tasks. Use for the user's to-do list, tasks and due dates.
 allowed-tools:
   - todoist_find-tasks
   - todoist_find-tasks-by-date

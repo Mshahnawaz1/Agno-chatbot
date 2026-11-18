@@ -33,3 +33,9 @@ Rules for this work:
 - Python: `uv` at the repo root.
 - shadcn CLI here resolves the utils alias wrongly: after `npx shadcn add`, replace
   `from "cn"` with `from "@/lib/utils"` and `npm uninstall cn`.
+
+## Run logs
+- Every run (app server, tests, `learn_agno/*`) logs at DEBUG to `data/logdb/logs.db` via `runlog.py`
+  (repo root, stdlib only). New entry points: `import runlog; runlog.start("<app-name>")` first thing.
+- Inspect: `uv run python runlog.py runs` / `tail --level WARNING --grep text`, or query `v_logs` in sqlite.
+  A run with no `ended_at` was killed. Secrets are redacted; disable with `RUNLOG_DISABLE=1`.

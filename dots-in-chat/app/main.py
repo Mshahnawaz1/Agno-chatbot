@@ -5,10 +5,21 @@ uvicorn app.main:app --reload          # run from the dots-in-chat/ root
 
 import asyncio
 import logging
+import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+# Run logs go to <repo>/data/logdb/logs.db (see runlog.py at the repo root). Start before the app
+# imports so import-time logs and agno's loggers are captured.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+try:
+    import runlog
+    runlog.start("dots-in-chat")
+except ImportError:  # app deployed without the repo root: console logging only
+    runlog = None
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -48,8 +59,9 @@ class SPAStaticFiles(StaticFiles):
 # uvicorn configures only its own loggers; show ours (run costs, routing, tool calls) too.
 _handler = logging.StreamHandler()
 _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S"))
+_handler.setLevel(logging.INFO)  # console stays INFO; the run-log DB gets everything at DEBUG
 logging.getLogger("app").addHandler(_handler)
-logging.getLogger("app").setLevel(logging.INFO)
+logging.getLogger("app").setLevel(logging.DEBUG)
 
 
 @asynccontextmanager
@@ -66,6 +78,25 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Dots-in Chat", lifespan=lifespan)
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """One DEBUG line per request: method, path (no query string: OAuth codes/tokens live there),
+    status, duration. Streaming responses report the time to the first byte."""
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception("request %s %s crashed after %.0fms", request.method, request.url.path,
+                         (time.perf_counter() - start) * 1000)
+        raise
+    logger.debug(
+        "request %s %s -> %s in %.0fms (client=%s, content-length=%s)",
+        request.method, request.url.path, response.status_code, (time.perf_counter() - start) * 1000,
+        request.client.host if request.client else "?", request.headers.get("content-length", "-"),
+    )
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,

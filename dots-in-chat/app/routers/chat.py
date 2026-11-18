@@ -57,10 +57,19 @@ def run_metrics(metrics, tools) -> dict:
     return out
 
 
+def _clip(value, limit: int = 4000) -> str:
+    text = value if isinstance(value, str) else json.dumps(value, default=repr, ensure_ascii=False)
+    return text if len(text) <= limit else f"{text[:limit]}... [+{len(text) - limit} chars]"
+
+
 def log_run(run_id, metrics, tools) -> None:
     """One line per run: what it cost and which tools it called. Tune routing from these."""
     if metrics is None:
         return
+    for t in tools or []:  # full detail for post-mortems; the DB log keeps it, the console doesn't
+        logger.debug("run %s tool %s args=%s result=%s", (run_id or "?")[:8], t.tool_name,
+                     _clip(t.tool_args), _clip(t.result))
+    logger.debug("run %s metrics: %s", (run_id or "?")[:8], _clip(metrics.to_dict() if hasattr(metrics, "to_dict") else metrics))
     logger.info(
         "run %s done: in=%s out=%s %.1fs ttft=%.1fs tools=[%s]",
         (run_id or "?")[:8], metrics.input_tokens, metrics.output_tokens,
@@ -154,6 +163,8 @@ async def model_pass(
 ) -> AsyncIterator[str]:
     """One agent run streamed through the A2UI compiler. Fills `run` with its outcome."""
     turn.start_pass()
+    logger.debug("model pass start: session=%s user=%s repair=%s input=%s",
+                 session_id, user["id"], repair, _clip(model_input, 2000))
     # `query` lets the tool router pick connector tools for the message. A repair run only fixes
     # UI, so it gets none: routing its prompt ("create ... form") attached unrelated tools.
     metadata = {"query": "" if repair else model_input}
@@ -183,7 +194,10 @@ async def model_pass(
             if event.content:
                 for name, data in turn.feed(str(event.content)):
                     yield sse(name, data)
+        elif event.event == RunEvent.tool_call_started:
+            logger.debug("tool call started: %s args=%s", event.tool.tool_name, _clip(event.tool.tool_args))
         elif event.event == RunEvent.tool_call_completed:
+            logger.debug("tool call completed: %s result=%s", event.tool.tool_name, _clip(event.tool.result))
             run["tools"].append(event.tool)
             for payload in file_events(event.tool, run.setdefault("seen_files", set())):
                 yield sse("file", payload)
@@ -203,6 +217,9 @@ async def model_pass(
 @router.post("/stream")
 async def chat_stream(body: ChatRequest, user: CurrentUser):
     session = resolve_session(body, user)      # 404 is raised here, before streaming
+    logger.debug("chat stream: session=%s user=%s new_session=%s message=%s action=%s",
+                 session["id"], user["id"], not body.session_id, _clip(body.message or "", 2000),
+                 bool(body.action))
     turn = A2uiTurn(session["id"])
     # New chat typed by the user: name it from the message's meaning, in parallel with the reply.
     # make_title's first-words title (set by resolve_session) stays if this fails or is slow.

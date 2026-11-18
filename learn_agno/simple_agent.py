@@ -2,6 +2,9 @@
 Run:
 python3 learn_agno/simple_agent.py
 """
+import sys as _sys, pathlib as _pl  # run logs -> data/logdb/logs.db (runlog.py at the repo root)
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1]))
+import runlog; runlog.start("learn_agno/" + _pl.Path(__file__).stem)
 
 
 from agno.agent import Agent

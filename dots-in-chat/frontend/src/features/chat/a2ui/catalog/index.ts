@@ -9,9 +9,9 @@ import { BASIC_FUNCTIONS, Catalog } from '@a2ui/web_core/v1_0'
 import type { ReactCatalogComponent } from '@a2ui/react/v0_9'
 import { BLOCKS } from '../blocks'
 import { VegaChart } from './chart'
-import { Icon, Image, Text } from './content'
+import { AudioPlayer, Icon, Image, Text, Video } from './content'
 import { Button, CheckBox, ChoicePicker, DateTimeInput, Slider, TextField } from './inputs'
-import { Card, Column, Divider, List, Row, Tabs } from './layout'
+import { Card, Column, Divider, List, Modal, Row, Tabs } from './layout'
 
 export const CATALOG_ID = 'dots-in-chat/chat/v1'
 
@@ -22,6 +22,7 @@ export const catalog = new Catalog<ReactCatalogComponent>(
     Text, Image, Icon,
     Row, Column, List, Card, Tabs, Divider,
     Button, TextField, CheckBox, ChoicePicker, Slider, DateTimeInput,
+    Video, AudioPlayer, Modal,
     VegaChart,
     ...BLOCKS,
   ] as ReactCatalogComponent[],

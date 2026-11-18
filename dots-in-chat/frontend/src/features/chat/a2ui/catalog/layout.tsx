@@ -1,6 +1,8 @@
 /** Layout components: Row, Column, List, Card, Tabs, Divider. */
-import { CardApi, ColumnApi, DividerApi, ListApi, RowApi, TabsApi } from '@a2ui/web_core/v1_0'
+import { CardApi, ColumnApi, DividerApi, ListApi, ModalApi, RowApi, TabsApi } from '@a2ui/web_core/v1_0'
 import { createComponentImplementation } from '@a2ui/react/v0_9'
+import { useState } from 'react'
+import { Dialog, DialogContent } from '@/components/ui/Dialog'
 import { Separator } from '@/components/shadcn/separator'
 import { Tabs as TabsRoot, TabsContent, TabsList, TabsTrigger } from '@/components/shadcn/tabs'
 import { cn } from '@/lib/utils'
@@ -90,3 +92,18 @@ export const Tabs = createComponentImplementation(TabsApi, ({ props, buildChild 
 export const Divider = createComponentImplementation(DividerApi, ({ props }) => (
   <Separator orientation={props.axis ?? 'horizontal'} className="data-[orientation=vertical]:self-stretch" />
 ))
+
+/** The trigger child draws inline; pressing it (its own events still fire) opens `content`. */
+export const Modal = createComponentImplementation(ModalApi, ({ props, buildChild }) => {
+  const [open, setOpen] = useState(false)
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <span style={weightStyle(props.weight)} className="inline-flex" onClickCapture={() => setOpen(true)}>
+        {buildChild(props.trigger)}
+      </span>
+      <DialogContent title="Details" hideTitle>
+        {buildChild(props.content)}
+      </DialogContent>
+    </Dialog>
+  )
+})

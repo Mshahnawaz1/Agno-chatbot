@@ -7,7 +7,7 @@ import {
   SkipForward, Smartphone, Square, Star, StarHalf, StarOff, Trash2, TriangleAlert, Upload, User, Volume,
   Volume1, Volume2, VolumeOff, X, type LucideIcon,
 } from 'lucide-react'
-import { IconApi, ImageApi, TextApi } from '@a2ui/web_core/v1_0'
+import { AudioPlayerApi, IconApi, ImageApi, TextApi, VideoApi } from '@a2ui/web_core/v1_0'
 import { createComponentImplementation } from '@a2ui/react/v0_9'
 import { Markdown } from '@/components/Markdown'
 import { cn } from '@/lib/utils'
@@ -45,6 +45,24 @@ export const Image = createComponentImplementation(ImageApi, ({ props }) => (
     style={weightStyle(props.weight)}
     className={cn('rounded-xl', imageSize[props.variant ?? 'mediumFeature'], imageFit[props.fit ?? 'cover'])}
   />
+))
+
+export const Video = createComponentImplementation(VideoApi, ({ props }) => (
+  <video
+    src={props.url ?? ''}
+    poster={props.posterUrl}
+    controls
+    preload="metadata"
+    style={weightStyle(props.weight)}
+    className="w-full max-w-2xl rounded-xl bg-black"
+  />
+))
+
+export const AudioPlayer = createComponentImplementation(AudioPlayerApi, ({ props }) => (
+  <figure style={weightStyle(props.weight)} className="flex flex-col gap-2">
+    {props.description ? <figcaption className="text-sm text-fg-muted">{props.description}</figcaption> : null}
+    <audio src={props.url ?? ''} controls preload="metadata" className="w-full max-w-md" />
+  </figure>
 ))
 
 /** The basic catalog's icon names (Material names), drawn with the app's lucide set. */

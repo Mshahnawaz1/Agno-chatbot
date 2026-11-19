@@ -1,5 +1,5 @@
 import { clearToken, getToken } from './token'
-import type { Connector, FilePreview, Message, Session, Skill, User } from './types'
+import type { Connector, FileEntry, FilePreview, Message, Session, Skill, User } from './types'
 
 export class ApiError extends Error {
   status: number
@@ -144,6 +144,15 @@ export function openChatStream(
 }
 
 // ---- files ----
+
+export const listFiles = () => request<FileEntry[]>('/files')
+
+/** Uploads documents into the workspace (multipart: the browser sets the boundary header). */
+export const uploadFiles = (files: File[]) => {
+  const body = new FormData()
+  for (const f of files) body.append('files', f)
+  return request<FileEntry[]>('/files/upload', { method: 'POST', body })
+}
 
 export const getFilePreview = (path: string) =>
   request<FilePreview>(`/files/preview?path=${enc(path)}`)

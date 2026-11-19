@@ -9,6 +9,9 @@ import { ChatPage } from '@/features/chat/ChatPage'
 const LoginPage = lazy(() => import('@/features/auth/LoginPage').then((m) => ({ default: m.LoginPage })))
 const SignupPage = lazy(() => import('@/features/auth/SignupPage').then((m) => ({ default: m.SignupPage })))
 const LandingPage = lazy(() => import('@/features/landing/LandingPage').then((m) => ({ default: m.LandingPage })))
+const FilesPage = lazy(() =>
+  import('@/features/files/FilesPage').then((m) => ({ default: m.FilesPage })),
+)
 const ConnectorsPage = lazy(() =>
   import('@/features/connectors/ConnectorsPage').then((m) => ({ default: m.ConnectorsPage })),
 )
@@ -49,6 +52,7 @@ export function App() {
         <Route element={<AppShell />}>
           <Route index element={<ChatPage />} />
           <Route path="c/:sessionId" element={<ChatPage />} />
+          <Route path="artifacts" element={<Page><FilesPage /></Page>} />
           <Route path="settings/connectors" element={<Page><ConnectorsPage /></Page>} />
         </Route>
       </Route>

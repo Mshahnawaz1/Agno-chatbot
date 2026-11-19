@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, NavLink } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DropdownMenu } from 'radix-ui'
-import { ArrowUpRight, MoreHorizontal, PanelLeftClose, Plug, Search, Trash2 } from 'lucide-react'
+import { ArrowUpRight, FolderOpen, MoreHorizontal, PanelLeftClose, Plug, Search, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import * as api from '@/lib/api'
 import { groupSessionsByDate } from '@/lib/format'
@@ -209,6 +209,16 @@ export function Sidebar({ onClose, onNavigate }: { onClose: () => void; onNaviga
       </div>
 
       <div className="flex shrink-0 flex-col gap-1 border-t border-white/10 p-2">
+        <NavLink
+          to="/artifacts"
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            clsx(rowBase, isActive ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-2 hover:text-fg')
+          }
+        >
+          <FolderOpen className="size-4 shrink-0" aria-hidden />
+          <span className="flex-1">Artifacts</span>
+        </NavLink>
         <NavLink
           to="/settings/connectors"
           onClick={onNavigate}

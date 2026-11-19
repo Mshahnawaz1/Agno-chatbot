@@ -8,6 +8,7 @@ import { useChatStream } from '@/features/chat/chatStore'
 function useTitle(): string {
   const { pathname } = useLocation()
   const sessions = useQuery({ queryKey: ['sessions'], queryFn: api.listSessions })
+  if (pathname.startsWith('/artifacts')) return 'Artifacts'
   if (pathname.startsWith('/settings/connectors')) return 'Connectors'
   const id = matchPath('/c/:sessionId', pathname)?.params.sessionId
   if (!id) return 'New chat'

@@ -1,16 +1,21 @@
 """The user's agent workspace over HTTP: list, preview (sanitised HTML) and download."""
 import asyncio
+import logging
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
+from app.agent.doc_edit import rewrite_excerpt
 from app.agent.formats import adapter_for, md_twin
-from app.agent.workspace import PathEscape, safe_path, workspace_for
+from app.agent.workspace import MAX_MD_BYTES, PathEscape, safe_path, workspace_for
 from app.deps import CurrentUser
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/files", tags=["files"])
 
 UPLOAD_DIR = "uploads"  # uploads live in the workspace, in their own folder, beside generated files
@@ -127,7 +132,11 @@ async def preview(user: CurrentUser, path: str = Query(...)):
         version = str(p.stat().st_mtime_ns)
     except FileNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
-    return {"path": path.replace("\\", "/"), "kind": ad.kind, "html": html, "version": version}
+    out = {"path": path.replace("\\", "/"), "kind": ad.kind, "html": html, "version": version}
+    if ad.kind == "md":
+        # The editor renders and edits the source itself (it needs line numbers for selections).
+        out["source"] = await asyncio.to_thread(p.read_text, encoding="utf-8", errors="replace")
+    return out
 
 
 @router.get("/download")
@@ -138,3 +147,69 @@ def download(user: CurrentUser, path: str = Query(...)):
         media_type=adapter_for(p).mime,
         headers={"Content-Disposition": f'attachment; filename="{p.name}"'},
     )
+
+
+def editable_md(user: dict, path: str):
+    """Existing Markdown file of this user; the only kind the editor may change."""
+    p = resolve(user, path)
+    if p.suffix.lower() != ".md":
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Only Markdown files can be edited")
+    return p
+
+
+def check_version(p, base_version: str | None) -> None:
+    """409 when the file changed since the client loaded it (the agent or another tab edited it)."""
+    if base_version is not None and base_version != str(p.stat().st_mtime_ns):
+        raise HTTPException(status.HTTP_409_CONFLICT, "The file changed since you opened it. Reload and try again.")
+
+
+class SaveBody(BaseModel):
+    path: str
+    content: str
+    base_version: str | None = None
+
+
+@router.put("/content")
+def save_content(body: SaveBody, user: CurrentUser):
+    """Save an edited Markdown file. Written to a temp name first, so a failure never truncates it."""
+    p = editable_md(user, body.path)
+    data = body.content.encode("utf-8")
+    if len(data) > MAX_MD_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large")
+    check_version(p, body.base_version)
+    tmp = p.with_name(f".{p.name}.tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, p)
+    return {"version": str(p.stat().st_mtime_ns)}
+
+
+class AiEditBody(BaseModel):
+    path: str
+    start_line: int = Field(ge=1)  # 1-based, inclusive: the source lines of the blocks the user selected
+    end_line: int = Field(ge=1)
+    selected_text: str = Field(max_length=4000)
+    instruction: str = Field(min_length=1, max_length=2000)
+    base_version: str | None = None
+
+
+@router.post("/ai-edit")
+async def ai_edit(body: AiEditBody, user: CurrentUser):
+    """Propose a rewrite of the selected lines. Nothing is written: the client shows the proposal
+    and saves it through PUT /files/content if the user accepts."""
+    p = editable_md(user, body.path)
+    check_version(p, body.base_version)
+    text = await asyncio.to_thread(p.read_text, encoding="utf-8", errors="replace")
+    lines = text.split("\n")
+    if body.end_line < body.start_line or body.end_line > len(lines):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Selected lines are outside the file")
+    excerpt = "\n".join(lines[body.start_line - 1:body.end_line])
+    try:
+        replacement = await asyncio.wait_for(
+            rewrite_excerpt(text, excerpt, body.selected_text, body.instruction, body.start_line, body.end_line),
+            timeout=90,
+        )
+    except Exception:
+        logger.exception("ai-edit failed")
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The AI could not edit this part. Try again.")
+    return {"replacement": replacement, "start_line": body.start_line, "end_line": body.end_line,
+            "version": str(p.stat().st_mtime_ns)}

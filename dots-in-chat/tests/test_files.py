@@ -144,7 +144,7 @@ def test_list_preview_download(client):
     (workspace.workspace_for("u1") / "notes.txt").write_text("nope")
     listed = client.get("/files").json()
     assert {f["path"] for f in listed} == {"brief.md", "brief.docx"}
-    assert set(listed[0]) == {"path", "name", "size", "modified", "kind"}
+    assert set(listed[0]) == {"path", "name", "size", "modified", "kind", "origin"}
 
     r = client.get("/files/preview", params={"path": "brief.docx"})
     body = r.json()
@@ -459,3 +459,91 @@ def test_script_usage_returns_the_spec_docstring_and_rejects_bad_names():
     assert "elements" in script_usage(sk, "scripts/pdf_create.py")
     assert script_usage(sk, "pdf_create") is not None
     assert script_usage(sk, "../pdf_create") is None and script_usage(sk, "nope") is None
+
+
+# ---- uploads ------------------------------------------------------------------------------------
+
+def test_upload_saves_into_uploads_and_lists_origin(client, ws):
+    r = client.post("/files/upload", files=[("files", ("../../my notes.md", b"# Hi\n", "text/markdown"))])
+    assert r.status_code == 201
+    assert r.json()[0]["path"] == "uploads/my notes.md" and r.json()[0]["origin"] == "uploaded"
+    (workspace.workspace_for("u1") / "made.md").write_text("# agent")
+    origins = {f["path"]: f["origin"] for f in client.get("/files").json()}
+    assert origins == {"uploads/my notes.md": "uploaded", "made.md": "generated"}
+
+
+def test_upload_never_overwrites_and_rejects_bad_files(client, ws, monkeypatch):
+    from dataclasses import replace
+    one = [("files", ("a.md", b"x", "text/markdown"))]
+    assert client.post("/files/upload", files=one).json()[0]["path"] == "uploads/a.md"
+    assert client.post("/files/upload", files=one).json()[0]["path"] == "uploads/a (1).md"
+    assert client.post("/files/upload", files=[("files", ("a.exe", b"x", "application/x"))]).status_code == 415
+    assert client.post("/files/upload", files=[("files", ("e.md", b"", "text/markdown"))]).status_code == 400
+    monkeypatch.setitem(formats.ADAPTERS, ".md", replace(formats.ADAPTERS[".md"], max_bytes=3))
+    assert client.post("/files/upload", files=[("files", ("big.md", b"abcd", "text/markdown"))]).status_code == 413
+    # all-or-nothing: a bad file in the batch writes none of the good ones
+    mixed = [("files", ("ok.md", b"x", "text/markdown")), ("files", ("bad.exe", b"x", "application/x"))]
+    assert client.post("/files/upload", files=mixed).status_code == 415
+    assert not (workspace.workspace_for("u1") / "uploads" / "ok.md").exists()
+
+
+# ---- markdown editor ----------------------------------------------------------------------------
+
+def test_md_preview_carries_source_and_save_roundtrips(client, ws):
+    p = workspace.workspace_for("u1") / "doc.md"
+    p.write_text("# T\n\nbody\n")
+    prev = client.get("/files/preview", params={"path": "doc.md"}).json()
+    assert prev["source"] == "# T\n\nbody\n"
+    r = client.put("/files/content", json={"path": "doc.md", "content": "# T2\n", "base_version": prev["version"]})
+    assert r.status_code == 200 and p.read_text() == "# T2\n"
+    assert r.json()["version"] != prev["version"]
+    assert not list(p.parent.glob(".*.tmp"))
+
+
+def test_save_rejects_stale_version_other_types_and_oversize(client, ws, monkeypatch):
+    base = workspace.workspace_for("u1")
+    (base / "doc.md").write_text("one")
+    v = client.get("/files/preview", params={"path": "doc.md"}).json()["version"]
+    (base / "doc.md").write_text("changed elsewhere")
+    os.utime(base / "doc.md", ns=(1, int(v) + 5_000_000_000))  # certainly a different mtime
+    r = client.put("/files/content", json={"path": "doc.md", "content": "mine", "base_version": v})
+    assert r.status_code == 409 and (base / "doc.md").read_text() == "changed elsewhere"
+    (base / "r.html").write_text("<p>x</p>")
+    assert client.put("/files/content", json={"path": "r.html", "content": "x"}).status_code == 415
+    assert client.put("/files/content", json={"path": "../x.md", "content": "x"}).status_code == 400
+    monkeypatch.setattr(files_router, "MAX_MD_BYTES", 3)
+    assert client.put("/files/content", json={"path": "doc.md", "content": "abcd"}).status_code == 413
+
+
+def test_ai_edit_proposes_without_writing(client, ws, monkeypatch):
+    p = workspace.workspace_for("u1") / "doc.md"
+    p.write_text("# T\n\nfirst\n\n- a\n- b\n")
+    seen = {}
+
+    async def fake(doc, excerpt, selected, instruction, start, end):
+        seen.update(excerpt=excerpt, selected=selected, instruction=instruction, span=(start, end))
+        return "SHORTER"
+
+    monkeypatch.setattr(files_router, "rewrite_excerpt", fake)
+    body = {"path": "doc.md", "start_line": 5, "end_line": 6, "selected_text": "a", "instruction": "shorten"}
+    r = client.post("/files/ai-edit", json=body)
+    assert r.status_code == 200 and r.json()["replacement"] == "SHORTER"
+    assert seen["excerpt"] == "- a\n- b" and seen["span"] == (5, 6)
+    assert p.read_text() == "# T\n\nfirst\n\n- a\n- b\n"  # nothing written
+    assert client.post("/files/ai-edit", json={**body, "end_line": 99}).status_code == 400
+    assert client.post("/files/ai-edit", json={**body, "path": "x.pdf"}).status_code in (404, 415)
+
+    async def boom(*a):
+        raise RuntimeError("model down")
+
+    monkeypatch.setattr(files_router, "rewrite_excerpt", boom)
+    assert client.post("/files/ai-edit", json=body).status_code == 502
+
+
+def test_doc_edit_prompt_and_fence_stripping():
+    from app.agent import doc_edit
+    assert doc_edit.clean_reply("```markdown\n- a\n- b\n```", "- a\n- b") == "- a\n- b"
+    assert doc_edit.clean_reply("```py\nx=1\n```", "```py\nx=0\n```") == "```py\nx=1\n```"  # excerpt is a fence
+    assert doc_edit.clean_reply("plain\n", "x") == "plain"
+    prompt = doc_edit.build_prompt("DOC", "EX", "SEL", "do it", 3, 4)
+    assert '<excerpt lines="3-4">\nEX\n</excerpt>' in prompt and "Instruction: do it" in prompt

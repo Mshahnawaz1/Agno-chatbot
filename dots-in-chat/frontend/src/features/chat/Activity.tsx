@@ -30,6 +30,12 @@ function duration(ms: number): string {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`
 }
 
+/** A running timer: whole seconds, then minutes ("0s", "42s", "1m 05s"). */
+function clock(ms: number): string {
+  const s = Math.floor(ms / 1000)
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
+}
+
 /** Current time, ticking while `active` so running steps show a live duration. */
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now())
@@ -209,12 +215,17 @@ export function Activity({
 
   return (
     <Collapsible open={open ?? running} onOpenChange={setOpen} className="mb-3">
-      <CollapsibleTrigger className="group flex h-7 w-full max-w-[17rem] cursor-pointer items-center gap-2.5 rounded-lg border border-border-strong bg-surface px-3 text-left outline-none transition-colors hover:border-accent-2/60 focus-visible:ring-3 focus-visible:ring-ring/50">
+      <CollapsibleTrigger className="group flex h-7 w-fit max-w-full cursor-pointer items-center gap-2.5 rounded-lg border border-border-strong bg-surface px-3 text-left outline-none transition-colors hover:border-accent-2/60 focus-visible:ring-3 focus-visible:ring-ring/50">
         <Dots active={running} />
         <span className="shrink-0 text-sm font-semibold text-fg">Thinking &amp; Actions</span>
-        <span className={clsx('min-w-0 flex-1 truncate text-sm', running ? 'shimmer text-accent-2' : 'text-success')}>
-          {running ? 'Working on it…' : total !== null ? `Done in ${duration(total)}` : 'Done'}
+        <span className={clsx('shrink-0 text-sm', running ? 'text-accent-2' : 'text-success')}>
+          <span className={running ? 'shimmer' : undefined}>{running ? 'Working…' : 'Done'}</span>
         </span>
+        {total !== null ? (
+          <span className={clsx('shrink-0 text-xs font-medium tabular-nums', running ? 'text-accent-2' : 'text-fg-subtle')}>
+            {running ? clock(total) : duration(total)}
+          </span>
+        ) : null}
         <span className="shrink-0 rounded-md bg-surface-2 px-2 text-xs font-semibold leading-5 tabular-nums text-fg-muted">
           {count} {count === 1 ? 'step' : 'steps'}
         </span>

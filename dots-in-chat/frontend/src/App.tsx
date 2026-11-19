@@ -28,7 +28,7 @@ function Page({ children }: { children: ReactNode }) {
         </div>
       }
     >
-      {children}
+      <div className="page-in h-full">{children}</div>
     </Suspense>
   )
 }

@@ -146,7 +146,7 @@ export function AttachButton({
             side="top"
             align="start"
             sideOffset={8}
-            className="z-50 min-w-56 rounded-lg border border-border bg-surface p-1 shadow-2xl"
+            className="anim-pop z-50 min-w-56 rounded-lg border border-border bg-surface p-1 shadow-2xl"
           >
             <DropdownMenu.Item className={itemClass} onSelect={() => input.current?.click()}>
               <Upload className="size-4 text-fg-muted" aria-hidden />

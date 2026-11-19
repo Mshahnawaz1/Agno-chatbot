@@ -44,7 +44,7 @@ export function UserMenu({ onNavigate }: { onNavigate: () => void }) {
           side="top"
           align="start"
           sideOffset={6}
-          className="z-50 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] rounded-xl border border-white/10 bg-surface-2/95 backdrop-blur-xl p-1 shadow-2xl"
+          className="anim-pop z-50 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] rounded-xl border border-white/10 bg-surface-2/95 backdrop-blur-xl p-1 shadow-2xl"
         >
           {email ? (
             <div className="truncate px-2.5 py-2 text-xs text-fg-subtle">{email}</div>

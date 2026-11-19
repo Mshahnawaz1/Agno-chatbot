@@ -47,7 +47,7 @@ function Shell() {
   return (
     <div className="flex h-dvh overflow-hidden bg-bg">
       {!isMobile && !collapsed ? (
-        <aside className="shrink-0 border-r border-white/10">
+        <aside className="fade-in shrink-0 border-r border-white/10">
           <Sidebar onClose={() => setCollapsedPersist(true)} onNavigate={() => {}} />
         </aside>
       ) : null}
@@ -55,10 +55,10 @@ function Shell() {
       {isMobile ? (
         <RadixDialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
           <RadixDialog.Portal>
-            <RadixDialog.Overlay className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" />
+            <RadixDialog.Overlay className="anim-overlay fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" />
             <RadixDialog.Content
               aria-describedby={undefined}
-              className="fixed inset-y-0 left-0 z-50 max-w-[85vw] border-r border-white/10 shadow-2xl outline-none"
+              className="anim-drawer fixed inset-y-0 left-0 z-50 max-w-[85vw] border-r border-white/10 shadow-2xl outline-none"
             >
               <RadixDialog.Title className="sr-only">Sidebar</RadixDialog.Title>
               <Sidebar onClose={closeDrawer} onNavigate={closeDrawer} />

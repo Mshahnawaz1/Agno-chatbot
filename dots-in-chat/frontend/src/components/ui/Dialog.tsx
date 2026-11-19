@@ -20,11 +20,11 @@ export interface DialogContentProps {
 export function DialogContent({ title, description, children, className, hideTitle }: DialogContentProps) {
   return (
     <RadixDialog.Portal>
-      <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm" />
+      <RadixDialog.Overlay className="anim-overlay fixed inset-0 z-50 bg-black/70 backdrop-blur-sm" />
       <RadixDialog.Content
         {...(description ? {} : { 'aria-describedby': undefined })}
         className={clsx(
-          'fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2',
+          'anim-pop fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2',
           'overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-2xl',
           className,
         )}

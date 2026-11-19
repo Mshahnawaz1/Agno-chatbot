@@ -112,7 +112,7 @@ function ReplyBody({ parts, streaming }: { parts: Part[]; streaming: boolean }) 
     }
     const caret = streaming && i === parts.length - 1
     return part.text.trim() ? (
-      <Markdown key={i} className={caret ? CARET : undefined}>
+      <Markdown key={i} className={clsx(streaming && 'fade-in', caret && CARET) || undefined}>
         {part.text}
       </Markdown>
     ) : null
@@ -192,7 +192,7 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
         {hasActions ? (
           <div
             className={clsx(
-              'mt-2 -ml-2 flex items-center gap-0.5 transition-opacity',
+              'fade-in mt-2 -ml-2 flex items-center gap-0.5 transition-opacity',
               // Touch devices always show the row; hover devices reveal it on hover/focus.
               !isLast && !showMetrics && '[@media(hover:hover)]:opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
             )}

@@ -113,7 +113,8 @@ function Row({
     </span>
   )
   return (
-    <li className="step-in">
+    <li className="reveal">
+     <div className="-m-[3px] min-h-0 overflow-hidden p-[3px]">
       {expandable ? (
         <Collapsible open={open} onOpenChange={setOpen}>
           <CollapsibleTrigger className="group/row flex w-full min-w-0 cursor-pointer items-center rounded-md py-1.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
@@ -126,6 +127,7 @@ function Row({
       ) : (
         <div className="flex py-1.5">{head}</div>
       )}
+     </div>
     </li>
   )
 }
@@ -143,7 +145,9 @@ function ReasoningCard({ text, live, ms }: { text: string; live: boolean; ms: nu
     }
   }
   return (
-    <li className="step-in rounded-xl border border-border bg-surface px-4 py-3">
+    <li className="reveal">
+     <div className="min-h-0 overflow-hidden">
+      <div className="rounded-xl border border-border bg-surface px-4 py-3">
       <div className="flex items-center gap-2 text-sm font-semibold text-accent-2">
         <Brain className={clsx('size-4', live && 'animate-pulse')} aria-hidden />
         Reasoning
@@ -161,6 +165,8 @@ function ReasoningCard({ text, live, ms }: { text: string; live: boolean; ms: nu
       <Markdown className="mt-2 min-w-0 text-[14px] leading-6 text-fg-muted [&_p]:leading-6 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
         {text}
       </Markdown>
+      </div>
+     </div>
     </li>
   )
 }
@@ -232,7 +238,7 @@ export function Activity({
         <ChevronDown className="size-4 shrink-0 text-fg-muted transition-transform duration-200 group-aria-expanded:rotate-180" aria-hidden />
       </CollapsibleTrigger>
       <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
-        <div className="mt-2 max-h-[28rem] max-w-xl overflow-y-auto rounded-2xl border border-border bg-bg p-3">
+        <div className="fade-in mt-2 max-h-[28rem] max-w-xl overflow-y-auto rounded-2xl border border-border bg-bg p-3">
           <ol className="flex flex-col gap-1">
             <Row
               icon={Plug}

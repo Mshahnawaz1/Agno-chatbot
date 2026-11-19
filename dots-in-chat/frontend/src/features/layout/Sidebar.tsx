@@ -128,7 +128,7 @@ function SessionList({ query, onNavigate }: { query: string; onNavigate: () => v
                       side="bottom"
                       align="start"
                       sideOffset={4}
-                      className="z-50 min-w-[160px] rounded-xl border border-white/10 bg-surface-2/95 p-1 shadow-2xl backdrop-blur-xl"
+                      className="anim-pop z-50 min-w-[160px] rounded-xl border border-white/10 bg-surface-2/95 p-1 shadow-2xl backdrop-blur-xl"
                     >
                       <DropdownMenu.Item
                         className="flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-sm px-2.5 text-sm text-danger outline-none data-[highlighted]:bg-danger/10"

@@ -146,7 +146,7 @@ export function FilePanel({ path }: { path: string }) {
   return (
     <aside
       aria-label="File preview"
-      className="fixed inset-0 z-40 flex flex-col bg-bg lg:static lg:z-auto lg:w-[45%] lg:shrink-0 lg:border-l lg:border-white/10"
+      className="panel-in fixed inset-0 z-40 flex flex-col bg-bg lg:static lg:z-auto lg:w-[45%] lg:shrink-0 lg:border-l lg:border-white/10"
     >
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-white/10 px-3">
         <IconButton aria-label="Back to chat" size="sm" onClick={close} className="lg:hidden">

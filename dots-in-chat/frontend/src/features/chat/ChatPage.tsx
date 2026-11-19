@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
@@ -89,6 +90,8 @@ export function ChatPage() {
   const stream = useChatStream()
   const [draft, setDraft] = useState('')
   const composerRef = useRef<HTMLTextAreaElement>(null)
+  const composerWrap = useRef<HTMLDivElement>(null)
+  const heroWrap = useRef<HTMLDivElement>(null)
   const listRef = useRef<MessageListHandle>(null)
   const panel = useFilePanelState()
   const files = useAttachments()
@@ -159,10 +162,23 @@ export function ChatPage() {
     const text = draft.trim() || (files.attached.length ? 'Please look at the attached file(s).' : '')
     if (!text || stream.streaming || loadingHistory || files.uploading) return
     const paths = files.attached.map((a) => a.path)
-    setDraft('')
-    files.clear()
-    listRef.current?.scrollToBottom()
-    stream.send(text, paths)
+    const run = () => {
+      setDraft('')
+      files.clear()
+      listRef.current?.scrollToBottom()
+      stream.send(text, paths)
+    }
+    // The first message of a chat swaps the welcome screen for the conversation: animate it as a view
+    // transition (composer glides down, welcome fades) where the browser can. The state change is
+    // flushed inside the callback so the "after" snapshot is the conversation.
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (isEmpty && !reduce && typeof document.startViewTransition === 'function') {
+      const names: [HTMLElement | null, string][] = [[composerWrap.current, 'composer'], [heroWrap.current, 'hero']]
+      for (const [el, name] of names) if (el) el.style.viewTransitionName = name
+      const done = () => names.forEach(([el]) => el && (el.style.viewTransitionName = ''))
+      const vt = document.startViewTransition(() => flushSync(run))
+      void vt.finished.then(done, done)
+    } else run()
   }
 
   function pickSuggestion(text: string) {
@@ -205,7 +221,7 @@ export function ChatPage() {
       {isEmpty ? (
         <>
           <Backdrop orbClassName="top-1/2 w-[min(900px,150vw)] -translate-y-[55%]" fadeAt="70%" fadeTop />
-          <div className="flex flex-1 flex-col items-center justify-end px-4 pb-8">
+          <div ref={heroWrap} className="flex flex-1 flex-col items-center justify-end px-4 pb-8">
             <h1 className="text-display text-center text-[clamp(2.5rem,6vw,4.5rem)] text-fg [text-shadow:0_4px_40px_rgb(0_0_0/0.35)]">
               What can I help with?
             </h1>
@@ -218,7 +234,7 @@ export function ChatPage() {
         </SurfaceFeedContext.Provider>
       )}
 
-      <div className={clsx('mx-auto w-full max-w-[768px] px-4 sm:px-6', isEmpty ? 'pb-4' : 'pb-3')}>
+      <div ref={composerWrap} className={clsx('mx-auto w-full max-w-[768px] px-4 sm:px-6', isEmpty ? 'pb-4' : 'pb-3')}>
         <Composer
           ref={composerRef}
           value={draft}

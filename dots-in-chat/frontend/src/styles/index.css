@@ -45,8 +45,11 @@
   --color-ring: rgb(255 255 255 / 0.4);
 
   /* Radix Collapsible open/close (shadcn trace) */
-  --animate-collapsible-down: collapsible-down 200ms ease-out;
-  --animate-collapsible-up: collapsible-up 200ms ease-out;
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-out-gentle: cubic-bezier(0.4, 0, 0.2, 1);
+  --animate-collapsible-down: collapsible-down 340ms var(--ease-in-out-gentle);
+  --animate-collapsible-up: collapsible-up 380ms var(--ease-in-out-gentle);
 }
 
 @keyframes collapsible-down {
@@ -230,6 +233,139 @@
 
 @utility step-in {
   animation: step-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A list row that grows into place (height and fade), so steps arriving in the activity list
+   push what is below down smoothly instead of jumping. Its only child is the clipped content. */
+@keyframes reveal {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility reveal {
+  display: grid;
+  animation: reveal 0.34s var(--ease-out-soft) backwards;
+}
+
+/* Fade for things that appear once (never leaves the element hidden, unlike `both`). */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@utility fade-in {
+  animation: fade-in 0.25s ease-out backwards;
+}
+
+/* Routed pages ease in. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@utility page-in {
+  animation: page-in 0.28s var(--ease-out-soft) backwards;
+}
+
+/* Side panels slide in from the right. */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@utility panel-in {
+  animation: panel-in 0.3s var(--ease-out-soft) backwards;
+}
+
+/* Radix overlays, menus and tooltips: they stay mounted while a data-[state=closed] animation runs. */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes overlay-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes drawer-out {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@utility anim-overlay {
+  &[data-state='open'] {
+    animation: overlay-in 0.2s ease-out;
+  }
+  &[data-state='closed'] {
+    animation: overlay-out 0.15s ease-in forwards;
+  }
+}
+
+@utility anim-pop {
+  transform-origin: var(--radix-popper-transform-origin, center);
+  &[data-state='open'],
+  &[data-state='delayed-open'],
+  &[data-state='instant-open'] {
+    animation: pop-in 0.16s var(--ease-out-soft);
+  }
+  &[data-state='closed'] {
+    animation: pop-out 0.12s ease-in forwards;
+  }
+}
+
+@utility anim-drawer {
+  &[data-state='open'] {
+    animation: drawer-in 0.28s var(--ease-in-out-soft);
+  }
+  &[data-state='closed'] {
+    animation: drawer-out 0.2s ease-in forwards;
+  }
+}
+
+/* Sending the first message of a chat (view transition, see ChatPage): the composer glides from the
+   middle of the page to the bottom while the welcome text fades and the conversation fades in. */
+::view-transition-group(composer) {
+  animation-duration: 0.42s;
+  animation-timing-function: var(--ease-in-out-soft);
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.3s;
+}
+::view-transition-old(hero) {
+  animation-duration: 0.2s;
 }
 
 @utility dot-pulse {

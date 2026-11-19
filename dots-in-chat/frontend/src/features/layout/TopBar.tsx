@@ -8,11 +8,13 @@ import { useChatStream } from '@/features/chat/chatStore'
 function useTitle(): string {
   const { pathname } = useLocation()
   const sessions = useQuery({ queryKey: ['sessions'], queryFn: api.listSessions })
+  const { streaming } = useChatStream()
   if (pathname.startsWith('/artifacts')) return 'Artifacts'
   if (pathname.startsWith('/settings/connectors')) return 'Connectors'
   const id = matchPath('/c/:sessionId', pathname)?.params.sessionId
   if (!id) return 'New chat'
-  return sessions.data?.find((s) => s.id === id)?.title || (sessions.isPending ? '' : 'Untitled')
+  // A reply still streaming in a chat the list doesn't know yet: keep "New chat" instead of flashing "Untitled".
+  return sessions.data?.find((s) => s.id === id)?.title || (sessions.isPending ? '' : streaming ? 'New chat' : 'Untitled')
 }
 
 export function TopBar({

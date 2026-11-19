@@ -17,6 +17,8 @@ Create PDFs from structured specs, build and fill AcroForm forms (with layout li
 - **Scanned/image-only PDFs and OCR** (pymupdf fast path, marker-pdf quality path, scripts/extract_pymupdf.py + scripts/extract_marker.py): `references/ocr-extraction.md`
 - **Editing text inside an existing PDF via natural-language prompts** (nano-pdf CLI): `references/nano-pdf-editing.md`
 
+- **Styling created PDFs** (themes, cover banner, KPI cards, callouts, styled tables): `references/styling.md`. Read it BEFORE writing any `pdf_create` spec; unstyled black-and-white output is not acceptable.
+
 ## Runtime here
 
 Tool mapping (hermes -> this app): `write_file` -> `save_file`, `patch` -> `replace_file_chunk`,

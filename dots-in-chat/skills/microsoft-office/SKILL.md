@@ -39,6 +39,10 @@ Pick the format, then load its reference with `get_skill_instructions` before wo
 | `.pptx` | `references/powerpoint.md` | pitch decks, brand-template decks, chart refreshes, speaker notes |
 | `.xlsx`, `.csv` | `references/excel.md` | styled multi-sheet workbooks, formulas, charts, CSV conversion, row/column restructures |
 
+**Styling:** before writing any `docx_create` / `pptx_create` spec, also load `references/word-styling.md`
+or `references/powerpoint-styling.md` (themes, structure, colour rules). Created files are themed by default;
+choose the preset that fits the topic or the user's brand instead of leaving output plain black and white.
+
 Deeper notes: `references/revisions-and-comments.md` (Word review markup) and
 `references/restructuring.md` (Excel reference shifting).
 

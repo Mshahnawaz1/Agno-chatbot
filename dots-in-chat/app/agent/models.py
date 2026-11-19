@@ -34,10 +34,23 @@ def gemini_models() -> list:
 def model_chain():
     """(primary model, FallbackConfig) per settings.primary_model.
 
+    With settings.user_openrouter the model is OpenRouter alone, no fallback.
+
     Gemini is the default: on the free tiers it took 6 x 12k-token requests in a
     row without a 429, while Groq's gpt-oss-120b allows 8k tokens/minute in total
     (x-ratelimit-limit-tokens), so a single tool-heavy turn could exhaust it.
     """
+    if settings.user_openrouter:
+        if not (settings.openrouter_api_key and settings.openrouter_model):
+            raise RuntimeError("user_openrouter is on: set OPENROUTER_API_KEY and OPENROUTER_MODEL")
+        from agno.models.openrouter import OpenRouter
+
+        return OpenRouter(
+            id=settings.openrouter_model,
+            api_key=settings.openrouter_api_key,
+            base_url=settings.openrouter_base_url,
+        ), None
+
     # No SDK retries: on a 429 the Groq SDK would sleep for `retry-after` (up to 60s,
     # twice) before agno ever tried a fallback. Fail fast and fall over instead.
     groq = ReasoningGroq(id=settings.groq_model, max_retries=0, timeout=settings.groq_timeout)

@@ -45,11 +45,16 @@ class SourceCards(unittest.TestCase):
         self.assertEqual(sources.build_sources(refs, "The capital of France is Paris.", "u1"), [])
 
     def test_duplicates_collapse_and_best_first(self):
-        weak = doc("guide.pdf", "gaussian noise robust models", page=1)
-        strong = doc("guide.pdf", "gaussian noise robust models degrade detection accuracy", page=2)
-        reply = "Gaussian noise makes robust models degrade, detection accuracy drops."
+        weak = doc("guide.pdf", "robust models degrade detection accuracy", page=1)
+        strong = doc("guide.pdf", "robust models degrade detection accuracy under gaussian noise badly", page=2)
+        reply = "Robust models degrade detection accuracy under gaussian noise."
         cards = sources.build_sources(ref(weak, strong) + ref(strong), reply, "u1")
         self.assertEqual([c["page"] for c in cards], [2, 1])
+
+    def test_answer_that_found_nothing_gives_no_cards(self):
+        refs = ref(doc("guide.pdf", "Robust detection models degrade under gaussian noise.", page=4, chunk=2))
+        reply = "I searched the knowledge base but the results didn't contain any relevant matches (they were about detection models and noise)."
+        self.assertEqual(sources.build_sources(refs, reply, "u1"), [])
 
     def test_inline_text_has_no_file(self):
         refs = ref(doc("\n    I liv", "I live in Bengaluru and work as software developer", chunk=1))

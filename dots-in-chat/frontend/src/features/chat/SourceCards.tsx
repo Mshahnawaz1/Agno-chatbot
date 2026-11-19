@@ -23,14 +23,12 @@ export function SourceCards({ sources }: { sources: Source[] }) {
         {sources.map((s, i) => {
           const body = (
             <>
-              <span className="flex items-baseline justify-between gap-2">
-                <span className="min-w-0 truncate text-sm font-medium text-fg">{s.name}</span>
-                <span className="shrink-0 text-xs text-fg-subtle">{where(s)}</span>
-              </span>
-              <span className="mt-1 line-clamp-3 block text-xs leading-5 text-fg-muted">{s.snippet}</span>
+              <span className="block truncate text-sm font-medium text-fg">{s.name}</span>
+              <span className="block text-xs text-fg-subtle">{where(s)}</span>
+              <span className="mt-1.5 line-clamp-4 block text-xs leading-5 text-fg-muted">{s.snippet}</span>
             </>
           )
-          const base = 'block h-full w-full rounded-md border px-3 py-2.5 text-left transition-colors'
+          const base = 'flex h-full w-full flex-col items-stretch justify-start rounded-md border px-3 py-2.5 text-left transition-colors'
           return (
             <li key={`${s.name}:${s.page}:${s.chunk}:${i}`} className="min-w-0">
               {s.path ? (

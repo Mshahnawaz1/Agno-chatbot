@@ -20,18 +20,23 @@ KB_SOURCE_DIR = APP_ROOT / "data"  # where ingestion.py reads the documents it i
 SOURCES_DIR = "sources"  # in the user's workspace: copies of the knowledge files cards open
 MAX_CARDS = 3
 SNIPPET_CHARS = 240
-MIN_SHARED_WORDS = 3  # a search that found nothing relevant must not look like evidence
+MIN_SHARED_PHRASES = 3  # a search that found nothing relevant must not look like evidence
+PHRASE_WORDS = 3  # consecutive words a reply must repeat from a chunk to count as drawing on it
 
-_WORD = re.compile(r"[a-z0-9]{5,}")
+_WORD = re.compile(r"[a-z0-9]+")
 
 
-def _words(text: str) -> set[str]:
-    return set(_WORD.findall(text.lower()))
+def _phrases(text: str) -> set[tuple[str, ...]]:
+    """Every run of PHRASE_WORDS consecutive words. Single words overlap by chance (a reply saying
+    "no match, the documents were a job description" shares words with any chunk); a run of four
+    only appears when the reply repeats the chunk's wording."""
+    words = _WORD.findall(text.lower())
+    return {tuple(words[i : i + PHRASE_WORDS]) for i in range(len(words) - PHRASE_WORDS + 1)}
 
 
 def _snippet(content: str) -> str:
     text = re.sub(r"[\s.]*\n[\s.]*", " ", content).strip()  # collapse PDF line breaks and dot leaders
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\s*[●•▪◦]\s*", " • ", re.sub(r"\s+", " ", text)).strip(" •")  # PDF bullets
     return text if len(text) <= SNIPPET_CHARS else text[:SNIPPET_CHARS].rstrip() + "…"
 
 
@@ -59,10 +64,10 @@ def build_sources(references: list[Any] | None, reply: str, user_id: str) -> lis
     """Cards for the chunks of `references` that the `reply` shares wording with, best first.
 
     Retrieval always returns the top chunks, relevant or not, so a chunk counts only when the reply
-    reuses at least MIN_SHARED_WORDS of its words. Each card: {name, page, chunk, snippet, path}.
+    repeats at least MIN_SHARED_PHRASES runs of PHRASE_WORDS words from it. Each card: {name, page, chunk, snippet, path}.
     """
-    reply_words = _words(reply or "")
-    if not reply_words:
+    reply_phrases = _phrases(reply or "")
+    if not reply_phrases:
         return []
     seen: dict[tuple, tuple[int, dict]] = {}
     for ref in references or []:
@@ -74,8 +79,8 @@ def build_sources(references: list[Any] | None, reply: str, user_id: str) -> lis
             meta = doc.get("meta_data") or {}
             raw = str(doc.get("name") or "")
             name = raw if raw and raw == raw.strip() else "Note"  # inline text is named after its first chars
-            shared = len(reply_words & _words(content))
-            if shared < MIN_SHARED_WORDS:
+            shared = len(reply_phrases & _phrases(content))
+            if shared < MIN_SHARED_PHRASES:
                 continue
             key = (name, meta.get("page"), meta.get("chunk"))
             card = {

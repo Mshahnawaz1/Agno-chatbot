@@ -7,7 +7,7 @@ from agno.agent import RunEvent
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response, StreamingResponse
 
-from app import db, live_runs
+from app import db, live_runs, versions
 from app.a2ui.actions import InvalidAction, action_prompt, read_action
 from app.a2ui.turn import A2uiTurn
 from app.agent import agent
@@ -259,6 +259,8 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
     async def event_stream() -> AsyncIterator[str]:
         # run_id is the reply's run: the repair run's parts are stored under it too.
         run: dict = {"run_id": None, "all_ids": [], "tools": [], "metrics": None, "stopped": False}
+        # Edits made outside a run are the user's: record them before the agent can touch anything.
+        await asyncio.to_thread(versions.record_changes, user["id"], "user", session["id"])
         yield sse("session", {"session_id": session["id"]})
         # What was sent, so a client that attaches later can show the turn it replays.
         yield sse("user", {"text": body.message, "attachments": attached, "action": body.action})
@@ -297,6 +299,10 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
                         db.set_chat_session_title(session["id"], title)
                 except Exception:  # timeout, cancel or failure: keep the first-words title
                     title_task.cancel()
+            try:
+                await asyncio.to_thread(versions.record_changes, user["id"], "agent", session["id"], run["run_id"])
+            except Exception:
+                logger.exception("could not record file versions")
             turn.save(run["run_id"])
             try:
                 await stub_skill_loads(agent, session["id"], run["all_ids"])

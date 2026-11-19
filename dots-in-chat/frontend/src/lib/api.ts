@@ -208,3 +208,23 @@ export async function downloadFile(path: string): Promise<void> {
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
+
+// ---- file versions ----
+
+export type FileVersion = {
+  version: number
+  action: 'created' | 'updated' | 'deleted' | 'restored'
+  author: 'user' | 'agent'
+  size: number
+  run_id: string | null
+  session_id: string | null
+  created_at: string
+}
+
+export function listFileVersions(path: string): Promise<FileVersion[]> {
+  return request<FileVersion[]>(`/files/versions?path=${enc(path)}`)
+}
+
+export function restoreFileVersion(path: string, version: number): Promise<FileVersion> {
+  return request<FileVersion>('/files/versions/restore', { method: 'POST', body: JSON.stringify({ path, version }) })
+}

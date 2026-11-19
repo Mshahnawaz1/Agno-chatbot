@@ -53,6 +53,24 @@ CREATE TABLE IF NOT EXISTS chat_parts (
     payload     TEXT NOT NULL,
     PRIMARY KEY (session_id, run_id, seq)
 );
+-- every version of a workspace file, see app/versions.py. The bytes live in the user's workspace
+-- (.versions/<sha256>); sha256 is NULL for a 'deleted' version.
+CREATE TABLE IF NOT EXISTS file_versions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    TEXT NOT NULL REFERENCES users(id),
+    path       TEXT NOT NULL,           -- workspace-relative, posix
+    version    INTEGER NOT NULL,        -- 1, 2, 3... per (user, path)
+    action     TEXT NOT NULL,           -- 'created' | 'updated' | 'deleted' | 'restored'
+    author     TEXT NOT NULL,           -- 'user' | 'agent'
+    sha256     TEXT,
+    size       INTEGER NOT NULL DEFAULT 0,
+    mtime_ns   INTEGER NOT NULL DEFAULT 0,  -- lets a scan skip hashing an untouched file
+    session_id TEXT,
+    run_id     TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, path, version)
+);
+CREATE INDEX IF NOT EXISTS idx_file_versions_sha ON file_versions(user_id, sha256);
 -- each connector's MCP tool list (JSON), so a run needn't contact the server to know it
 CREATE TABLE IF NOT EXISTS connector_catalog (
     connector_id TEXT PRIMARY KEY,
@@ -299,3 +317,71 @@ def get_catalog(connector_id: str) -> tuple[str, float] | None:
             "SELECT tools, fetched_at FROM connector_catalog WHERE connector_id = ?", (connector_id,)
         ).fetchone()
     return (row["tools"], row["fetched_at"]) if row else None
+
+
+# ---- file versions (app/versions.py) ----
+def latest_file_versions(user_id: str) -> dict[str, dict]:
+    """The newest version row of every path this user has history for."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT v.* FROM file_versions v JOIN ("
+            " SELECT path, MAX(version) AS m FROM file_versions WHERE user_id = ? GROUP BY path"
+            ") x ON v.path = x.path AND v.version = x.m WHERE v.user_id = ?",
+            (user_id, user_id),
+        ).fetchall()
+    return {r["path"]: dict(r) for r in rows}
+
+
+def add_file_version(user_id: str, path: str, action: str, author: str, sha256: str | None,
+                     size: int, mtime_ns: int, session_id: str | None, run_id: str | None) -> dict:
+    with get_conn() as conn:
+        n = conn.execute(
+            "SELECT COALESCE(MAX(version), 0) + 1 FROM file_versions WHERE user_id = ? AND path = ?",
+            (user_id, path),
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO file_versions (user_id, path, version, action, author, sha256, size, mtime_ns,"
+            " session_id, run_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, path, n, action, author, sha256, size, mtime_ns, session_id, run_id),
+        )
+        return dict(conn.execute(
+            "SELECT * FROM file_versions WHERE user_id = ? AND path = ? AND version = ?", (user_id, path, n)
+        ).fetchone())
+
+
+def list_file_versions(user_id: str, path: str) -> list[dict]:
+    """Newest first."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM file_versions WHERE user_id = ? AND path = ? ORDER BY version DESC", (user_id, path)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_file_version(user_id: str, path: str, version: int) -> dict | None:
+    with get_conn() as conn:
+        r = conn.execute(
+            "SELECT * FROM file_versions WHERE user_id = ? AND path = ? AND version = ?", (user_id, path, version)
+        ).fetchone()
+    return dict(r) if r else None
+
+
+def delete_file_versions(user_id: str, path: str, keep_from: int) -> None:
+    """Drop this path's versions older than `keep_from` (retention)."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM file_versions WHERE user_id = ? AND path = ? AND version < ?",
+                     (user_id, path, keep_from))
+
+
+def referenced_hashes(user_id: str) -> set[str]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT sha256 FROM file_versions WHERE user_id = ? AND sha256 IS NOT NULL", (user_id,)
+        ).fetchall()
+    return {r["sha256"] for r in rows}
+
+
+def set_file_version_action(user_id: str, path: str, version: int, action: str) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE file_versions SET action = ? WHERE user_id = ? AND path = ? AND version = ?",
+                     (action, user_id, path, version))

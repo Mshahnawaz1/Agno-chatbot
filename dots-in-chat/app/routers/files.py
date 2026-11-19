@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from app.agent.doc_edit import rewrite_excerpt
 from app.agent.formats import adapter_for, md_twin
 from app.agent.workspace import MAX_MD_BYTES, PathEscape, rel_posix, safe_path, workspace_for
+from app import versions
 from app.deps import CurrentUser
 
 logger = logging.getLogger(__name__)
@@ -115,6 +116,7 @@ async def upload(user: CurrentUser, files: list[UploadFile]):
             "modified": datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).isoformat(),
             "kind": adapter_for(p).kind, "origin": "uploaded",
         })
+    await asyncio.to_thread(versions.record_changes, user["id"], "user")
     return out
 
 
@@ -186,6 +188,7 @@ def save_content(body: SaveBody, user: CurrentUser):
     tmp = p.with_name(f".{p.name}.tmp")
     tmp.write_bytes(data)
     os.replace(tmp, p)
+    versions.record_changes(user["id"], "user")
     return {"version": str(p.stat().st_mtime_ns)}
 
 
@@ -219,3 +222,49 @@ async def ai_edit(body: AiEditBody, user: CurrentUser):
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The AI could not edit this part. Try again.")
     return {"replacement": replacement, "start_line": body.start_line, "end_line": body.end_line,
             "version": str(p.stat().st_mtime_ns)}
+
+
+# ---- version history (app/versions.py) ----
+def _rel(user: dict, path: str) -> str:
+    """A safe workspace-relative path; the file itself may be gone (a deleted file has history)."""
+    try:
+        return rel_posix(user["id"], safe_path(user["id"], path))
+    except PathEscape:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid path")
+
+
+def _public(v: dict) -> dict:
+    return {k: v[k] for k in ("version", "action", "author", "size", "run_id", "session_id", "created_at")}
+
+
+@router.get("/versions")
+def file_versions(user: CurrentUser, path: str = Query(...)):
+    """Every version of a file, newest first."""
+    return [_public(v) for v in versions.list_versions(user["id"], _rel(user, path))]
+
+
+@router.get("/versions/content")
+def version_content(user: CurrentUser, path: str = Query(...), version: int = Query(..., ge=1)):
+    rel = _rel(user, path)
+    got = versions.read_version(user["id"], rel, version)
+    if got is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Version not found")
+    ad = adapter_for(rel)
+    return Response(got[1], media_type=ad.mime if ad else "application/octet-stream")
+
+
+class RestoreBody(BaseModel):
+    path: str
+    version: int = Field(ge=1)
+
+
+@router.post("/versions/restore")
+def restore_version(body: RestoreBody, user: CurrentUser):
+    """Put an old version back as the current file; it becomes a new version."""
+    rel = _rel(user, body.path)
+    if adapter_for(rel) is None:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Unsupported file type")
+    row = versions.restore(user["id"], rel, body.version, safe_path(user["id"], rel))
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Version not found")
+    return _public(row)

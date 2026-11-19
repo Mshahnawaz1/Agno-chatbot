@@ -6,6 +6,7 @@ import { Button, IconButton, Spinner } from '@/components/ui'
 import { fileName } from './fileRefs'
 import { MdView } from './MdView'
 import { useFilePanelContext, useFilePreview } from './useFilePanel'
+import { VersionHistory } from './VersionHistory'
 
 /** The paper stays light in both themes: it stands for the printed page. */
 const PAGE_CSS = `
@@ -177,6 +178,7 @@ export function FilePanel({ path }: { path: string }) {
         <h2 className="min-w-0 flex-1 truncate text-sm font-medium text-fg" title={path}>
           {fileName(path)}
         </h2>
+        <VersionHistory path={path} />
         <Button size="sm" variant="secondary" onClick={() => void download()} loading={downloading}>
           <Download className="size-4" aria-hidden />
           {ext ? `Download .${ext}` : 'Download'}

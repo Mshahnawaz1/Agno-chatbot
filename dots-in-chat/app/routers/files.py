@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -183,6 +183,30 @@ def save_content(body: SaveBody, user: CurrentUser):
     if len(data) > MAX_MD_BYTES:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large")
     check_version(p, body.base_version)
+    tmp = p.with_name(f".{p.name}.tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, p)
+    return {"version": str(p.stat().st_mtime_ns)}
+
+
+OFFICE_SUFFIXES = {".docx", ".xlsx", ".pptx"}
+
+
+@router.put("/binary")
+async def save_binary(request: Request, user: CurrentUser, path: str = Query(...), base_version: str | None = Query(None)):
+    """Save an office file edited in the viewer (the raw bytes as the body)."""
+    p = resolve(user, path)
+    if p.suffix.lower() not in OFFICE_SUFFIXES:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Only Word, Excel and PowerPoint files can be saved here")
+    if not p.is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
+    limit = adapter_for(p).max_bytes
+    data = await request.body()
+    if not data.startswith(b"PK"):  # these formats are zip files
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Not a valid Office file")
+    if len(data) > limit:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large")
+    check_version(p, base_version)
     tmp = p.with_name(f".{p.name}.tmp")
     tmp.write_bytes(data)
     os.replace(tmp, p)

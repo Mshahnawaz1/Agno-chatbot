@@ -169,6 +169,13 @@ export const saveFileContent = (path: string, content: string, baseVersion: stri
     body: JSON.stringify({ path, content, base_version: baseVersion }),
   })
 
+/** Saves an office file edited in the viewer; 409 if the file changed since `baseVersion`. */
+export const saveFileBinary = (path: string, blob: Blob, baseVersion: string) =>
+  request<{ version: string }>(`/files/binary?path=${enc(path)}&base_version=${enc(baseVersion)}`, {
+    method: 'PUT',
+    body: blob,
+  })
+
 export type AiEditRequest = {
   path: string
   start_line: number

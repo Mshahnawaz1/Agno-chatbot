@@ -3,6 +3,8 @@ import { BookOpenText } from 'lucide-react'
 import type { Source } from '@/lib/types'
 import { useFilePanelContext } from '@/features/files/useFilePanel'
 
+const MAX_CHIPS = 3 // more than this shows as "+N", so every card is the same size
+
 type Group = { name: string; path: string | null; passages: Source[] }
 
 /** One card per file, its passages in page order. */
@@ -20,13 +22,12 @@ function groupByFile(sources: Source[]): Group[] {
 
 function where(s: Source): string {
   const parts = []
-  if (s.page != null) parts.push(`p. ${s.page}`)
-  if (s.chunk != null) parts.push(`chunk ${s.chunk}`)
+  if (s.page != null) parts.push(`p.${s.page}`)
+  if (s.chunk != null) parts.push(`#${s.chunk}`)
   return parts.join(' · ') || 'note'
 }
 
-/** What the reply was based on: one card per file, listing the pages and chunks it used with a short
- *  excerpt of each; a click opens the file in the panel. */
+/** What the reply was based on: one card per file, showing which pages and chunks it used; a click opens the file in the panel. */
 export function SourceCards({ sources }: { sources: Source[] }) {
   const { path: openPath, open } = useFilePanelContext()
   const groups = groupByFile(sources)
@@ -36,36 +37,32 @@ export function SourceCards({ sources }: { sources: Source[] }) {
         <BookOpenText className="size-3.5" aria-hidden />
         Sources
       </p>
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <ul className="flex flex-wrap gap-2">
         {groups.map((g) => {
-          const pages = [...new Set(g.passages.map((p) => p.page).filter((p): p is number => p != null))]
+          const shown = g.passages.slice(0, MAX_CHIPS)
+          const extra = g.passages.length - shown.length
           const body = (
             <>
-              <span className="flex items-baseline justify-between gap-2">
-                <span className="min-w-0 truncate text-sm font-medium text-fg">{g.name}</span>
-                <span className="shrink-0 text-xs text-fg-subtle">
-                  {pages.length ? `${pages.length === 1 ? 'Page' : 'Pages'} ${pages.join(', ')}` : 'Text note'}
-                </span>
-              </span>
-              <span className="mt-1.5 flex flex-col gap-1.5">
-                {g.passages.map((p, i) => (
-                  <span key={`${p.page}:${p.chunk}:${i}`} className="block text-xs leading-5">
-                    <span className="font-medium text-fg-muted">{where(p)}</span>
-                    <span className="line-clamp-1 block text-fg-subtle">{p.snippet}</span>
+              <span className="block truncate text-sm font-medium text-fg">{g.name}</span>
+              <span className="mt-1.5 flex flex-nowrap gap-1 overflow-hidden whitespace-nowrap">
+                {shown.map((p, i) => (
+                  <span key={`${p.page}:${p.chunk}:${i}`} className="rounded-sm bg-surface-3 px-1.5 py-0.5 text-xs text-fg-muted">
+                    {where(p)}
                   </span>
                 ))}
+                {extra > 0 ? <span className="px-0.5 py-0.5 text-xs text-fg-subtle">+{extra}</span> : null}
               </span>
             </>
           )
-          const base = 'flex h-full w-full flex-col items-stretch justify-start rounded-md border px-3 py-2.5 text-left transition-colors'
+          const base = 'flex h-16 w-full flex-col items-stretch justify-start overflow-hidden rounded-md border px-3 py-2 text-left transition-colors'
           return (
-            <li key={g.path ?? g.name} className="min-w-0">
+            <li key={g.path ?? g.name} className="w-56 max-w-full">
               {g.path ? (
                 <button
                   type="button"
                   onClick={() => open(g.path!)}
                   aria-pressed={openPath === g.path}
-                  title={`Open ${g.name}`}
+                  title={`Open ${g.name}: ${g.passages.map(where).join(', ')}`}
                   className={clsx(
                     base,
                     openPath === g.path

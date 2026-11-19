@@ -86,7 +86,8 @@ function appendText(parts: Part[], text: string): Part[] {
 export function mergeFile(files: FileRef[], file: FileRef): FileRef[] {
   const prev = files.find((f) => f.path === file.path)
   if (!prev) return [...files, file]
-  const action = file.action === 'updated' && prev.action === 'created' ? 'created' : file.action
+  // Opening a file changes nothing: it keeps the earlier action.
+  const action = file.action === 'shown' ? prev.action : file.action === 'updated' && prev.action === 'created' ? 'created' : file.action
   return files.map((f) => (f.path === file.path ? { ...file, action } : f))
 }
 

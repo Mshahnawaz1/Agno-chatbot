@@ -4,7 +4,7 @@ import { fileName } from './fileRefs'
 import { KIND_ICON, KIND_LABEL } from './kinds'
 import { useFilePanelContext } from './useFilePanel'
 
-const LABEL = { created: 'Created', updated: 'Updated', deleted: 'Deleted' } as const
+const LABEL = { created: 'Created', updated: 'Updated', deleted: 'Deleted', shown: 'Opened' } as const
 
 /** Card under an assistant reply for a file the agent touched; a click opens it in the panel. */
 export function FileChip({ file }: { file: FileRef }) {

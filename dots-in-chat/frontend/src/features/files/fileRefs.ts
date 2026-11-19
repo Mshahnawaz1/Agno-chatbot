@@ -80,6 +80,10 @@ export function filesFromTools(tools: Metrics['tools']): FileRef[] {
         path = str(args.file_name)
         action = 'deleted'
         break
+      case 'show_file':
+        path = str(args.file_name)
+        action = 'shown'
+        break
     }
     const kind = path ? kindOf(path) : null
     if (path && kind) files = mergeFile(files, { path, kind, action })

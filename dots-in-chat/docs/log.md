@@ -18,6 +18,7 @@ TODO: change to thumbnail based. Every visible card runs a full viewer (heaviest
 2 requests per card, nothing cached across visits), and Office previews may show viewer chrome.
 Instead render page 1 to a small PNG on the server when a file is saved (e.g. LibreOffice / a PDF
 renderer, stored next to the version blobs), serve it from an endpoint, and make the card an `<img>`.
+- Add pagination for this page.
 
 ## 2026-11-19: File version history
 Branch `feat/file-versions`. Every change to a workspace file, by the user or the agent, is kept

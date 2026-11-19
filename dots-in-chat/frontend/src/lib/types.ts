@@ -69,7 +69,7 @@ export type User = {
 }
 
 export type FileKind = 'docx' | 'pdf' | 'html' | 'md' | 'xlsx' | 'csv' | 'pptx'
-export type FileAction = 'created' | 'updated' | 'deleted'
+export type FileAction = 'created' | 'updated' | 'deleted' | 'shown'
 
 /** A workspace file the agent touched (SSE `file` event, or derived from stored tool calls). */
 export type FileRef = { path: string; kind: FileKind; action: FileAction }

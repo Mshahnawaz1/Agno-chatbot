@@ -230,7 +230,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
               break
             case 'file': {
               const kind = d.kind === 'docx' || d.kind === 'pdf' || d.kind === 'html' || d.kind === 'md' || d.kind === 'xlsx' || d.kind === 'csv' || d.kind === 'pptx' ? d.kind : null
-              const act = d.action === 'created' || d.action === 'updated' || d.action === 'deleted' ? d.action : null
+              const act = d.action === 'created' || d.action === 'updated' || d.action === 'deleted' || d.action === 'shown' ? d.action : null
               if (typeof d.path === 'string' && kind && act) {
                 dispatch({ type: 'file', runId, assistantId, file: { path: d.path, kind, action: act } })
               }

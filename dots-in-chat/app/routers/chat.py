@@ -93,6 +93,7 @@ def file_events(tool, seen: set) -> list[dict]:
     - save_file / replace_file_chunk on .html / .md: one event. "created" vs "updated" can't be
       known after the fact, so save_file is "created" the first time a path is seen in this stream
       and "updated" after; replace_file_chunk is always "updated".
+    - show_file: "shown" (the panel opens it; the file is unchanged).
     - delete_file of a previewable file: "deleted".
     - run_skill_script: one event per previewable entry of its JSON result's `changed` list (the
       runner diffs the workspace, so its actions are exact).
@@ -115,13 +116,15 @@ def file_events(tool, seen: set) -> list[dict]:
             (seen.discard if c["action"] == "deleted" else seen.add)(c["path"])
             events.append({"path": c["path"], "kind": c["kind"], "action": c["action"]})
         return events
-    if name not in ("save_file", "replace_file_chunk", "delete_file"):
+    if name not in ("save_file", "replace_file_chunk", "delete_file", "show_file"):
         return []
     path = args.get("file_name")
     if not isinstance(path, str) or not path:
         return []
     path = path.replace("\\", "/")
     kind = kind_for(path)
+    if name == "show_file":  # opens an existing file in the panel; nothing changed
+        return [{"path": path, "kind": kind, "action": "shown"}] if result.startswith("Opened") else []
     if name == "delete_file":
         if result or kind not in PREVIEW_KINDS:  # empty result = success
             return []

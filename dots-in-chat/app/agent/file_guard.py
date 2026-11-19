@@ -11,6 +11,9 @@ from pathlib import Path
 
 from agno.tools.file import FileTools
 
+from app.agent.formats import kind_for
+from app.agent.workspace import PathEscape, resolve_in
+
 BINARY_EXTENSIONS = {
     ".docx", ".docm", ".dotx", ".doc", ".xlsx", ".xlsm", ".xls", ".pptx", ".ppt", ".odt", ".ods",
     ".odp", ".pdf", ".zip", ".gz", ".7z", ".rar", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
@@ -57,7 +60,11 @@ def binary_read_error(file_name: str) -> str | None:
 
 
 class WorkspaceFileTools(FileTools):
-    """agno FileTools + the binary-document guard (replace_file_chunk writes via save_file)."""
+    """agno FileTools + the binary-document guard (replace_file_chunk writes via save_file) + show_file."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.register(self.show_file)
 
     def save_file(self, contents: str, file_name: str, overwrite: bool = True, encoding: str = "utf-8") -> str:
         """Saves the contents to a text file called `file_name` and returns the file name if successful.
@@ -73,6 +80,7 @@ class WorkspaceFileTools(FileTools):
     def read_file(self, file_name: str, encoding: str = "utf-8") -> str:
         """Reads the contents of the text file `file_name` and returns the contents if successful.
         For .docx / .pdf / .xlsx / .pptx use the skill read scripts via run_skill_script.
+        To SHOW or OPEN a file for the user, do not read it: call show_file.
 
         :param file_name: The name of the file to read.
         :param encoding: Encoding to use, default - utf-8
@@ -89,3 +97,22 @@ class WorkspaceFileTools(FileTools):
         result = binary_read_error(file_name) or super().read_file(file_name, encoding)
         # agno's errors quote the absolute server path; the model only needs the workspace-relative one
         return result.replace(str(self.base_dir) + os.sep, "").replace(str(self.base_dir), "<workspace>")
+
+    def show_file(self, file_name: str) -> str:
+        """Opens a workspace file in the user's preview panel, as they would see it (any of .pdf .docx
+        .xlsx .csv .pptx .html .md). Use this when the user asks to open, show, view or display a file
+        (e.g. "open the budget"): do NOT read the file and paste its text into the reply. Afterwards
+        say in one short line what you opened; add contents only if they asked a question about it.
+
+        :param file_name: The workspace-relative name of the file to show.
+        :return: Confirmation that the file is open, otherwise an error message.
+        """
+        try:
+            p = resolve_in(self.base_dir, str(file_name))
+        except PathEscape:
+            return f"Error: '{file_name}' is outside your workspace."
+        if not p.is_file():
+            return f"Error: no file called '{file_name}'. Use list_files to see what exists."
+        if kind_for(p.name) == "file":
+            return f"Error: '{file_name}' cannot be previewed."
+        return f"Opened {p.name} in the user's preview panel."

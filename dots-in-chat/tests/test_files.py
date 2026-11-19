@@ -564,3 +564,19 @@ def test_csv_uploads_and_opens_in_the_spreadsheet_viewer(client, ws):
     assert p["kind"] == "csv" and p["file"] == "uploads/sales.csv" and p["html"] == ""
     d = client.get("/files/download", params={"path": "uploads/sales.csv"})
     assert d.content == data and d.headers["content-type"].startswith("text/csv")
+
+
+def test_show_file_event_and_tool(tmp_path):
+    from app.agent.file_guard import WorkspaceFileTools
+
+    (tmp_path / "a.pdf").write_bytes(b"x")
+    tools = WorkspaceFileTools(base_dir=tmp_path)
+    assert "show_file" in tools.functions
+    ok = tools.show_file("a.pdf")
+    assert ok.startswith("Opened")
+    assert tools.show_file("missing.pdf").startswith("Error")
+    assert tools.show_file("../a.pdf").startswith("Error")
+    t = SimpleNamespace(tool_name="show_file", tool_args={"file_name": "a.pdf"}, result=ok)
+    assert file_events(t, set()) == [{"path": "a.pdf", "kind": "pdf", "action": "shown"}]
+    t.result = "Error: no file"
+    assert file_events(t, set()) == []

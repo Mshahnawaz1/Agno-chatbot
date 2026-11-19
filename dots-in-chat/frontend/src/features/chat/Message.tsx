@@ -8,6 +8,7 @@ import { AttachmentChip } from './Attach'
 import type { Turn } from './chatStore'
 import { FileChip } from '@/features/files/FileChip'
 import { MetricsPanel } from './MetricsPanel'
+import { SourceCards } from './SourceCards'
 import { LegacySurface, Surface } from './a2ui'
 import { createdSurfaceId, type Part, type UiAction } from './a2ui/protocol'
 
@@ -185,6 +186,8 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
             ))}
           </div>
         ) : null}
+
+        {turn.sources.length && !streaming ? <SourceCards sources={turn.sources} /> : null}
 
         {turn.status === 'stopped' ? (
           <p className="mt-2 text-xs text-fg-subtle">{turn.parts.length ? 'Stopped' : 'Stopped before a reply'}</p>

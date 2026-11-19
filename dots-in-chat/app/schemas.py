@@ -72,6 +72,8 @@ class MessageOut(BaseModel):
     parts: list[dict[str, Any]] | None = None
     # Assistant replies: the model's thoughts before/while answering, if it shared any.
     reasoning: str | None = None
+    # Assistant replies: knowledge-base chunks the reply drew on ({name, page, chunk, snippet, path}).
+    sources: list[dict[str, Any]] | None = None
     # User turns started by a click: the action that was sent.
     action: dict[str, Any] | None = None
     # User turns: workspace paths of the files attached to the message.

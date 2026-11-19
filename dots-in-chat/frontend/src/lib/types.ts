@@ -9,12 +9,17 @@ export type Metrics = {
   [k: string]: unknown
 }
 
+/** A knowledge-base chunk a reply drew on. `path` is the workspace copy of its file (null: nothing to open). */
+export type Source = { name: string; page: number | null; chunk: number | null; snippet: string; path: string | null }
+
 export type Message = {
   role: 'user' | 'assistant'
   content: string
   metrics?: Metrics | null
   /** Assistant replies since A2UI v1.0: text and A2UI wire messages, in order. */
   parts?: ({ type: 'text'; text: string } | { type: 'a2ui'; message: Record<string, unknown> & { version: string } })[] | null
+  /** Assistant replies: knowledge-base chunks the reply drew on. */
+  sources?: Source[] | null
   /** Assistant replies: the model's thoughts, if it shared any. */
   reasoning?: string | null
   /** User turns: workspace paths of the files attached to the message. */

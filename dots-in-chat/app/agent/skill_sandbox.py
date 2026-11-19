@@ -124,6 +124,10 @@ def main() -> None:
     script = sys.argv[2]
     sys.dont_write_bytecode = True
     sys.path.insert(0, os.path.dirname(script))
+    # mimetypes reads /etc/mime.types etc. lazily on first use (openpyxl hits it on import on
+    # Linux/macOS); load it now so the hook doesn't block that outside-workspace read.
+    import mimetypes
+    mimetypes.init()
     install(policy)
     sys.argv = [script, *sys.argv[3:]]
     try:

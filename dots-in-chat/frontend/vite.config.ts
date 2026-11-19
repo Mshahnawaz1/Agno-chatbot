@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 const target = 'http://localhost:8000'
-const apiPrefixes = ['/auth', '/users', '/sessions', '/chat', '/connectors', '/health']
+const apiPrefixes = ['/auth', '/users', '/sessions', '/chat', '/connectors', '/files', '/health']
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

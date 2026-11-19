@@ -1,6 +1,6 @@
 ---
 name: ui-blocks
-description: Shows ready-made live cards (growth/SIP, budget, quadratic, charts, ranklist, reminder, message, batch, draftdiff, order). Use when a request matches one.
+description: Shows ready-made live cards (growth/SIP, budget, quadratic, charts, datachart for CSV or tool data, ranklist, reminder, message, batch, draftdiff, order). Use when a request matches one.
 metadata:
   preload: references/grammar.md references/rules.md templates/block-card.md
 ---
@@ -18,6 +18,7 @@ matches the request, then load its signature in your FIRST call, naming the file
 | budget | BudgetSplit | split a salary or a 50-30-20 budget, draggable ring |
 | quadratic | QuadraticExplorer | explore y = ax² + bx + c |
 | charts | ChartSwitcher | one series of up to ~12 points that the user restyles (bar, line, pie...) |
+| datachart | DataChart | chart/plot/graph rows from an uploaded CSV or a tool result (line, bar, scatter) |
 | chartgallery | ChartGallery | a menu of chart types to pick from |
 | ranklist | RankList | the user drags 3-7 items into priority order |
 | reminder | ReminderPicker | set a reminder |
@@ -30,7 +31,9 @@ matches the request, then load its signature in your FIRST call, naming the file
 ## Workflow
 1. Start from `templates/block-card.md`: the block first in
    `root = Column([...])`, a Suggestions under it.
-2. Fill the block's arguments from the user's numbers; don't compute results yourself.
-3. Reply with one sentence and the block (see rules.md).
+2. Charting a CSV or tool result: read it first (`read_file`, or the tool result), aggregate big
+   tables, then pass the rows to DataChart.
+3. Fill the block's arguments from the user's numbers; don't compute results yourself.
+4. Reply with one sentence and the block (see rules.md).
 
 No block fits? A form is `ui-forms`; results, tables, other charts are `ui-display`.

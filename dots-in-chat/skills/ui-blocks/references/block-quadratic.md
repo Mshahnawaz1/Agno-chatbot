@@ -2,8 +2,8 @@
 # QuadraticExplorer (chat block)
 
 • QuadraticExplorer(a (static), b (static), c (static))
-  - Description: An interactive quadratic y = axÂ² + bx + c with live plot, roots and vertex.
-  - a: Coefficient of xÂ². Not 0.
+  - Description: An interactive quadratic y = ax² + bx + c with live plot, roots and vertex.
+  - a: Coefficient of x². Not 0.
   - b: Coefficient of x.
   - c: Constant term.
 

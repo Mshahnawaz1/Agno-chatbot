@@ -1,0 +1,29 @@
+{
+  "guide": "DataChart(title, type, data, x, y, group?, xLabel?, yLabel?, note?) — a Recharts line, bar or scatter chart of ROWS. Use it when the user asks to chart/plot/graph data from an uploaded CSV or a tool result. Workflow: read the data first (read_file for a CSV, or the tool's result), then pass rows as flat objects keyed by column name, e.g. [{month: \"Jan\", sales: 120}, {month: \"Feb\", sales: 150}]. Numbers must be JSON numbers (strip currency signs and thousands separators; parse dates to a sortable label such as \"2026-01\"). type: line = values over an ordered x such as time; bar = compare categories; scatter = two numeric columns against each other (group colours points by a column). x is the x column, y the list of y columns (one series each; scatter uses the first). The block draws at most 500 rows and says when it cut: for a big file, aggregate first (monthly totals, top 15 categories) instead of sending raw rows, and never invent or round data. If the columns are not numeric the card says so, so check them. Prefer it over VegaChart and ChartSwitcher whenever the data is a table of rows or has several series. Example: chart = DataChart(\"Monthly sales\", \"line\", [{month: \"Jan\", sales: 120, cost: 80}, {month: \"Feb\", sales: 150, cost: 95}, {month: \"Mar\", sales: 170, cost: 100}], \"month\", [\"sales\", \"cost\"], note=\"Source: sales.csv\")",
+  "components": {
+    "DataChart": {
+      "type": "object",
+      "description": "A line, bar or scatter chart of rows from a CSV or tool result.",
+      "properties": {
+        "component": {"const": "DataChart"},
+        "title": {"type": "string", "description": "Card title, e.g. \"Monthly sales\"."},
+        "type": {"enum": ["line", "bar", "scatter"], "description": "line: values over an ordered x (time). bar: compare categories. scatter: two numeric columns against each other."},
+        "data": {
+          "type": "array",
+          "description": "The rows: flat objects, one per point, keyed by column name.",
+          "items": {
+            "type": "object",
+            "additionalProperties": {"type": ["string", "number", "null"]}
+          }
+        },
+        "x": {"type": "string", "description": "Column for the x axis."},
+        "y": {"type": "array", "items": {"type": "string"}, "description": "Column(s) for the y axis, one series each. Scatter uses the first."},
+        "group": {"type": "string", "description": "Scatter only: a column whose values colour the points."},
+        "xLabel": {"type": "string", "description": "X axis title. Defaults to the x column name."},
+        "yLabel": {"type": "string", "description": "Y axis title."},
+        "note": {"type": "string", "description": "Footnote, e.g. where the data came from."}
+      },
+      "required": ["component", "title", "type", "data", "x", "y"]
+    }
+  }
+}

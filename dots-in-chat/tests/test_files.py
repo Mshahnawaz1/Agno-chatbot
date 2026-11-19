@@ -19,6 +19,7 @@ from docx import Document  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app import db  # noqa: E402
 from app.agent import formats, previews, workspace  # noqa: E402
 from app.agent.file_guard import WorkspaceFileTools  # noqa: E402
 from app.config import settings  # noqa: E402
@@ -50,6 +51,11 @@ Intro with **bold** and *italic* and `code` and [a link](https://example.com).
 @pytest.fixture()
 def ws(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "agent_workspace_dir", str(tmp_path / "ws"))
+    monkeypatch.setattr(settings, "app_db_path", str(tmp_path / "app.db"))  # version history lives here
+    db.init_db()
+    with db.get_conn() as conn:
+        conn.executemany("INSERT INTO users (id, email, password_hash) VALUES (?, ?, 'x')",
+                         [("u1", "u1@x.io"), ("u2", "u2@x.io")])
     return tmp_path
 
 

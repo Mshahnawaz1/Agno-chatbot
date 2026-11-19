@@ -45,6 +45,14 @@ def origin_of(rel: Path) -> str:
     return "uploaded" if rel.parts and rel.parts[0] == UPLOAD_DIR else "generated"
 
 
+def record_user_changes(user: dict) -> None:
+    """History is a safety net: a failure to record must never fail the user's save or upload."""
+    try:
+        versions.record_changes(user["id"], "user")
+    except Exception:
+        logger.exception("could not record file versions")
+
+
 def resolve(user: dict, path: str):
     """Existing, allowed file for this user: 400 escape, 404 missing, 415 unsupported type."""
     try:
@@ -116,7 +124,7 @@ async def upload(user: CurrentUser, files: list[UploadFile]):
             "modified": datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).isoformat(),
             "kind": adapter_for(p).kind, "origin": "uploaded",
         })
-    await asyncio.to_thread(versions.record_changes, user["id"], "user")
+    await asyncio.to_thread(record_user_changes, user)
     return out
 
 
@@ -188,7 +196,7 @@ def save_content(body: SaveBody, user: CurrentUser):
     tmp = p.with_name(f".{p.name}.tmp")
     tmp.write_bytes(data)
     os.replace(tmp, p)
-    versions.record_changes(user["id"], "user")
+    record_user_changes(user)
     return {"version": str(p.stat().st_mtime_ns)}
 
 

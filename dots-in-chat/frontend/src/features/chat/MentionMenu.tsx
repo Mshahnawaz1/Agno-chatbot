@@ -21,8 +21,18 @@ export function MentionMenu({
   onSelect: (file: FileEntry) => void
   onHover: (index: number) => void
 }) {
+  const list = useRef<HTMLUListElement>(null)
   const activeEl = useRef<HTMLLIElement>(null)
-  useEffect(() => activeEl.current?.scrollIntoView({ block: 'nearest' }), [active])
+  // Keep the highlighted row in view by scrolling the list itself. scrollIntoView would also scroll
+  // the page's overflow-hidden ancestors, and (in a block body) its Promise return would be taken
+  // by React as an effect clean-up function and crash the app.
+  useEffect(() => {
+    const ul = list.current
+    const li = activeEl.current
+    if (!ul || !li) return
+    if (li.offsetTop < ul.scrollTop) ul.scrollTop = li.offsetTop
+    else if (li.offsetTop + li.offsetHeight > ul.scrollTop + ul.clientHeight) ul.scrollTop = li.offsetTop + li.offsetHeight - ul.clientHeight
+  }, [active])
 
   return (
     <div className="absolute inset-x-2 bottom-full z-30 mb-2 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
@@ -30,7 +40,7 @@ export function MentionMenu({
       {items.length === 0 ? (
         <p className="px-3 py-4 text-center text-sm text-fg-muted">{loading ? 'Loading…' : 'No matching artifacts'}</p>
       ) : (
-        <ul id={id} role="listbox" aria-label="Artifacts" className="max-h-60 overflow-y-auto p-1">
+        <ul ref={list} id={id} role="listbox" aria-label="Artifacts" className="relative max-h-60 overflow-y-auto p-1">
           {items.map((f, i) => {
             const Icon = KIND_ICON[f.kind]
             const on = chosen.has(f.path)

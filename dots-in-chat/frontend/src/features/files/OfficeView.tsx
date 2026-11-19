@@ -5,7 +5,7 @@ import * as api from '@/lib/api'
 import { Spinner } from '@/components/ui'
 import { fileName } from './fileRefs'
 
-/** A .docx / .xlsx / .pptx drawn as the file is (layout, slides, sheets), view only. */
+/** A .docx / .xlsx / .csv / .pptx drawn as the file is (layout, slides, sheets), view only. */
 export default function OfficeView({ path }: { path: string }) {
   const [blob, setBlob] = useState<Blob | null>(null)
   const [error, setError] = useState<string | null>(null)

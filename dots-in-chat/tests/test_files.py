@@ -547,3 +547,14 @@ def test_doc_edit_prompt_and_fence_stripping():
     assert doc_edit.clean_reply("plain\n", "x") == "plain"
     prompt = doc_edit.build_prompt("DOC", "EX", "SEL", "do it", 3, 4)
     assert '<excerpt lines="3-4">\nEX\n</excerpt>' in prompt and "Instruction: do it" in prompt
+
+
+def test_csv_uploads_and_opens_in_the_spreadsheet_viewer(client, ws):
+    """A CSV is accepted, stays plain text for the agent, and previews as a raw-viewed file."""
+    data = b"month,sales\n2026-01,120\n2026-02,150\n"
+    r = client.post("/files/upload", files=[("files", ("sales.csv", data, "text/csv"))])
+    assert r.status_code == 201 and r.json()[0]["kind"] == "csv"
+    p = client.get("/files/preview", params={"path": "uploads/sales.csv"}).json()
+    assert p["kind"] == "csv" and p["file"] == "uploads/sales.csv" and p["html"] == ""
+    d = client.get("/files/download", params={"path": "uploads/sales.csv"})
+    assert d.content == data and d.headers["content-type"].startswith("text/csv")

@@ -68,7 +68,7 @@ export type User = {
   created_at: string
 }
 
-export type FileKind = 'docx' | 'pdf' | 'html' | 'md' | 'xlsx' | 'pptx'
+export type FileKind = 'docx' | 'pdf' | 'html' | 'md' | 'xlsx' | 'csv' | 'pptx'
 export type FileAction = 'created' | 'updated' | 'deleted'
 
 /** A workspace file the agent touched (SSE `file` event, or derived from stored tool calls). */

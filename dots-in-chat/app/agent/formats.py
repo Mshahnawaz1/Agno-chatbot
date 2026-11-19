@@ -1,4 +1,4 @@
-"""Format adapter registry: one entry per previewable file type (.md .docx .html .pdf .xlsx .pptx).
+"""Format adapter registry: one entry per previewable file type (.md .docx .html .pdf .xlsx .csv .pptx).
 
 The files router and the workspace allow-list read from here, so a new format is one adapter.
 `kind` is the value sent to the client (preview + SSE); `preview(path)` returns the `html` field.
@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 from app.agent.previews import docx_to_html, md_to_html, pptx_to_html, xlsx_to_html
-from app.agent.workspace import MAX_DOCX_BYTES, MAX_HTML_BYTES, MAX_MD_BYTES, MAX_PDF_BYTES, MAX_PPTX_BYTES, MAX_XLSX_BYTES
+from app.agent.workspace import MAX_DOCX_BYTES, MAX_HTML_BYTES, MAX_MD_BYTES, MAX_PDF_BYTES, MAX_CSV_BYTES, MAX_PPTX_BYTES, MAX_XLSX_BYTES
 
 HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
 _CSP_META = f'<meta http-equiv="Content-Security-Policy" content="{HTML_CSP}">'
@@ -73,6 +73,8 @@ ADAPTERS: dict[str, Adapter] = {a.ext: a for a in [
     Adapter(".pdf", "pdf", "application/pdf", MAX_PDF_BYTES, _preview_pdf, twin_priority=1),
     Adapter(".xlsx", "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             MAX_XLSX_BYTES, _preview_xlsx),
+    # A CSV is plain text for the agent, but the user sees it in the spreadsheet viewer.
+    Adapter(".csv", "csv", "text/csv; charset=utf-8", MAX_CSV_BYTES, _preview_pdf),
     Adapter(".pptx", "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             MAX_PPTX_BYTES, _preview_pptx),
 ]}

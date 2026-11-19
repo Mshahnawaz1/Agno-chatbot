@@ -7,7 +7,7 @@ export function fileName(path: string): string {
 
 export function kindOf(path: string): FileKind | null {
   const ext = path.toLowerCase().split('.').pop()
-  return ext === 'docx' || ext === 'pdf' || ext === 'html' || ext === 'md' || ext === 'xlsx' || ext === 'pptx' ? ext : null
+  return ext === 'docx' || ext === 'pdf' || ext === 'html' || ext === 'md' || ext === 'xlsx' || ext === 'csv' || ext === 'pptx' ? ext : null
 }
 
 function str(v: unknown): string | null {
@@ -25,7 +25,7 @@ function argsOf(raw: unknown): Record<string, unknown> {
   return raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
 }
 
-const RESULT_KINDS = new Set(['docx', 'pdf', 'html', 'md', 'xlsx', 'pptx'])
+const RESULT_KINDS = new Set(['docx', 'pdf', 'html', 'md', 'xlsx', 'csv', 'pptx'])
 const ACTIONS = new Set(['created', 'updated', 'deleted'])
 
 /** Chips from a run_skill_script result: JSON {ok, changed:[{path, action, kind}]}; anything odd => none. */

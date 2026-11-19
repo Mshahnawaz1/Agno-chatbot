@@ -126,7 +126,7 @@ function PanelBody({ path }: { path: string }) {
   }
   const file = q.data.file ?? path
   if (q.data.kind === 'pdf') return <PdfView key={`${file}:${q.data.version}`} path={file} />
-  if (q.data.kind === 'docx' || q.data.kind === 'xlsx' || q.data.kind === 'pptx') {
+  if (q.data.kind === 'docx' || q.data.kind === 'xlsx' || q.data.kind === 'csv' || q.data.kind === 'pptx') {
     return (
       <Suspense fallback={<div className="flex h-full items-center justify-center gap-2 text-sm text-fg-muted"><Spinner label="Loading viewer" /> Loading viewer…</div>}>
         <OfficeView key={`${file}:${q.data.version}`} path={file} />

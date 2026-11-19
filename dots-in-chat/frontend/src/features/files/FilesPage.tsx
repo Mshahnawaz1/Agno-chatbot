@@ -9,7 +9,7 @@ import { KIND_ICON, KIND_LABEL } from './kinds'
 import { FilePanel } from './FilePanel'
 import { FilePanelContext, useFilePanelState } from './useFilePanel'
 
-const ACCEPT = '.pdf,.docx,.md,.html,.xlsx,.pptx'
+const ACCEPT = '.pdf,.docx,.md,.html,.xlsx,.csv,.pptx'
 type Filter = 'all' | 'uploaded' | 'generated'
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all', label: 'All' },

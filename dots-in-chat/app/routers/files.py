@@ -118,7 +118,7 @@ async def upload(user: CurrentUser, files: list[UploadFile]):
     return out
 
 
-RAW_VIEW_KINDS = {"docx", "xlsx", "pptx", "pdf"}
+RAW_VIEW_KINDS = {"docx", "xlsx", "csv", "pptx", "pdf"}
 
 
 @router.get("/preview")

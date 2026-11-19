@@ -9,6 +9,7 @@ MAX_DOCX_BYTES = 10 * 1024 * 1024
 MAX_HTML_BYTES = 2 * 1024 * 1024
 MAX_PDF_BYTES = 25 * 1024 * 1024  # the knowledge-base report is 15 MB; the viewer loads the whole file
 MAX_XLSX_BYTES = 10 * 1024 * 1024
+MAX_CSV_BYTES = 5 * 1024 * 1024
 MAX_PPTX_BYTES = 10 * 1024 * 1024
 _SAFE_ID = re.compile(r"[^A-Za-z0-9_.-]")
 APP_ROOT = Path(__file__).resolve().parents[2]  # dots-in-chat/: relative settings are anchored here, not to the cwd

@@ -12,7 +12,7 @@ import { useFilePanelContext } from '@/features/files/useFilePanel'
 import { kindOf } from '@/features/files/fileRefs'
 import { MAX_ATTACHMENTS, type Attached } from './attachments'
 
-export const ACCEPT = '.pdf,.docx,.md,.html,.xlsx,.pptx'
+export const ACCEPT = '.pdf,.docx,.md,.html,.xlsx,.csv,.pptx'
 
 const itemClass =
   'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-fg outline-none data-[highlighted]:bg-surface-3'

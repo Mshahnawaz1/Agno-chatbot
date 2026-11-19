@@ -81,15 +81,28 @@ export function ConnectorsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-[1040px] px-4 py-8 sm:px-6 sm:py-10">
-        <header className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-display text-4xl text-fg sm:text-5xl">Connectors</h1>
-            {data && <Badge aria-label={`${list.length} connectors`}>{list.length}</Badge>}
+      <div className="mx-auto w-full max-w-[1040px] px-4 py-6 sm:px-6 sm:py-8">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <h1 className="font-display text-3xl font-semibold tracking-tight text-fg">Connectors</h1>
+              {data && <Badge aria-label={`${list.length} connectors`}>{list.length}</Badge>}
+            </div>
+            <p className="text-fg-muted">
+              Connect the tools you use so the assistant can read and act in them on your behalf.
+            </p>
           </div>
-          <p className="text-fg-muted">
-            Connect the tools you use so the assistant can read and act in them on your behalf.
-          </p>
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />
+            <Input
+              type="search"
+              aria-label="Search connectors"
+              placeholder="Search connectors"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="rounded-full pl-10"
+            />
+          </div>
         </header>
 
         {banner && (
@@ -118,12 +131,12 @@ export function ConnectorsPage() {
           </div>
         )}
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-6 flex">
           <div
             role="tablist"
             aria-label="Filter connectors"
             onKeyDown={onTabKey}
-            className="inline-flex self-start rounded-full border border-border bg-surface p-1"
+            className="inline-flex self-start gap-1"
           >
             {tabs.map((t) => (
               <button
@@ -138,24 +151,13 @@ export function ConnectorsPage() {
                 onClick={() => setTab(t.id)}
                 className={clsx(
                   'inline-flex h-8 items-center gap-2 rounded-full px-4 text-sm font-medium transition-colors',
-                  tab === t.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:text-fg',
+                  tab === t.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface hover:text-fg',
                 )}
               >
                 {t.label}
                 <span className="text-xs text-fg-subtle">{t.count}</span>
               </button>
             ))}
-          </div>
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />
-            <Input
-              type="search"
-              aria-label="Search connectors"
-              placeholder="Search connectors"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-10"
-            />
           </div>
         </div>
 
@@ -167,14 +169,13 @@ export function ConnectorsPage() {
 
         <div role="tabpanel" className="mt-6">
           {isPending ? (
-            <ul className="grid gap-4 min-[900px]:grid-cols-2" aria-busy="true" aria-label="Loading connectors">
+            <ul className="grid gap-x-8 gap-y-1 min-[900px]:grid-cols-2" aria-busy="true" aria-label="Loading connectors">
               {Array.from({ length: 6 }, (_, i) => (
-                <li key={i} className="flex h-[124px] animate-pulse items-start gap-4 rounded-lg bg-surface p-5">
-                  <div className="size-14 rounded-md bg-surface-3" />
-                  <div className="flex flex-1 flex-col gap-2 pt-1">
+                <li key={i} className="flex h-[72px] animate-pulse items-center gap-4 rounded-xl bg-surface p-3">
+                  <div className="size-12 rounded-xl bg-surface-3" />
+                  <div className="flex flex-1 flex-col gap-2">
                     <div className="h-4 w-1/3 rounded-sm bg-surface-3" />
-                    <div className="h-3 w-full rounded-sm bg-surface-2" />
-                    <div className="h-3 w-1/2 rounded-sm bg-surface-2" />
+                    <div className="h-3 w-2/3 rounded-sm bg-surface-2" />
                   </div>
                 </li>
               ))}
@@ -195,7 +196,7 @@ export function ConnectorsPage() {
                   : 'No connectors available.'}
             </div>
           ) : (
-            <ul className="grid gap-4 min-[900px]:grid-cols-2">
+            <ul className="grid gap-x-8 gap-y-1 min-[900px]:grid-cols-2">
               {visible.map((c) => (
                 <ConnectorCard
                   key={c.id}

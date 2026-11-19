@@ -5,6 +5,8 @@ export type ConnectorMeta = {
   /** Glyph/monogram text color */
   textColor: string
   monogram: string
+  /** Logo path under /connectors, when we have one */
+  logo?: string
 }
 
 const META: Record<string, Omit<ConnectorMeta, 'monogram' | 'textColor'> & { textColor?: string; monogram?: string }> = {
@@ -20,5 +22,5 @@ export function getConnectorMeta(id: string, name: string): ConnectorMeta {
   const m = META[id]
   const monogram = (m?.monogram ?? name.trim().charAt(0) ?? '?').toUpperCase() || '?'
   if (!m) return { provider: 'Custom', color: '#3a3a48', textColor: '#ffffff', monogram }
-  return { provider: m.provider, color: m.color, textColor: m.textColor ?? '#ffffff', monogram }
+  return { provider: m.provider, color: m.color, textColor: m.textColor ?? '#ffffff', monogram, logo: `/connectors/${id}.png` }
 }

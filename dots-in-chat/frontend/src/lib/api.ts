@@ -154,6 +154,30 @@ export const uploadFiles = (files: File[]) => {
   return request<FileEntry[]>('/files/upload', { method: 'POST', body })
 }
 
+/** Saves a Markdown file. `baseVersion` makes the server refuse (409) if the file changed meanwhile. */
+export const saveFileContent = (path: string, content: string, baseVersion: string) =>
+  request<{ version: string }>('/files/content', {
+    method: 'PUT',
+    body: JSON.stringify({ path, content, base_version: baseVersion }),
+  })
+
+export type AiEditRequest = {
+  path: string
+  start_line: number
+  end_line: number
+  selected_text: string
+  instruction: string
+  base_version: string
+}
+
+/** Asks the AI to rewrite some lines; returns a proposal, nothing is saved. */
+export const aiEditFile = (body: AiEditRequest, signal?: AbortSignal) =>
+  request<{ replacement: string; start_line: number; end_line: number; version: string }>('/files/ai-edit', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    signal,
+  })
+
 export const getFilePreview = (path: string) =>
   request<FilePreview>(`/files/preview?path=${enc(path)}`)
 

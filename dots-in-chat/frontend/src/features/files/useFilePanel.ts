@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import * as api from '@/lib/api'
 
 export type FilePanelValue = {
@@ -41,6 +41,9 @@ export function useFilePreview(path: string, rev: number) {
     queryKey: ['file-preview', path, rev],
     queryFn: () => api.getFilePreview(path),
     staleTime: Infinity,
+    // A refetch after an edit keeps the old preview on screen instead of unmounting it (an open editor
+    // would lose its state).
+    placeholderData: keepPreviousData,
     retry: (count, err) => !(err instanceof api.ApiError && err.status < 500) && count < 2,
   })
 }

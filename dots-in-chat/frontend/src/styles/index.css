@@ -235,3 +235,15 @@
 @utility dot-pulse {
   animation: dot-pulse 1.2s ease-in-out infinite;
 }
+
+/* Markdown editor: the blocks the AI is about to edit, and the exact text the user selected. */
+.md-doc [data-target='true'] {
+  background: rgb(167 139 250 / 0.1);
+  box-shadow: -3px 0 0 rgb(167 139 250 / 0.85);
+  border-radius: 4px;
+}
+
+::highlight(ai-target) {
+  background-color: rgb(167 139 250 / 0.4);
+  color: inherit;
+}

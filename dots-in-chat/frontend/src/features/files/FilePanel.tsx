@@ -4,6 +4,7 @@ import * as api from '@/lib/api'
 import { ApiError } from '@/lib/api'
 import { Button, IconButton, Spinner } from '@/components/ui'
 import { fileName } from './fileRefs'
+import { MdView } from './MdView'
 import { useFilePanelContext, useFilePreview } from './useFilePanel'
 
 /** The paper stays light in both themes: it stands for the printed page. */
@@ -116,6 +117,10 @@ function PanelBody({ path }: { path: string }) {
         ) : null}
       </div>
     )
+  }
+  // Markdown is drawn in the page (not an iframe): selections have to be readable to offer AI edits.
+  if (q.data.kind === 'md' && q.data.source !== undefined) {
+    return <MdView key={path} path={path} source={q.data.source} version={q.data.version} />
   }
   if (q.data.kind === 'pdf') return <PdfView key={`${path}:${q.data.version}`} path={path} />
   // html: the server's full document (CSP already injected), shown as is; docx/md: paper wrapper.

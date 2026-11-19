@@ -12,6 +12,7 @@ from app.a2ui.actions import InvalidAction, action_prompt, read_action
 from app.a2ui.turn import A2uiTurn
 from app.agent import agent
 from app.agent.formats import kind_for
+from app.agent.sources import build_sources
 from app.agent.workspace import rel_posix
 from app.attachments import with_attachments
 from app.deps import CurrentUser
@@ -195,6 +196,7 @@ async def model_pass(
             if event.reasoning_content and not repair:
                 yield sse("reasoning", {"content": event.reasoning_content})
             if event.content:
+                run["reply"] = run.get("reply", "") + str(event.content)
                 for name, data in turn.feed(str(event.content)):
                     yield sse(name, data)
         elif event.event == RunEvent.tool_call_started:
@@ -217,6 +219,7 @@ async def model_pass(
         elif event.event == RunEvent.run_completed:
             run["run_id"] = run.get("run_id") or event.run_id
             run["all_ids"].append(event.run_id)
+            run.setdefault("references", []).extend(event.references or [])
             if not repair:
                 run["metrics"] = run_metrics(event.metrics, run["tools"])
             log_run(event.run_id, event.metrics, run["tools"])
@@ -275,6 +278,11 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
                     yield sse(name, data)
             for name, data in turn.finish():
                 yield sse(name, data)
+            cards = await asyncio.to_thread(
+                build_sources, run.get("references"), run.get("reply", ""), user["id"]
+            )
+            if cards:
+                yield sse("sources", {"sources": cards})
             if run["metrics"]:
                 yield sse("metrics", run["metrics"])
             yield sse("done", {"run_id": run["run_id"]})

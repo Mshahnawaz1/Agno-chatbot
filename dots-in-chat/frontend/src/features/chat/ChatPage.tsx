@@ -114,6 +114,7 @@ export function ChatPage() {
         content: m.role === 'assistant' ? parts.flatMap((p) => (p.kind === 'text' ? [p.text] : [])).join('\n\n') : (m.content ?? ''),
         parts,
         files: m.role === 'assistant' ? filesFromTools(m.metrics?.tools) : [],
+        sources: m.sources ?? [],
         attachments: m.attachments ?? [],
         steps: m.role === 'assistant' ? stepsFromHistory(m.reasoning, m.metrics?.tools) : [],
         startedAt: null,

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { FileRef, Metrics } from '@/lib/types'
+import type { FileRef, Metrics, Source } from '@/lib/types'
 import type { Step } from './activity'
 import type { A2uiMessage, ActionMessage, Part, UiAction } from './a2ui/protocol'
 
@@ -26,6 +26,8 @@ export type Turn = {
   action?: UiAction
   /** Assistant turns: workspace files the agent created, updated or deleted. */
   files: FileRef[]
+  /** Assistant turns: knowledge-base chunks the reply drew on. */
+  sources: Source[]
   metrics: Metrics | null
   error: string | null
   errorKind: ErrorKind | null
@@ -55,6 +57,7 @@ export type StreamAction =
   | { type: 'workDone'; runId: number; assistantId: string; ms: number }
   | { type: 'a2ui'; runId: number; assistantId: string; message: A2uiMessage }
   | { type: 'file'; runId: number; assistantId: string; file: FileRef }
+  | { type: 'sources'; runId: number; assistantId: string; sources: Source[] }
   | { type: 'metrics'; runId: number; assistantId: string; metrics: Metrics }
   | { type: 'fail'; runId: number; assistantId: string; message: string; kind: ErrorKind }
   | { type: 'finish'; runId: number; assistantId: string; status: Exclude<TurnStatus, 'streaming'> }
@@ -98,10 +101,10 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       turns: [
         ...state.turns,
         {
-          id: action.userId, role: 'user', attachments: 'text' in action.input ? (action.input.attachments ?? []) : [], parts: [], files: [], steps: [], startedAt: null, workMs: null, metrics: null, error: null, errorKind: null, status: 'done',
+          id: action.userId, role: 'user', attachments: 'text' in action.input ? (action.input.attachments ?? []) : [], parts: [], files: [], sources: [], steps: [], startedAt: null, workMs: null, metrics: null, error: null, errorKind: null, status: 'done',
           ...('text' in action.input ? { content: action.input.text } : { content: '', action: action.input.action.action }),
         },
-        { id: action.assistantId, role: 'assistant', content: '', attachments: [], parts: [], files: [], steps: [], startedAt: Date.now(), workMs: null, metrics: null, error: null, errorKind: null, status: 'streaming' },
+        { id: action.assistantId, role: 'assistant', content: '', attachments: [], parts: [], files: [], sources: [], steps: [], startedAt: Date.now(), workMs: null, metrics: null, error: null, errorKind: null, status: 'streaming' },
       ],
     }
   }
@@ -146,6 +149,8 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       }))
     case 'file':
       return updateTurn(state, action.assistantId, (t) => ({ files: mergeFile(t.files, action.file) }))
+    case 'sources':
+      return updateTurn(state, action.assistantId, () => ({ sources: action.sources }))
     case 'metrics':
       return updateTurn(state, action.assistantId, () => ({ metrics: action.metrics }))
     case 'fail':

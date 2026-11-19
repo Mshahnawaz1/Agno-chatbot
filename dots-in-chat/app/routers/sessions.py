@@ -1,3 +1,4 @@
+import asyncio
 from agno.run.base import HISTORY_SKIP_STATUSES
 from fastapi import APIRouter, HTTPException, status
 
@@ -8,6 +9,7 @@ from app.attachments import split_attachments
 from app.deps import CurrentUser
 from app.schemas import SessionCreate, SessionOut, MessageOut
 from app.agent import agent
+from app.agent.sources import build_sources
 from app.routers.chat import run_metrics
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -74,5 +76,8 @@ async def session_messages(session_id: str, user: CurrentUser):
                 parts=turn_parts,
                 metrics=run_metrics(run.metrics, run.tools),
                 reasoning=run.reasoning_content or None,
+                sources=await asyncio.to_thread(
+                    build_sources, run.references, str(run.content or ""), user["id"]
+                ) or None,
             ))
     return out

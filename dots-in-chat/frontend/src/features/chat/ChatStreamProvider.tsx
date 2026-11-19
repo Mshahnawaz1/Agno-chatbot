@@ -3,7 +3,7 @@ import { matchPath, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import * as api from '@/lib/api'
 import { readSseEvents } from '@/lib/sse'
-import type { Message, Metrics } from '@/lib/types'
+import type { Message, Metrics, Source } from '@/lib/types'
 import { ChatStreamContext, initialStreamState, streamReducer, type ChatStreamValue, type TurnInput } from './chatStore'
 import { actionMessage, type A2uiMessage, type UiAction } from './a2ui/protocol'
 
@@ -234,6 +234,11 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
               if (typeof d.path === 'string' && kind && act) {
                 dispatch({ type: 'file', runId, assistantId, file: { path: d.path, kind, action: act } })
               }
+              break
+            }
+            case 'sources': {
+              const list = Array.isArray(d.sources) ? (d.sources as Source[]) : []
+              if (list.length) dispatch({ type: 'sources', runId, assistantId, sources: list })
               break
             }
             case 'metrics':

@@ -127,22 +127,22 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
         if (last?.kind === 'thought') {
           return { steps: [...t.steps.slice(0, -1), { ...last, text: last.text + action.content }] }
         }
-        return { steps: [...t.steps, { kind: 'thought', id: `t${t.steps.length}`, text: action.content }] }
+        return { steps: [...t.steps, { kind: 'thought', id: `t${t.steps.length}`, text: action.content, startedAt: Date.now() }] }
       })
     case 'toolStart':
       return updateTurn(state, action.assistantId, (t) => ({
-        steps: [...t.steps, { kind: 'tool', id: action.id, name: action.name, args: action.args, status: 'running' }],
+        steps: [...closeThought(t.steps), { kind: 'tool', id: action.id, name: action.name, args: action.args, status: 'running', startedAt: Date.now() }],
       }))
     case 'toolEnd':
       return updateTurn(state, action.assistantId, (t) => ({
         steps: t.steps.map((st) =>
           st.kind === 'tool' && st.id === action.id
-            ? { ...st, status: action.error ? 'error' : 'done', result: action.result }
+            ? { ...st, status: action.error ? 'error' : 'done', result: action.result, endedAt: Date.now() }
             : st,
         ),
       }))
     case 'workDone':
-      return updateTurn(state, action.assistantId, (t) => (t.workMs === null ? { workMs: action.ms } : {}))
+      return updateTurn(state, action.assistantId, (t) => (t.workMs === null ? { workMs: action.ms, steps: closeThought(t.steps) } : {}))
     case 'a2ui':
       return updateTurn(state, action.assistantId, (t) => ({
         parts: [...t.parts, { kind: 'a2ui', message: action.message }],
@@ -159,11 +159,20 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       const next = updateTurn(state, action.assistantId, (t) => ({
         status: t.error ? 'error' : action.status,
         // A stopped or failed run leaves no tool spinning.
-        steps: t.steps.map((st) => (st.kind === 'tool' && st.status === 'running' ? { ...st, status: 'error' as const } : st)),
+        steps: closeThought(t.steps).map((st) =>
+          st.kind === 'tool' && st.status === 'running' ? { ...st, status: 'error' as const, endedAt: Date.now() } : st,
+        ),
       }))
       return { ...next, activeRun: null }
     }
   }
+}
+
+/** Stamp the end of a thought that is still open (the next step, or the answer, has begun). */
+function closeThought(steps: Step[]): Step[] {
+  const last = steps.at(-1)
+  if (last?.kind !== 'thought' || last.endedAt) return steps
+  return [...steps.slice(0, -1), { ...last, endedAt: Date.now() }]
 }
 
 export type ChatStreamValue = {

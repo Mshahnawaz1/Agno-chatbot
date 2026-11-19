@@ -149,8 +149,6 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
   useEffect(() => () => clearTimeout(timer.current), [])
 
   const streaming = turn.status === 'streaming'
-  const hasSteps = turn.steps.length > 0
-  const thinking = streaming && turn.parts.length === 0 && !hasSteps
   // Working until the answer starts (the provider then records workMs), or while a tool still runs.
   const working =
     streaming && (turn.workMs === null || turn.steps.some((s) => s.kind === 'tool' && s.status === 'running'))
@@ -172,12 +170,8 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
     <div className="group flex gap-3 sm:gap-4">
       <Logo size={24} className="mt-0.5 shrink-0 self-start" />
       <div className="min-w-0 flex-1" aria-live={streaming ? 'polite' : undefined} aria-busy={streaming || undefined}>
-        {hasSteps ? <Activity steps={turn.steps} running={working} startedAt={turn.startedAt} workMs={turn.workMs} /> : null}
-        {thinking ? (
-          <p className="shimmer leading-7">Thinking…</p>
-        ) : (
-          <ReplyBody parts={turn.parts} streaming={streaming} />
-        )}
+        <Activity steps={turn.steps} running={working} startedAt={turn.startedAt} workMs={turn.workMs} />
+        <ReplyBody parts={turn.parts} streaming={streaming} />
 
         {turn.files.length ? (
           <div className="mt-3 flex flex-col gap-2">

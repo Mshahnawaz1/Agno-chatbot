@@ -4,7 +4,7 @@ import type { Metrics } from '@/lib/types'
 
 /** One thing the agent did before (or between) its answer, in the order it happened. */
 export type Step =
-  | { kind: 'thought'; id: string; text: string }
+  | { kind: 'thought'; id: string; text: string; startedAt?: number; endedAt?: number }
   | {
       kind: 'tool'
       id: string
@@ -12,6 +12,8 @@ export type Step =
       args: Record<string, unknown>
       status: 'running' | 'done' | 'error'
       result?: string
+      startedAt?: number
+      endedAt?: number
     }
 
 export type ToolStep = Extract<Step, { kind: 'tool' }>

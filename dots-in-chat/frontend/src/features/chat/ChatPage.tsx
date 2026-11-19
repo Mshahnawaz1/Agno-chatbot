@@ -118,7 +118,8 @@ export function ChatPage() {
         attachments: m.attachments ?? [],
         steps: m.role === 'assistant' ? stepsFromHistory(m.reasoning, m.metrics?.tools) : [],
         startedAt: null,
-        workMs: null,
+        // Time before the answer started, when the run recorded it (seconds in the metrics).
+        workMs: m.role === 'assistant' && typeof m.metrics?.time_to_first_token === 'number' ? Math.round(m.metrics.time_to_first_token * 1000) : null,
         action: m.action ?? undefined,
         metrics: m.metrics ?? null,
         error: null,

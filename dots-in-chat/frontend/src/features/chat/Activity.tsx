@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Brain, ChevronRight, CircleAlert, Loader2 } from 'lucide-react'
+import { Brain, Check, ChevronDown, CircleAlert, Copy, Plug, X } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import clsx from 'clsx'
 import { Markdown } from '@/components/Markdown'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/shadcn/collapsible'
 import { toolLabel, type Step, type ToolStep } from './activity'
+
+type Status = 'running' | 'done' | 'failed'
+type Tag = 'connecting' | 'reasoning' | 'tool_calling'
 
 /** Four dots that pulse in turn while the agent works, and sit still once it is done. */
 function Dots({ active }: { active: boolean }) {
@@ -20,20 +24,21 @@ function Dots({ active }: { active: boolean }) {
   )
 }
 
-function seconds(ms: number): string {
-  const s = Math.max(1, Math.round(ms / 1000))
+function duration(ms: number): string {
+  if (ms < 1000) return `${Math.max(0, Math.round(ms / 100) * 100)}ms`
+  const s = Math.round(ms / 1000)
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`
 }
 
-/** Seconds since `since`, ticking once a second while `running`. */
-function useElapsed(since: number | null, running: boolean): number | null {
+/** Current time, ticking while `active` so running steps show a live duration. */
+function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    if (!running || since === null) return
-    const id = setInterval(() => setNow(Date.now()), 1000)
+    if (!active) return
+    const id = setInterval(() => setNow(Date.now()), 250)
     return () => clearInterval(id)
-  }, [running, since])
-  return since === null ? null : Math.max(0, now - since)
+  }, [active])
+  return now
 }
 
 function pretty(value: unknown): string {
@@ -57,59 +62,130 @@ function Detail({ title, text }: { title: string; text: string }) {
   )
 }
 
-function ToolRow({ step }: { step: ToolStep }) {
-  const [open, setOpen] = useState(false)
-  const label = toolLabel(step.name, step.args)
-  const running = step.status === 'running'
-  const Icon = step.status === 'error' ? CircleAlert : label.icon
-  const hasDetail = Object.keys(step.args).length > 0 || !!step.result
-  const line = (
-    <span className="flex min-w-0 items-center gap-2">
-      {running ? (
-        <Loader2 className="size-3.5 shrink-0 animate-spin text-fg-subtle" aria-hidden />
-      ) : (
-        <Icon className={clsx('size-3.5 shrink-0', step.status === 'error' ? 'text-danger' : 'text-fg-subtle')} aria-hidden />
-      )}
-      <span className={clsx('min-w-0 truncate', running && 'shimmer', step.status === 'error' && 'text-danger')}>
-        {running ? label.running : label.done}
-      </span>
-      {hasDetail ? (
-        <ChevronRight
-          className={clsx('size-3.5 shrink-0 text-fg-subtle transition-transform duration-200', open && 'rotate-90')}
-          aria-hidden
-        />
-      ) : null}
-    </span>
-  )
-  if (!hasDetail) return <div className="step-in py-1 text-sm text-fg-muted">{line}</div>
+const TONE: Record<Status, { ring: string; text: string }> = {
+  done: { ring: 'border-success/70 text-success', text: 'text-success' },
+  running: { ring: 'border-warning/70 text-warning', text: 'text-warning' },
+  failed: { ring: 'border-danger/70 text-danger', text: 'text-danger' },
+}
+
+/** Round status mark: a tick when done, a pulsing dot while running, a cross on failure. */
+function Mark({ status }: { status: Status }) {
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="step-in">
-      <CollapsibleTrigger className="flex w-fit max-w-full cursor-pointer py-1 text-left text-sm text-fg-muted transition-colors hover:text-fg">
-        {line}
-      </CollapsibleTrigger>
-      <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
-        <div className="mb-1 mt-1 flex flex-col gap-2 pl-5">
-          <Detail title="Input" text={pretty(step.args)} />
-          <Detail title="Output" text={step.result ?? ''} />
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    <span className={clsx('grid size-6 shrink-0 place-content-center rounded-full border', TONE[status].ring)}>
+      {status === 'done' ? <Check className="size-3.5" aria-hidden /> : null}
+      {status === 'failed' ? <X className="size-3.5" aria-hidden /> : null}
+      {status === 'running' ? <span className="size-2 animate-pulse rounded-full bg-warning" aria-hidden /> : null}
+    </span>
   )
 }
 
-function ThoughtRow({ text, live }: { text: string; live: boolean }) {
+/** One step: status mark, the step's icon and label in the status colour, tag and duration. */
+function Row({
+  icon: Icon, status, tag, label, ms, children,
+}: {
+  icon: LucideIcon
+  status: Status
+  tag: Tag
+  label: string
+  ms: number | null
+  children?: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const expandable = !!children
+  const head = (
+    <span className="flex min-w-0 flex-1 items-center gap-2.5">
+      <Mark status={status} />
+      <Icon className={clsx('size-4 shrink-0', TONE[status].text)} aria-hidden />
+      <span className={clsx('min-w-0 truncate text-[15px] font-medium', TONE[status].text, status === 'running' && 'shimmer')}>{label}</span>
+      <span className="hidden shrink-0 rounded bg-surface-2 px-1.5 py-px font-mono text-[10.5px] text-fg-subtle sm:inline">{tag}</span>
+      <span className="ml-auto flex shrink-0 items-center gap-1.5 text-xs tabular-nums text-fg-subtle">
+        {ms !== null ? duration(ms) : null}
+        {expandable ? (
+          <ChevronDown className="size-4 transition-transform duration-200 group-aria-expanded/row:rotate-180" aria-hidden />
+        ) : null}
+      </span>
+    </span>
+  )
   return (
-    <div className="step-in flex min-w-0 gap-2 py-1 text-sm text-fg-muted">
-      <Brain className={clsx('mt-1 size-3.5 shrink-0 text-fg-subtle', live && 'animate-pulse')} aria-hidden />
-      <Markdown className="min-w-0 text-[13px] leading-5 text-fg-muted [&_p]:leading-5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">{text}</Markdown>
-    </div>
+    <li className="step-in">
+      {expandable ? (
+        <Collapsible open={open} onOpenChange={setOpen}>
+          <CollapsibleTrigger className="group/row flex w-full min-w-0 cursor-pointer items-center rounded-md py-1.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+            {head}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
+            <div className="mb-1 ml-[34px] mt-1 flex flex-col gap-2">{children}</div>
+          </CollapsibleContent>
+        </Collapsible>
+      ) : (
+        <div className="flex py-1.5">{head}</div>
+      )}
+    </li>
+  )
+}
+
+/** A reasoning step as its own panel, with a copy button, like the reference. */
+function ReasoningCard({ text, live, ms }: { text: string; live: boolean; ms: number | null }) {
+  const [copied, setCopied] = useState(false)
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // clipboard unavailable
+    }
+  }
+  return (
+    <li className="step-in rounded-xl border border-border bg-surface px-4 py-3">
+      <div className="flex items-center gap-2 text-sm font-semibold text-accent-2">
+        <Brain className={clsx('size-4', live && 'animate-pulse')} aria-hidden />
+        Reasoning
+        <span className="hidden rounded bg-surface-2 px-1.5 py-px font-mono text-[10.5px] font-normal text-fg-subtle sm:inline">reasoning</span>
+        {ms !== null ? <span className="text-xs font-normal tabular-nums text-fg-subtle">{duration(ms)}</span> : null}
+        <button
+          type="button"
+          onClick={copy}
+          className="ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-normal text-fg-subtle transition-colors hover:text-fg"
+        >
+          {copied ? <Check className="size-3.5 text-success" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <Markdown className="mt-2 min-w-0 text-[14px] leading-6 text-fg-muted [&_p]:leading-6 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+        {text}
+      </Markdown>
+    </li>
+  )
+}
+
+function ToolItem({ step, now }: { step: ToolStep; now: number }) {
+  const label = toolLabel(step.name, step.args)
+  const status: Status = step.status === 'error' ? 'failed' : step.status
+  const hasDetail = Object.keys(step.args).length > 0 || !!step.result
+  const ms = step.startedAt ? (step.endedAt ?? now) - step.startedAt : null
+  return (
+    <Row
+      icon={step.status === 'error' ? CircleAlert : label.icon}
+      status={status}
+      tag="tool_calling"
+      label={status === 'running' ? label.running : label.done}
+      ms={ms}
+    >
+      {hasDetail ? (
+        <>
+          <Detail title="Input" text={pretty(step.args)} />
+          <Detail title="Output" text={step.result ?? ''} />
+        </>
+      ) : null}
+    </Row>
   )
 }
 
 /**
- * What the agent is doing, like Claude's activity list: a header ("Running a command · 30s") that
- * collapses, and under it each thought and tool call in order. Open while working, closed once the
- * answer starts; a click wins over both.
+ * What the agent is doing, as a collapsible timeline: connecting, then each reasoning and
+ * tool-calling step in order, each with its icon, status and duration. Open while working,
+ * closed once the answer starts; a click wins over both.
  */
 export function Activity({
   steps, running, startedAt, workMs,
@@ -120,33 +196,49 @@ export function Activity({
   workMs: number | null
 }) {
   const [open, setOpen] = useState<boolean | undefined>(undefined)
-  const elapsed = useElapsed(startedAt, running)
-  const current = [...steps].reverse().find((s): s is ToolStep => s.kind === 'tool' && s.status === 'running')
-  const tools = steps.filter((s) => s.kind === 'tool').length
+  const now = useNow(running)
+  const total = running ? (startedAt === null ? null : Math.max(0, now - startedAt)) : workMs
 
-  let title: string
-  if (running) title = current ? toolLabel(current.name, current.args).running : steps.at(-1)?.kind === 'thought' ? 'Thinking' : 'Working'
-  else if (tools) title = `Used ${tools} ${tools === 1 ? 'tool' : 'tools'}`
-  else title = 'Thought'
-  const time = running ? elapsed : workMs
+  // Connecting lasts until the first step (or the end of the work when nothing else happened).
+  const firstAt = steps[0]?.startedAt
+  const connectMs =
+    startedAt === null ? null : firstAt ? firstAt - startedAt : running ? now - startedAt : (workMs ?? null)
+  const connecting = running && !steps.length
+
+  const count = steps.length + 1
 
   return (
     <Collapsible open={open ?? running} onOpenChange={setOpen} className="mb-3">
-      <CollapsibleTrigger className="group flex w-fit max-w-full cursor-pointer items-center gap-2.5 rounded-md text-left text-[15px] text-fg-muted transition-colors outline-none hover:text-fg focus-visible:ring-3 focus-visible:ring-ring/50">
+      <CollapsibleTrigger className="group flex h-7 w-full max-w-[17rem] cursor-pointer items-center gap-2.5 rounded-lg border border-border-strong bg-surface px-3 text-left outline-none transition-colors hover:border-accent-2/60 focus-visible:ring-3 focus-visible:ring-ring/50">
         <Dots active={running} />
-        <span className={clsx('min-w-0 truncate', running && 'shimmer')}>{title}</span>
-        {time !== null && time >= 1000 ? <span className="shrink-0 tabular-nums text-fg-subtle">{seconds(time)}</span> : null}
-        <ChevronRight className="size-3.5 shrink-0 text-fg-subtle transition-transform duration-200 group-aria-expanded:rotate-90" aria-hidden />
+        <span className="shrink-0 text-sm font-semibold text-fg">Thinking &amp; Actions</span>
+        <span className={clsx('min-w-0 flex-1 truncate text-sm', running ? 'shimmer text-accent-2' : 'text-success')}>
+          {running ? 'Working on it…' : total !== null ? `Done in ${duration(total)}` : 'Done'}
+        </span>
+        <span className="shrink-0 rounded-md bg-surface-2 px-2 text-xs font-semibold leading-5 tabular-nums text-fg-muted">
+          {count} {count === 1 ? 'step' : 'steps'}
+        </span>
+        <ChevronDown className="size-4 shrink-0 text-fg-muted transition-transform duration-200 group-aria-expanded:rotate-180" aria-hidden />
       </CollapsibleTrigger>
       <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
-        <div className="mb-1 ml-2 mt-2 max-h-96 overflow-y-auto border-l border-border pl-5">
-          {steps.map((s, i) =>
-            s.kind === 'thought' ? (
-              <ThoughtRow key={s.id} text={s.text} live={running && i === steps.length - 1} />
-            ) : (
-              <ToolRow key={s.id} step={s} />
-            ),
-          )}
+        <div className="mt-2 max-h-[28rem] max-w-xl overflow-y-auto rounded-2xl border border-border bg-bg p-3">
+          <ol className="flex flex-col gap-1">
+            <Row
+              icon={Plug}
+              status={connecting ? 'running' : 'done'}
+              tag="connecting"
+              label={connecting ? 'Connecting to provider' : 'Connected to provider'}
+              ms={connectMs}
+            />
+            {steps.map((s, i) => {
+              const live = running && i === steps.length - 1 && !s.endedAt
+              return s.kind === 'thought' ? (
+                <ReasoningCard key={s.id} text={s.text} live={live} ms={s.startedAt ? (s.endedAt ?? now) - s.startedAt : null} />
+              ) : (
+                <ToolItem key={s.id} step={s} now={now} />
+              )
+            })}
+          </ol>
         </div>
       </CollapsibleContent>
     </Collapsible>

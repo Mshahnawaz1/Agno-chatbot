@@ -6,6 +6,7 @@ import * as api from '@/lib/api'
 import type { FileEntry } from '@/lib/types'
 import { Button, Spinner } from '@/components/ui'
 import { KIND_ICON, KIND_LABEL } from './kinds'
+import { FileThumb } from './FileThumb'
 import { FilePanel } from './FilePanel'
 import { FilePanelContext, useFilePanelState } from './useFilePanel'
 
@@ -27,7 +28,7 @@ function when(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function FileRow({ file, active, onOpen }: { file: FileEntry; active: boolean; onOpen: () => void }) {
+function FileCard({ file, active, onOpen }: { file: FileEntry; active: boolean; onOpen: () => void }) {
   const Icon = KIND_ICON[file.kind]
   return (
     <li>
@@ -36,24 +37,27 @@ function FileRow({ file, active, onOpen }: { file: FileEntry; active: boolean; o
         onClick={onOpen}
         aria-pressed={active}
         className={clsx(
-          'flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors',
-          active ? 'border-border-strong bg-surface-3' : 'border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3',
+          'flex w-full flex-col overflow-hidden rounded-2xl border text-left transition-colors',
+          active ? 'border-border-strong bg-surface-3' : 'border-border bg-surface hover:border-border-strong hover:bg-surface-2',
         )}
       >
-        <Icon className="size-5 shrink-0 text-accent" aria-hidden />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-fg">{file.name}</span>
-          <span className="block truncate text-xs text-fg-subtle">
+        <span className="flex items-center gap-3 border-b border-border px-4 py-3">
+          <Icon className="size-5 shrink-0 text-accent" aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">{file.name}</span>
+        </span>
+        <FileThumb file={file} />
+        <span className="flex items-center justify-between gap-2 border-t border-border px-4 py-2.5 text-xs text-fg-subtle">
+          <span className="truncate">
             {KIND_LABEL[file.kind]} · {size(file.size)} · {when(file.modified)}
           </span>
-        </span>
-        <span
-          className={clsx(
-            'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
-            file.origin === 'uploaded' ? 'bg-accent/15 text-accent' : 'bg-surface-3 text-fg-muted',
-          )}
-        >
-          {file.origin === 'uploaded' ? 'Uploaded' : 'Generated'}
+          <span
+            className={clsx(
+              'shrink-0 rounded-full px-2 py-0.5 font-medium',
+              file.origin === 'uploaded' ? 'bg-accent/15 text-accent' : 'bg-surface-3 text-fg-muted',
+            )}
+          >
+            {file.origin === 'uploaded' ? 'Uploaded' : 'Generated'}
+          </span>
         </span>
       </button>
     </li>
@@ -109,9 +113,9 @@ function FilesView() {
           onDragLeave={(e) => e.currentTarget === e.target && setDragging(false)}
           onDrop={onDrop}
         >
-          <div className="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col px-4 pb-6">
-            <div className="flex flex-wrap items-center gap-3 pb-4">
-              <div role="tablist" aria-label="Filter files" className="flex gap-1 rounded-full bg-surface-2 p-1">
+          <div className="mx-auto flex w-full max-w-6xl min-h-0 flex-1 flex-col px-4 pb-6">
+            <div className="flex flex-wrap items-center gap-3 pb-5 pt-2">
+              <div role="tablist" aria-label="Filter files" className="flex gap-1">
                 {FILTERS.map((f) => (
                   <button
                     key={f.id}
@@ -119,8 +123,8 @@ function FilesView() {
                     aria-selected={filter === f.id}
                     onClick={() => setFilter(f.id)}
                     className={clsx(
-                      'rounded-full px-3 py-1 text-sm transition-colors',
-                      filter === f.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:text-fg',
+                      'rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                      filter === f.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface hover:text-fg',
                     )}
                   >
                     {f.label}
@@ -175,9 +179,9 @@ function FilesView() {
                   </p>
                 </div>
               ) : (
-                <ul className="flex flex-col gap-2">
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
                   {visible.map((f) => (
-                    <FileRow key={f.path} file={f} active={panel.path === f.path} onOpen={() => panel.open(f.path)} />
+                    <FileCard key={f.path} file={f} active={panel.path === f.path} onOpen={() => panel.open(f.path)} />
                   ))}
                 </ul>
               )}

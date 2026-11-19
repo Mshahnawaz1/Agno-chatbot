@@ -2,6 +2,23 @@
 
 Short notes on how each change was built, newest first.
 
+## 2026-11-19: Artifacts page restyle and file previews
+Card grid like the Library reference; each card shows the first page of its file.
+The connectors page got a plugin-style list with company logos (`public/connectors/`).
+
+How the preview works (`frontend/src/features/files/FileThumb.tsx`)
+- **Client side, no thumbnail image.** The real file is rendered at 800x1000, scaled down with a CSS
+  transform to the card width, and clipped by the card, so only the top (page one) shows.
+- **Per kind**: md/html: `/files/preview` HTML in a sandboxed iframe (md wrapped by `pageDoc.ts`);
+  pdf: blob in an iframe with `#page=1&toolbar=0`; docx/xlsx/csv/pptx: `OfficeView`, scaled.
+- **Cost control**: a card loads only when it scrolls near view (IntersectionObserver); the preview
+  is `inert`; the kind's icon shows until it paints or if it fails.
+
+TODO: change to thumbnail based. Every visible card runs a full viewer (heaviest for Office files,
+2 requests per card, nothing cached across visits), and Office previews may show viewer chrome.
+Instead render page 1 to a small PNG on the server when a file is saved (e.g. LibreOffice / a PDF
+renderer, stored next to the version blobs), serve it from an endpoint, and make the card an `<img>`.
+
 ## 2026-11-19: File version history
 Branch `feat/file-versions`. Every change to a workspace file, by the user or the agent, is kept
 as a version that can be listed and restored. Details: [file-versions.md](file-versions.md).

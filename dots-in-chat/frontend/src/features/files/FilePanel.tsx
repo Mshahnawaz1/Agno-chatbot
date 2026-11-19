@@ -129,7 +129,7 @@ function PanelBody({ path }: { path: string }) {
   if (q.data.kind === 'docx' || q.data.kind === 'xlsx' || q.data.kind === 'pptx') {
     return (
       <Suspense fallback={<div className="flex h-full items-center justify-center gap-2 text-sm text-fg-muted"><Spinner label="Loading viewer" /> Loading viewer…</div>}>
-        <OfficeView key={`${file}:${q.data.version}`} path={file} version={q.data.version} />
+        <OfficeView key={`${file}:${q.data.version}`} path={file} />
       </Suspense>
     )
   }

@@ -103,6 +103,10 @@ def build() -> dict[str, str]:
         files[f"ui-blocks/references/block-{path.stem}.md"] = (
             f"# {', '.join(names)} (chat block)\n\n{body}\n\n{doc['guide']}\n")
 
+    # Row data from a file or tool result is charted by DataChart; ui-display carries its signature
+    # too, because that is where a chart request lands first.
+    files["ui-display/references/block-datachart.md"] = files["ui-blocks/references/block-datachart.md"]
+
     return {p: HEAD + t for p, t in files.items()}
 
 

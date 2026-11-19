@@ -44,6 +44,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
   const hadTurnsRef = useRef(false)
   /** Writes the run's buffered tokens into the state now (tokens are batched per frame). */
   const flushRef = useRef<(() => void) | null>(null)
+  const sendRef = useRef<((input: TurnInput | null, attachTo?: string) => Promise<void>) | null>(null)
 
   const abortActive = useCallback(() => {
     activeRunRef.current = null
@@ -64,6 +65,8 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       hadTurnsRef.current = false
       sessionIdRef.current = sessionId
       dispatch({ type: 'reset', sessionId })
+      // A reply still running on the server for that chat: replay it and follow it live.
+      if (sessionId) void sendRef.current?.(null, sessionId)
     },
     [abortActive, queryClient],
   )
@@ -86,12 +89,15 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
     if (runId === null) return
     const assistantId = `a${runId}`
     flushRef.current?.()
+    // Aborting only drops our connection; the run itself is stopped on the server.
+    if (sessionIdRef.current) void api.cancelChat(sessionIdRef.current).catch(() => {})
     abortActive()
     dispatch({ type: 'finish', runId, assistantId, status: 'stopped' })
   }, [abortActive])
 
   const send = useCallback(
-    async (input: TurnInput) => {
+    // input null + attachTo: re-attach to the reply running in that chat (no new message).
+    async (input: TurnInput | null, attachTo?: string) => {
       if (activeRunRef.current !== null) return
       const runId = ++runCounter.current
       const assistantId = `a${runId}`
@@ -102,8 +108,9 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       hadTurnsRef.current = true
       const isActive = () => activeRunRef.current === runId
       let sessionId = sessionIdRef.current
-
-      dispatch({ type: 'start', runId, userId, assistantId, input })
+      const attaching = input === null
+      // Attaching: the turn is shown once the server's replay says what was sent.
+      if (input) dispatch({ type: 'start', runId, userId, assistantId, input })
 
       // Batch tokens into one state update per animation frame. Each update re-parses the whole
       // reply's markdown, so per-chunk updates made long replies cost O(n^2) to render.
@@ -134,11 +141,23 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       let gotDone = false
       let failed = false
       try {
-        const res = await api.openChatStream(
-          'text' in input ? { message: input.text, attachments: input.attachments } : { action: input.action },
-          sessionId,
-          controller.signal,
-        )
+        const res = attaching
+          ? await api.attachChatStream(attachTo!, controller.signal)
+          : await api.openChatStream(
+              'text' in input ? { message: input.text, attachments: input.attachments } : { action: input.action },
+              sessionId,
+              controller.signal,
+            )
+        if (attaching && res.status === 204) {
+          // Nothing running. If it finished since the history was fetched, refetch it.
+          if (isActive()) {
+            activeRunRef.current = null
+            controllerRef.current = null
+            hadTurnsRef.current = false
+          }
+          void queryClient.invalidateQueries({ queryKey: ['messages', attachTo] })
+          return
+        }
         for await (const { event, data } of readSseEvents(res)) {
           if (!isActive()) break
           const d = (data ?? {}) as Record<string, unknown>
@@ -156,6 +175,17 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
                 navigate(`/c/${encodeURIComponent(id)}`, { replace: true })
                 void queryClient.invalidateQueries({ queryKey: ['sessions'] })
               }
+              break
+            }
+            case 'user': {
+              if (!attaching) break
+              const action = d.action as { action: unknown } | null
+              const text = typeof d.text === 'string' ? d.text : ''
+              const attachments = Array.isArray(d.attachments) ? (d.attachments as string[]) : []
+              dispatch({
+                type: 'start', runId, userId, assistantId,
+                input: action ? { action: action as never } : { text, attachments },
+              })
               break
             }
             case 'reasoning':
@@ -264,6 +294,15 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
     },
     [navigate, queryClient],
   )
+
+  useEffect(() => {
+    sendRef.current = send
+  }, [send])
+
+  // Opening /c/:id directly (reload, link): follow a reply still running there.
+  useEffect(() => {
+    if (sessionIdRef.current) void sendRef.current?.(null, sessionIdRef.current)
+  }, [])
 
   const newChat = useCallback(() => {
     reset(null)

@@ -5,9 +5,9 @@ from collections.abc import AsyncIterator
 
 from agno.agent import RunEvent
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
-from app import db
+from app import db, live_runs
 from app.a2ui.actions import InvalidAction, action_prompt, read_action
 from app.a2ui.turn import A2uiTurn
 from app.agent import agent
@@ -235,6 +235,8 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
     logger.debug("chat stream: session=%s user=%s new_session=%s message=%s action=%s",
                  session["id"], user["id"], not body.session_id, _clip(body.message or "", 2000),
                  bool(body.action))
+    if live_runs.get(session["id"]) is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This chat is already running")
     turn = A2uiTurn(session["id"])
     # New chat typed by the user: name it from the message's meaning, in parallel with the reply.
     # make_title's first-words title (set by resolve_session) stays if this fails or is slow.
@@ -255,6 +257,8 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
         # run_id is the reply's run: the repair run's parts are stored under it too.
         run: dict = {"run_id": None, "all_ids": [], "tools": [], "metrics": None, "stopped": False}
         yield sse("session", {"session_id": session["id"]})
+        # What was sent, so a client that attaches later can show the turn it replays.
+        yield sse("user", {"text": body.message, "attachments": attached, "action": body.action})
         try:
             model_input, repair = prompt, False
             for attempt in range(REPAIR_ATTEMPTS + 1):
@@ -292,8 +296,34 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
                 logger.exception("could not stub skill loads in history")
             db.touch_chat_session(session["id"])
 
+    return follow_response(live_runs.start(session["id"], event_stream))
+
+
+def follow_response(run: live_runs.LiveRun) -> StreamingResponse:
+    # The run lives in a background task: a client that disconnects only stops reading.
     return StreamingResponse(
-        event_stream(),
+        run.follow(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}, #-Accel- Buffering=yes allows middlewares to store the data and send all at the same time. 
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def own_session(session_id: str, user: dict) -> None:
+    if db.get_chat_session(session_id, user["id"]) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+
+
+@router.get("/{session_id}/stream")
+async def attach_stream(session_id: str, user: CurrentUser):
+    """Replays a still-running reply from its start and follows it; 204 when none is running."""
+    own_session(session_id, user)
+    run = live_runs.get(session_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT) if run is None else follow_response(run)
+
+
+@router.post("/{session_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_run(session_id: str, user: CurrentUser):
+    own_session(session_id, user)
+    run = live_runs.get(session_id)
+    if run is not None:
+        run.cancel()

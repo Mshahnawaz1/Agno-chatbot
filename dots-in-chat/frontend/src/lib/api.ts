@@ -143,6 +143,14 @@ export function openChatStream(
   })
 }
 
+/** Re-attaches to a reply still running on the server (replayed from its start); 204 if none. */
+export const attachChatStream = (sessionId: string, signal?: AbortSignal) =>
+  rawRequest(`/chat/${encodeURIComponent(sessionId)}/stream`, { method: 'GET', signal })
+
+/** Stops the session's running reply on the server. */
+export const cancelChat = (sessionId: string) =>
+  request<void>(`/chat/${encodeURIComponent(sessionId)}/cancel`, { method: 'POST' })
+
 // ---- files ----
 
 export const listFiles = () => request<FileEntry[]>('/files')

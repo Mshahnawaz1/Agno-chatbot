@@ -1,7 +1,9 @@
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-load_dotenv()  # os.getenv fallbacks elsewhere (GEMINI_API_KEY, GROQ_API_KEY) read the same .env
+# override=True: .env wins over keys exported in the shell (a stale shell GEMINI_API_KEY gave 401s).
+# Also feeds os.getenv fallbacks elsewhere (GEMINI_API_KEY, GROQ_API_KEY).
+load_dotenv(override=True)
 
 
 class Settings(BaseSettings):
@@ -12,12 +14,6 @@ class Settings(BaseSettings):
     agent_workspace_dir: str = "data/workspace"
     tool_cache_ttl: int = 3600 #seconds
     tool_cache_dir: str = "data/tools"
-
-    # OpenRouter: when true it is the only LLM (no fallback); otherwise Gemini/Groq below.
-    user_openrouter: bool = True
-    openrouter_api_key: str = ""
-    openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_model: str = ""
 
     # LLMs: one provider answers, the other is the fallback (rate limit, overflow,
     # 5xx). No GEMINI_API_KEY = Groq only.

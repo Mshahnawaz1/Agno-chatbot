@@ -17,19 +17,10 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL")
-
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 CHROMA_DB = "data/chromadb"
 PDF1 = "data/jd.pdf"
 PDF2 = "data/mp.pdf"
-
-# embedder = OpenAIEmbedder(
-#     id=EMBEDDING_MODEL, #model name can be str, working
-#     api_key=OPENROUTER_API_KEY,
-#     base_url=OPENROUTER_BASE_URL,
-# )
 
 # 2. Vector DB: Persistent ChromaDB instance
 vector_db = ChromaDb(

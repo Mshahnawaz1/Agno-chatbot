@@ -43,3 +43,17 @@ How it is implemented
 - **UI**: a History button in the file preview header (`frontend/src/features/files/VersionHistory.tsx`)
   lists versions with author, time and size, and restores one.
 - **Tests**: `tests/test_versions.py`; `tests/test_files.py` now sets up a DB and users.
+
+## 2026-11-19: Fixing black screen
+The UI goes dark when I search the artifacts using @ and press the down button. It loads back to the original when I refresh the page.
+
+Fixed the black screen and committed it as 3d12804. I reproduced the crash in a real browser (Playwright, API mocked) and confirmed the fix there.
+
+Cause
+- The @ menu had a line that scrolled the highlighted row into view: useEffect(() => activeEl.current?.scrollIntoView(...)).
+- That arrow function returned whatever scrollIntoView returned, and in this Chromium that is a Promise. React treats an effect's return value as its clean-up function, so the next ArrowDown threw destroy is not a function.
+- React then unmounted the whole app, which looked like a black screen. A refresh restored it because the page state was rebuilt from scratch.
+
+Fix
+- The menu now scrolls its own list element directly (MentionMenu.tsx), with no return value.
+- This also removes a second risk: scrollIntoView can scroll the page's overflow-hidden ancestors and push the chat window out of view.

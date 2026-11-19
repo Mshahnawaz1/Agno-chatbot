@@ -135,7 +135,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       let failed = false
       try {
         const res = await api.openChatStream(
-          'text' in input ? { message: input.text } : { action: input.action },
+          'text' in input ? { message: input.text, attachments: input.attachments } : { action: input.action },
           sessionId,
           controller.signal,
         )
@@ -280,7 +280,7 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       turns: state.turns,
       streaming,
       newChatCount,
-      send: (text) => void send({ text }),
+      send: (text, attachments) => void send({ text, attachments }),
       sendAction,
       stop,
       newChat,

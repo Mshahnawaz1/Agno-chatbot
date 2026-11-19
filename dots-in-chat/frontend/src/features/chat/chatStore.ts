@@ -20,6 +20,8 @@ export type Turn = {
   startedAt: number | null
   /** How long the agent worked before answering; null while working or when unknown (history). */
   workMs: number | null
+  /** User turns: workspace paths of the files attached to the message. */
+  attachments: string[]
   /** User turns started by a click on a surface. */
   action?: UiAction
   /** Assistant turns: workspace files the agent created, updated or deleted. */
@@ -58,7 +60,7 @@ export type StreamAction =
   | { type: 'finish'; runId: number; assistantId: string; status: Exclude<TurnStatus, 'streaming'> }
 
 /** What a turn sends: typed text, or a click on a surface. */
-export type TurnInput = { text: string } | { action: ActionMessage }
+export type TurnInput = { text: string; attachments?: string[] } | { action: ActionMessage }
 
 export const initialStreamState = (sessionId: string | null): StreamState => ({
   sessionId,
@@ -96,10 +98,10 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       turns: [
         ...state.turns,
         {
-          id: action.userId, role: 'user', parts: [], files: [], steps: [], startedAt: null, workMs: null, metrics: null, error: null, errorKind: null, status: 'done',
+          id: action.userId, role: 'user', attachments: 'text' in action.input ? (action.input.attachments ?? []) : [], parts: [], files: [], steps: [], startedAt: null, workMs: null, metrics: null, error: null, errorKind: null, status: 'done',
           ...('text' in action.input ? { content: action.input.text } : { content: '', action: action.input.action.action }),
         },
-        { id: action.assistantId, role: 'assistant', content: '', parts: [], files: [], steps: [], startedAt: Date.now(), workMs: null, metrics: null, error: null, errorKind: null, status: 'streaming' },
+        { id: action.assistantId, role: 'assistant', content: '', attachments: [], parts: [], files: [], steps: [], startedAt: Date.now(), workMs: null, metrics: null, error: null, errorKind: null, status: 'streaming' },
       ],
     }
   }
@@ -165,7 +167,7 @@ export type ChatStreamValue = {
   streaming: boolean
   /** Bumps on every "New chat" so the page can refocus the composer even when already on "/". */
   newChatCount: number
-  send: (text: string) => void
+  send: (text: string, attachments?: string[]) => void
   /** A click on an A2UI surface: sent to the agent as the next turn. */
   sendAction: (action: UiAction) => void
   stop: () => void

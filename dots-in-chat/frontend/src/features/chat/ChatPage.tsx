@@ -17,6 +17,7 @@ import { filesFromTools } from '@/features/files/fileRefs'
 import { FilePanelContext, useFilePanelState } from '@/features/files/useFilePanel'
 import type { FileRef } from '@/lib/types'
 import { Composer } from './Composer'
+import { useAttachments } from './attachments'
 import { MessageList, type MessageListHandle } from './MessageList'
 
 const SUGGESTIONS = [
@@ -90,6 +91,7 @@ export function ChatPage() {
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<MessageListHandle>(null)
   const panel = useFilePanelState()
+  const files = useAttachments()
 
   const history = useQuery({
     queryKey: ['messages', routeId],
@@ -112,6 +114,7 @@ export function ChatPage() {
         content: m.role === 'assistant' ? parts.flatMap((p) => (p.kind === 'text' ? [p.text] : [])).join('\n\n') : (m.content ?? ''),
         parts,
         files: m.role === 'assistant' ? filesFromTools(m.metrics?.tools) : [],
+        attachments: m.attachments ?? [],
         steps: m.role === 'assistant' ? stepsFromHistory(m.reasoning, m.metrics?.tools) : [],
         startedAt: null,
         workMs: null,
@@ -150,11 +153,14 @@ export function ChatPage() {
   }, [routeId, stream.newChatCount])
 
   function send() {
-    const text = draft.trim()
-    if (!text || stream.streaming || loadingHistory) return
+    // Files alone are a message too.
+    const text = draft.trim() || (files.attached.length ? 'Please look at the attached file(s).' : '')
+    if (!text || stream.streaming || loadingHistory || files.uploading) return
+    const paths = files.attached.map((a) => a.path)
     setDraft('')
+    files.clear()
     listRef.current?.scrollToBottom()
-    stream.send(text)
+    stream.send(text, paths)
   }
 
   function pickSuggestion(text: string) {
@@ -219,6 +225,12 @@ export function ChatPage() {
           onStop={stream.stop}
           streaming={stream.streaming}
           canSend={!loadingHistory && !(routeId && history.isError)}
+          attached={files.attached}
+          uploading={files.uploading}
+          attachError={files.error}
+          onUpload={(list) => void files.upload(list)}
+          onPick={(f) => (files.attached.some((a) => a.path === f.path) ? files.remove(f.path) : files.add([f]))}
+          onRemove={files.remove}
         />
         {isEmpty ? (
           <ul className="mt-4 flex flex-wrap justify-center gap-2" aria-label="Suggestions">

@@ -132,7 +132,7 @@ export const getConnectorSkill = (id: string) => request<Skill>(`/connectors/${e
 
 /** Opens the SSE stream; pass the result to readSseEvents. Throws ApiError for non-2xx. */
 export function openChatStream(
-  input: { message: string } | { action: unknown },
+  input: { message: string; attachments?: string[] } | { action: unknown },
   sessionId: string | null,
   signal?: AbortSignal,
 ): Promise<Response> {

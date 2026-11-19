@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 from app import db
 from app.a2ui.actions import parse_action_prompt
 from app.a2ui.store import parts_by_run
+from app.attachments import split_attachments
 from app.deps import CurrentUser
 from app.schemas import SessionCreate, SessionOut, MessageOut
 from app.agent import agent
@@ -60,7 +61,10 @@ async def session_messages(session_id: str, user: CurrentUser):
         text = run.input.input_content_string() if run.input else ""
         if text:
             action = parse_action_prompt(text)
-            out.append(MessageOut(role="user", content="" if action else text, action=action))
+            text, attached = split_attachments(text)
+            out.append(MessageOut(
+                role="user", content="" if action else text, action=action, attachments=attached or None,
+            ))
         turn_parts = parts.get(run.run_id)
         if turn_parts or run.content:
             out.append(MessageOut(

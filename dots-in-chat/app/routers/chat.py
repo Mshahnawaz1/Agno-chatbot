@@ -12,7 +12,10 @@ from app.a2ui.actions import InvalidAction, action_prompt, read_action
 from app.a2ui.turn import A2uiTurn
 from app.agent import agent
 from app.agent.formats import kind_for
+from app.agent.workspace import rel_posix
+from app.attachments import with_attachments
 from app.deps import CurrentUser
+from app.routers.files import resolve as resolve_file
 from app.schemas import ChatRequest, ChatResponse
 from app.agent.skills import stub_skill_loads
 from app.agent.titles import generate_title
@@ -226,6 +229,8 @@ async def model_pass(
 
 @router.post("/stream")
 async def chat_stream(body: ChatRequest, user: CurrentUser):
+    # Attached files must be this user's, existing and allowed: 400/404/415 before a session is made.
+    attached = [rel_posix(user["id"], resolve_file(user, a)) for a in dict.fromkeys(body.attachments)]
     session = resolve_session(body, user)      # 404 is raised here, before streaming
     logger.debug("chat stream: session=%s user=%s new_session=%s message=%s action=%s",
                  session["id"], user["id"], not body.session_id, _clip(body.message or "", 2000),
@@ -244,7 +249,7 @@ async def chat_stream(body: ChatRequest, user: CurrentUser):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid action: {e}")
         prompt = action_prompt(action, turn.surface_ids)
     else:
-        prompt = body.message
+        prompt = with_attachments(body.message, attached)
 
     async def event_stream() -> AsyncIterator[str]:
         # run_id is the reply's run: the repair run's parts are stored under it too.

@@ -52,11 +52,15 @@ class ChatRequest(BaseModel):
     message: str | None = Field(default=None, min_length=1, max_length=4000)  # rejects empty / huge input
     action: dict[str, Any] | None = None
     session_id: str | None = None
+    # Workspace paths of files the user attached to a typed message (uploads or earlier artifacts).
+    attachments: list[str] = Field(default_factory=list, max_length=10)
 
     @model_validator(mode="after")
     def one_input(self):
         if (self.message is None) == (self.action is None):
             raise ValueError("Send either a message or an action.")
+        if self.attachments and self.message is None:
+            raise ValueError("Attachments go with a typed message.")
         return self
 
 
@@ -70,6 +74,8 @@ class MessageOut(BaseModel):
     reasoning: str | None = None
     # User turns started by a click: the action that was sent.
     action: dict[str, Any] | None = None
+    # User turns: workspace paths of the files attached to the message.
+    attachments: list[str] | None = None
 
 class Token(BaseModel):
     access_token: str

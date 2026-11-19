@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import { Logo } from '@/components/ui'
 import { Markdown } from '@/components/Markdown'
 import { Activity } from './Activity'
+import { AttachmentChip } from './Attach'
 import type { Turn } from './chatStore'
 import { FileChip } from '@/features/files/FileChip'
 import { MetricsPanel } from './MetricsPanel'
@@ -122,7 +123,16 @@ function UserMessage({ turn }: { turn: Turn }) {
   const said = turn.action?.name === 'say' ? turn.action.context?.text : undefined
   if (turn.action && typeof said !== 'string') return <ActionMessage action={turn.action} />
   return (
-    <div className="flex justify-end">
+    <div className="flex flex-col items-end gap-2">
+      {turn.attachments.length ? (
+        <ul aria-label="Attached files" className="flex max-w-[80%] flex-wrap justify-end gap-2">
+          {turn.attachments.map((p) => (
+            <li key={p} className="min-w-0 max-w-full">
+              <AttachmentChip file={{ path: p }} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <div className="max-w-[80%] whitespace-pre-wrap rounded-xl bg-surface-2 px-4 py-2.5 leading-7 text-fg wrap-anywhere">
         {typeof said === 'string' ? said : turn.content}
       </div>

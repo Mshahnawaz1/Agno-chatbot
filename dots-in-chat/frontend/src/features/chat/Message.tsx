@@ -1,18 +1,9 @@
 import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { Brain, Check, CircleAlert, Copy, Info, MousePointerClick, ShieldAlert } from 'lucide-react'
+import { Check, CircleAlert, Copy, Info, MousePointerClick, ShieldAlert } from 'lucide-react'
 import clsx from 'clsx'
 import { Logo } from '@/components/ui'
 import { Markdown } from '@/components/Markdown'
-import {
-  Trace,
-  TraceCollapsible,
-  TraceCollapsibleContent,
-  TraceCollapsibleTrigger,
-  TraceDescription,
-  TraceIcon,
-  TraceLine,
-  TraceTitle,
-} from '@/components/shadcn/trace'
+import { Activity } from './Activity'
 import type { Turn } from './chatStore'
 import { FileChip } from '@/features/files/FileChip'
 import { MetricsPanel } from './MetricsPanel'
@@ -126,38 +117,6 @@ function ReplyBody({ parts, streaming }: { parts: Part[]; streaming: boolean }) 
   })
 }
 
-function formatThinkTime(ms: number): string {
-  const s = Math.max(1, Math.round(ms / 1000))
-  return s < 60 ? `for ${s}s` : `for ${Math.floor(s / 60)}m ${s % 60}s`
-}
-
-/**
- * The model's thoughts, as shadcn's Reasoning pattern (a Trace row that collapses):
- * open while the model is thinking, closed once the answer starts. A click wins over both.
- * https://ui.shadcn.com/docs/ai-elements/aria/reasoning
- */
-function Reasoning({ text, running, ms }: { text: string; running: boolean; ms: number | null }) {
-  const [open, setOpen] = useState<boolean | undefined>(undefined)
-  return (
-    <Trace className="mb-3">
-      <TraceCollapsible open={open ?? running} onOpenChange={setOpen}>
-        <TraceCollapsibleTrigger>
-          <TraceLine status={running ? 'running' : undefined}>
-            <TraceIcon>
-              <Brain />
-            </TraceIcon>
-            <TraceTitle>{running ? 'Thinking' : 'Thought'}</TraceTitle>
-            {!running && ms !== null ? <TraceDescription>{formatThinkTime(ms)}</TraceDescription> : null}
-          </TraceLine>
-        </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent className="max-h-80 overflow-y-auto text-sm">
-          <Markdown className="text-sm text-fg-muted">{text}</Markdown>
-        </TraceCollapsibleContent>
-      </TraceCollapsible>
-    </Trace>
-  )
-}
-
 function UserMessage({ turn }: { turn: Turn }) {
   // A tapped suggestion reads as what the user said.
   const said = turn.action?.name === 'say' ? turn.action.context?.text : undefined
@@ -179,10 +138,11 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
   useEffect(() => () => clearTimeout(timer.current), [])
 
   const streaming = turn.status === 'streaming'
-  const hasReasoning = turn.reasoning.trim() !== ''
-  const thinking = streaming && turn.parts.length === 0 && !hasReasoning
-  // Thinking until the answer starts (the provider then records reasoningMs) or the turn ends.
-  const reasoningRunning = streaming && turn.reasoningMs === null && turn.parts.length === 0
+  const hasSteps = turn.steps.length > 0
+  const thinking = streaming && turn.parts.length === 0 && !hasSteps
+  // Working until the answer starts (the provider then records workMs), or while a tool still runs.
+  const working =
+    streaming && (turn.workMs === null || turn.steps.some((s) => s.kind === 'tool' && s.status === 'running'))
   const finished = !streaming
   const hasActions = finished && (turn.content.trim() !== '' || turn.metrics != null)
 
@@ -201,7 +161,7 @@ function AssistantMessage({ turn, isLast }: { turn: Turn; isLast: boolean }) {
     <div className="group flex gap-3 sm:gap-4">
       <Logo size={24} className="mt-0.5 shrink-0 self-start" />
       <div className="min-w-0 flex-1" aria-live={streaming ? 'polite' : undefined} aria-busy={streaming || undefined}>
-        {hasReasoning ? <Reasoning text={turn.reasoning} running={reasoningRunning} ms={turn.reasoningMs} /> : null}
+        {hasSteps ? <Activity steps={turn.steps} running={working} startedAt={turn.startedAt} workMs={turn.workMs} /> : null}
         {thinking ? (
           <p className="shimmer leading-7">Thinking…</p>
         ) : (

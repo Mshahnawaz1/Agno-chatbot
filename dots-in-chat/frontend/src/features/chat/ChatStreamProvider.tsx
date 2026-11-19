@@ -110,13 +110,13 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
       let pending = ''
       let pendingReasoning = ''
       let frame = 0
-      // Thinking time: first reasoning chunk -> first piece of the answer (or the end).
-      let reasoningStart: number | null = null
-      let reasoningDone = false
+      // Working time: send -> first piece of the answer (or the end).
+      const workStart = performance.now()
+      let workDone = false
       const endReasoning = () => {
-        if (reasoningStart === null || reasoningDone) return
-        reasoningDone = true
-        dispatch({ type: 'reasoningDone', runId, assistantId, ms: performance.now() - reasoningStart })
+        if (workDone) return
+        workDone = true
+        dispatch({ type: 'workDone', runId, assistantId, ms: performance.now() - workStart })
       }
       const flush = () => {
         if (frame) cancelAnimationFrame(frame)
@@ -160,9 +160,23 @@ export function ChatStreamProvider({ children }: { children: ReactNode }) {
             }
             case 'reasoning':
               if (typeof d.content === 'string' && d.content) {
-                reasoningStart ??= performance.now()
                 pendingReasoning += d.content
                 if (!frame) frame = requestAnimationFrame(flush)
+              }
+              break
+            case 'tool_start':
+              if (typeof d.id === 'string' && typeof d.name === 'string') {
+                flush()
+                const args = d.args && typeof d.args === 'object' ? (d.args as Record<string, unknown>) : {}
+                dispatch({ type: 'toolStart', runId, assistantId, id: d.id, name: d.name, args })
+              }
+              break
+            case 'tool_end':
+              if (typeof d.id === 'string') {
+                dispatch({
+                  type: 'toolEnd', runId, assistantId, id: d.id,
+                  error: d.error === true, result: typeof d.result === 'string' ? d.result : '',
+                })
               }
               break
             case 'token':

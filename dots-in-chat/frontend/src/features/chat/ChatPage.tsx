@@ -12,6 +12,7 @@ import { useChatStream, type Turn } from './chatStore'
 import { SurfaceFeedContext, type SurfaceFeed } from './a2ui/feed'
 import { legacyParts, type A2uiMessage, type Part } from './a2ui/protocol'
 import { FilePanel } from '@/features/files/FilePanel'
+import { stepsFromHistory } from './activity'
 import { filesFromTools } from '@/features/files/fileRefs'
 import { FilePanelContext, useFilePanelState } from '@/features/files/useFilePanel'
 import type { FileRef } from '@/lib/types'
@@ -111,8 +112,9 @@ export function ChatPage() {
         content: m.role === 'assistant' ? parts.flatMap((p) => (p.kind === 'text' ? [p.text] : [])).join('\n\n') : (m.content ?? ''),
         parts,
         files: m.role === 'assistant' ? filesFromTools(m.metrics?.tools) : [],
-        reasoning: m.reasoning ?? '',
-        reasoningMs: null,
+        steps: m.role === 'assistant' ? stepsFromHistory(m.reasoning, m.metrics?.tools) : [],
+        startedAt: null,
+        workMs: null,
         action: m.action ?? undefined,
         metrics: m.metrics ?? null,
         error: null,

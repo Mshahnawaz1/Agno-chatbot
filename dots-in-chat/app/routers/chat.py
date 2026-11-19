@@ -196,9 +196,19 @@ async def model_pass(
                     yield sse(name, data)
         elif event.event == RunEvent.tool_call_started:
             logger.debug("tool call started: %s args=%s", event.tool.tool_name, _clip(event.tool.tool_args))
+            if not repair:
+                yield sse("tool_start", {
+                    "id": event.tool.tool_call_id, "name": event.tool.tool_name,
+                    "args": event.tool.tool_args or {},
+                })
         elif event.event == RunEvent.tool_call_completed:
             logger.debug("tool call completed: %s result=%s", event.tool.tool_name, _clip(event.tool.result))
             run["tools"].append(event.tool)
+            if not repair:
+                yield sse("tool_end", {
+                    "id": event.tool.tool_call_id, "error": bool(event.tool.tool_call_error),
+                    "result": _clip(event.tool.result, 1200),
+                })
             for payload in file_events(event.tool, run.setdefault("seen_files", set())):
                 yield sse("file", payload)
         elif event.event == RunEvent.run_completed:

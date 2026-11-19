@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { FileRef, Metrics } from '@/lib/types'
+import type { Step } from './activity'
 import type { A2uiMessage, ActionMessage, Part, UiAction } from './a2ui/protocol'
 
 export type TurnStatus = 'streaming' | 'done' | 'stopped' | 'error'
@@ -13,10 +14,12 @@ export type Turn = {
   content: string
   /** Assistant turns: text and A2UI messages in the order they arrived. */
   parts: Part[]
-  /** Assistant turns: the model's thoughts, streamed before (and between) its answer. */
-  reasoning: string
-  /** How long the model thought before answering; null while thinking or when unknown (history). */
-  reasoningMs: number | null
+  /** Assistant turns: what the agent did before (and between) its answer: thoughts and tool calls. */
+  steps: Step[]
+  /** When the run started (ms since epoch); null for stored history. */
+  startedAt: number | null
+  /** How long the agent worked before answering; null while working or when unknown (history). */
+  workMs: number | null
   /** User turns started by a click on a surface. */
   action?: UiAction
   /** Assistant turns: workspace files the agent created, updated or deleted. */
@@ -45,7 +48,9 @@ export type StreamAction =
   | { type: 'session'; runId: number; sessionId: string }
   | { type: 'token'; runId: number; assistantId: string; content: string }
   | { type: 'reasoning'; runId: number; assistantId: string; content: string }
-  | { type: 'reasoningDone'; runId: number; assistantId: string; ms: number }
+  | { type: 'toolStart'; runId: number; assistantId: string; id: string; name: string; args: Record<string, unknown> }
+  | { type: 'toolEnd'; runId: number; assistantId: string; id: string; error: boolean; result: string }
+  | { type: 'workDone'; runId: number; assistantId: string; ms: number }
   | { type: 'a2ui'; runId: number; assistantId: string; message: A2uiMessage }
   | { type: 'file'; runId: number; assistantId: string; file: FileRef }
   | { type: 'metrics'; runId: number; assistantId: string; metrics: Metrics }
@@ -91,10 +96,10 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       turns: [
         ...state.turns,
         {
-          id: action.userId, role: 'user', parts: [], files: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'done',
+          id: action.userId, role: 'user', parts: [], files: [], steps: [], startedAt: null, workMs: null, metrics: null, error: null, errorKind: null, status: 'done',
           ...('text' in action.input ? { content: action.input.text } : { content: '', action: action.input.action.action }),
         },
-        { id: action.assistantId, role: 'assistant', content: '', parts: [], files: [], reasoning: '', reasoningMs: null, metrics: null, error: null, errorKind: null, status: 'streaming' },
+        { id: action.assistantId, role: 'assistant', content: '', parts: [], files: [], steps: [], startedAt: Date.now(), workMs: null, metrics: null, error: null, errorKind: null, status: 'streaming' },
       ],
     }
   }
@@ -111,9 +116,28 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
         parts: appendText(t.parts, action.content),
       }))
     case 'reasoning':
-      return updateTurn(state, action.assistantId, (t) => ({ reasoning: t.reasoning + action.content }))
-    case 'reasoningDone':
-      return updateTurn(state, action.assistantId, (t) => (t.reasoningMs === null ? { reasoningMs: action.ms } : {}))
+      return updateTurn(state, action.assistantId, (t) => {
+        // Thoughts stream in pieces; a thought after a tool call starts a new step.
+        const last = t.steps.at(-1)
+        if (last?.kind === 'thought') {
+          return { steps: [...t.steps.slice(0, -1), { ...last, text: last.text + action.content }] }
+        }
+        return { steps: [...t.steps, { kind: 'thought', id: `t${t.steps.length}`, text: action.content }] }
+      })
+    case 'toolStart':
+      return updateTurn(state, action.assistantId, (t) => ({
+        steps: [...t.steps, { kind: 'tool', id: action.id, name: action.name, args: action.args, status: 'running' }],
+      }))
+    case 'toolEnd':
+      return updateTurn(state, action.assistantId, (t) => ({
+        steps: t.steps.map((st) =>
+          st.kind === 'tool' && st.id === action.id
+            ? { ...st, status: action.error ? 'error' : 'done', result: action.result }
+            : st,
+        ),
+      }))
+    case 'workDone':
+      return updateTurn(state, action.assistantId, (t) => (t.workMs === null ? { workMs: action.ms } : {}))
     case 'a2ui':
       return updateTurn(state, action.assistantId, (t) => ({
         parts: [...t.parts, { kind: 'a2ui', message: action.message }],
@@ -127,6 +151,8 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
     case 'finish': {
       const next = updateTurn(state, action.assistantId, (t) => ({
         status: t.error ? 'error' : action.status,
+        // A stopped or failed run leaves no tool spinning.
+        steps: t.steps.map((st) => (st.kind === 'tool' && st.status === 'running' ? { ...st, status: 'error' as const } : st)),
       }))
       return { ...next, activeRun: null }
     }

@@ -203,3 +203,35 @@
     color: var(--color-fg-muted);
   }
 }
+
+/* Agent activity: rows slide in as steps arrive; the four dots pulse in turn while working. */
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility step-in {
+  animation: step-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility dot-pulse {
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}

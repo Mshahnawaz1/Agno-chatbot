@@ -1,0 +1,87 @@
+{
+  "name": "@p10node/office-engine",
+  "version": "0.16.0",
+  "description": "Browser engine to view DOCX, XLSX, PPTX progressively (worker-based, range-loading, virtualized React views)",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/types/core/index.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./embed": {
+      "types": "./dist/types/embed.d.ts",
+      "import": "./dist/embed.js"
+    },
+    "./worker": "./dist/office-engine.worker.js",
+    "./embed.js": "./dist/office-engine.embed.js",
+    "./collab": {
+      "types": "./dist/types/collab/index.d.ts",
+      "import": "./dist/collab.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "sideEffects": [
+    "./src/core/default-worker.ts",
+    "./src/embed.ts",
+    "./dist/index.js",
+    "./dist/core.js",
+    "./dist/embed.js",
+    "./dist/office-engine.embed.js",
+    "**/*.css"
+  ],
+  "scripts": {
+    "dev": "vite --config vite.playground.config.ts",
+    "build": "bun run clean && bun run build:lib && bun run build:embed && bun run build:worker && bun run build:types && bun run build:css",
+    "build:css": "cp src/react/styles.css dist/styles.css",
+    "build:lib": "vite build",
+    "build:embed": "vite build --config vite.embed.config.ts",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:playground": "vite build --config vite.playground.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:e2e": "bun test ./e2e --timeout 90000",
+    "fixtures": "bun scripts/gen-fixtures.ts",
+    "build:worker": "vite build --config vite.worker.config.ts",
+    "collab": "bun scripts/collab-server.ts",
+    "clean": "rm -rf dist",
+    "screenshots": "bun scripts/screenshots.ts",
+    "gifs": "bun scripts/gifs.ts",
+    "build:site": "bun scripts/build-site.ts",
+    "build:packages": "bun scripts/build-packages.ts"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "fflate": "^0.8.3",
+    "playwright-core": "^1.64.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://p10node.github.io/office-engine/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/p10node/office-engine.git"
+  }
+}

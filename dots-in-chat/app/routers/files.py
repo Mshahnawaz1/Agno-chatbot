@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.agent.doc_edit import rewrite_excerpt
 from app.agent.formats import adapter_for, md_twin
-from app.agent.workspace import MAX_MD_BYTES, PathEscape, safe_path, workspace_for
+from app.agent.workspace import MAX_MD_BYTES, PathEscape, rel_posix, safe_path, workspace_for
 from app.deps import CurrentUser
 
 logger = logging.getLogger(__name__)
@@ -118,6 +118,9 @@ async def upload(user: CurrentUser, files: list[UploadFile]):
     return out
 
 
+RAW_VIEW_KINDS = {"docx", "xlsx", "pptx", "pdf"}
+
+
 @router.get("/preview")
 async def preview(user: CurrentUser, path: str = Query(...)):
     p = resolve(user, path)
@@ -128,11 +131,14 @@ async def preview(user: CurrentUser, path: str = Query(...)):
     try:
         if p.stat().st_size > ad.max_bytes:
             raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large to preview")
-        html = await asyncio.to_thread(ad.preview, p)
+        # Office files and PDFs are drawn in the browser from the raw file (see `file`).
+        html = "" if ad.kind in RAW_VIEW_KINDS else await asyncio.to_thread(ad.preview, p)
         version = str(p.stat().st_mtime_ns)
     except FileNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
     out = {"path": path.replace("\\", "/"), "kind": ad.kind, "html": html, "version": version}
+    if ad.kind in RAW_VIEW_KINDS:
+        out["file"] = rel_posix(user["id"], p)  # the file to fetch: the twin when a .md has one
     if ad.kind == "md":
         # The editor renders and edits the source itself (it needs line numbers for selections).
         out["source"] = await asyncio.to_thread(p.read_text, encoding="utf-8", errors="replace")

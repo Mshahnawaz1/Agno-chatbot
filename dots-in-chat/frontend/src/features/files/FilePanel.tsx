@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { ArrowLeft, CircleAlert, Download, FileX, X } from 'lucide-react'
 import * as api from '@/lib/api'
 import { ApiError } from '@/lib/api'
@@ -89,6 +89,8 @@ function PdfView({ path }: { path: string }) {
   return <iframe title={`Preview of ${fileName(path)}`} src={state.url} className="block size-full border-0 bg-white" />
 }
 
+const OfficeView = lazy(() => import('./OfficeView'))
+
 function PanelBody({ path }: { path: string }) {
   const { rev } = useFilePanelContext()
   const q = useFilePreview(path, rev)
@@ -122,7 +124,15 @@ function PanelBody({ path }: { path: string }) {
   if (q.data.kind === 'md' && q.data.source !== undefined) {
     return <MdView key={path} path={path} source={q.data.source} version={q.data.version} />
   }
-  if (q.data.kind === 'pdf') return <PdfView key={`${path}:${q.data.version}`} path={path} />
+  const file = q.data.file ?? path
+  if (q.data.kind === 'pdf') return <PdfView key={`${file}:${q.data.version}`} path={file} />
+  if (q.data.kind === 'docx' || q.data.kind === 'xlsx' || q.data.kind === 'pptx') {
+    return (
+      <Suspense fallback={<div className="flex h-full items-center justify-center gap-2 text-sm text-fg-muted"><Spinner label="Loading viewer" /> Loading viewer…</div>}>
+        <OfficeView key={`${file}:${q.data.version}`} path={file} />
+      </Suspense>
+    )
+  }
   // html: the server's full document (CSP already injected), shown as is; docx/md: paper wrapper.
   const doc = q.data.kind === 'html' ? q.data.html : pageDoc(q.data.html)
   return (

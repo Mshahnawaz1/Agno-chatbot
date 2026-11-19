@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 KB_SOURCE_DIR = APP_ROOT / "data"  # where ingestion.py reads the documents it indexes
 SOURCES_DIR = "sources"  # in the user's workspace: copies of the knowledge files cards open
-MAX_CARDS = 3
-SNIPPET_CHARS = 240
+MAX_CARDS = 6  # passages; the frontend groups them per file
+SNIPPET_CHARS = 160
 MIN_SHARED_PHRASES = 3  # a search that found nothing relevant must not look like evidence
 PHRASE_WORDS = 3  # consecutive words a reply must repeat from a chunk to count as drawing on it
 
